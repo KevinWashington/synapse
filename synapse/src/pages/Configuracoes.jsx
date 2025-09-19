@@ -41,22 +41,6 @@ function Configuracoes() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium text-foreground">
-                  Notificações
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Receber notificações do sistema
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                className="h-4 w-4 text-primary"
-                defaultChecked
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium text-foreground">
                   Tema Escuro
                 </h3>
                 <p className="text-sm text-muted-foreground">
@@ -227,16 +211,6 @@ function Configuracoes() {
               <strong>Provedor ativo:</strong>{" "}
               {aiProvider === "gemini" ? "Google Gemini" : "Ollama (Local)"}
             </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-lg shadow border p-6">
-          <h2 className="text-xl font-semibold text-card-foreground mb-4">
-            Segurança
-          </h2>
-          <div className="space-y-4">
-            <Button>Alterar Senha</Button>
-            <Button variant="secondary">Configurar 2FA</Button>
           </div>
         </div>
       </div>

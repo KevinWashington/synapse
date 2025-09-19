@@ -26,7 +26,6 @@ function Menu({ isMenuOpen, setIsMenuOpen }) {
   const menuItems = [
     { path: "/", label: "Dashboard", icon: Home },
     { path: "/projetos", label: "Projetos", icon: Folder },
-    { path: "/perfil", label: "Perfil", icon: User },
     { path: "/configuracoes", label: "Configurações", icon: Settings },
   ];
 

@@ -6,7 +6,6 @@ import ProjetoDetalhes from "./pages/ProjetoDetalhes";
 import ArtigoDetalhes from "./pages/ArtigoDetalhes";
 import GrafoProject from "./pages/GrafoProject";
 import Layout from "./pages/Layout";
-import Perfil from "./pages/Perfil";
 import Configuracoes from "./pages/Configuracoes";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AuthProvider from "./context/authContext.jsx";
@@ -41,7 +40,6 @@ function App() {
               element={<ArtigoDetalhes />}
             />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="perfil" element={<Perfil />} />
             <Route path="configuracoes" element={<Configuracoes />} />
           </Route>
 

@@ -32,7 +32,7 @@ function EditorNotas({ valorInicial = "", onSalvar }) {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 border">
+    <div className="flex flex-col h-full p-4 border bg-muted/50 rounded-xl">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-xl font-semibold ">Notas</h2>
         <Button onClick={handleSalvar} variant="default">
@@ -40,9 +40,7 @@ function EditorNotas({ valorInicial = "", onSalvar }) {
         </Button>
       </div>
 
-      <Separator className="mb-4" />
-
-      <div className="flex flex-1 bg-white rounded-md border overflow-hidden shadow-inner min-h-0">
+      <div className="flex flex-1 rounded-md border overflow-hidden shadow-inner min-h-0">
         <div
           ref={linhasRef}
           className="border-r py-2 overflow-hidden select-none"

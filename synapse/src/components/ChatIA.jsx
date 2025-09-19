@@ -172,7 +172,7 @@ const ChatIA = ({ artigo, onAdicionarNota, pdfData }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white p-4 border">
+    <div className="flex flex-col h-full p-4 border bg-muted/50 rounded-xl">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-lg font-semibold mb-2">Assistente</h2>
       </div>
@@ -191,8 +191,8 @@ const ChatIA = ({ artigo, onAdicionarNota, pdfData }) => {
             <div
               className={`rounded-xl relative px-4 py-2 max-w-[80%] whitespace-pre-wrap shadow-sm ${
                 msg.role === "user"
-                  ? "bg-black text-white rounded-br-none"
-                  : "bg-white text-black rounded-bl-none border hover:pr-9 transition-all duration-200 group"
+                  ? "bg-background rounded-br-none"
+                  : "bg-background rounded-bl-none border hover:pr-9 transition-all duration-200 group"
               }`}
             >
               <p className="text-sm">
@@ -234,7 +234,7 @@ const ChatIA = ({ artigo, onAdicionarNota, pdfData }) => {
             value={input}
             onChange={handleInputChange}
             placeholder="Faça uma pergunta sobre pesquisa acadêmica..."
-            className="resize-none max-h-40"
+            className="resize-none max-h-20"
             rows={1}
             disabled={isLoading}
             onKeyDown={(e) => {
