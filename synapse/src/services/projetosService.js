@@ -55,7 +55,46 @@ class ProjectService {
         throw new Error("ID do projeto é obrigatório");
       }
 
-      return await apiService.put(`${this.endpoint}/${id}`, projectData);
+      // Filtrar apenas os campos que devem ser atualizados no projeto
+      const {
+        title,
+        objetivo,
+        status,
+        picoc,
+        researchQuestions,
+        keywords,
+        searchStrings,
+        criteriosInclusao,
+        criteriosExclusao,
+        // Excluir campos que não devem ser enviados
+        articles: _articles,
+        stats: _stats,
+        _id: _projectId,
+        owner: _owner,
+        createdAt: _createdAt,
+        updatedAt: _updatedAt,
+        ..._otherFields
+      } = projectData;
+
+      const updateData = {
+        title,
+        objetivo,
+        status,
+        picoc,
+        researchQuestions,
+        keywords,
+        searchStrings,
+        criteriosInclusao,
+        criteriosExclusao,
+      };
+
+      Object.keys(updateData).forEach((key) => {
+        if (updateData[key] === undefined || updateData[key] === null) {
+          delete updateData[key];
+        }
+      });
+
+      return await apiService.put(`${this.endpoint}/${id}`, updateData);
     } catch (error) {
       console.error(`Erro ao atualizar projeto ${id}:`, error);
       throw error;

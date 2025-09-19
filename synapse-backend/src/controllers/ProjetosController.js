@@ -133,6 +133,7 @@ export const createProject = async (req, res) => {
       searchStrings,
       criteriosInclusao,
       criteriosExclusao,
+      aiConfig, // Capturar aiConfig mas não usar no modelo
     } = req.body;
     const userId = req.user._id;
 
@@ -188,6 +189,7 @@ export const updateProject = async (req, res) => {
       searchStrings,
       criteriosInclusao,
       criteriosExclusao,
+      aiConfig, 
     } = req.body;
     const userId = req.user._id;
 
@@ -235,6 +237,11 @@ export const updateProject = async (req, res) => {
     });
   } catch (error) {
     console.error("Erro ao atualizar projeto:", error);
+    console.error("Detalhes do erro:", {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    });
 
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors).map((err) => err.message);
