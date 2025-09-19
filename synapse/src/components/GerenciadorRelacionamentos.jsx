@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Input } from "./ui/input";
 import { articleService } from "../services/artigosService";
+import RecomendacoesIA from "./RecomendacoesIA";
 
 function GerenciadorRelacionamentos({
   projetoId,
@@ -149,15 +150,24 @@ function GerenciadorRelacionamentos({
   }
 
   return (
-    <Card className="p-4">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 px-0">
-        <CardTitle className="flex items-center gap-2">
-          <LinkIcon className="h-5 w-5" />
-          Artigos Relacionados
-          {relacionamentos.length > 0 && (
-            <Badge variant="secondary">{relacionamentos.length}</Badge>
-          )}
-        </CardTitle>
+    <div className="space-y-6">
+      {/* Componente de Recomendações IA */}
+      <RecomendacoesIA
+        projetoId={projetoId}
+        artigoId={artigoId}
+        onRelationshipsChange={onRelationshipsChange}
+      />
+
+      {/* Componente original de relacionamentos */}
+      <Card className="p-4">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 px-0">
+          <CardTitle className="flex items-center gap-2">
+            <LinkIcon className="h-5 w-5" />
+            Artigos Relacionados
+            {relacionamentos.length > 0 && (
+              <Badge variant="secondary">{relacionamentos.length}</Badge>
+            )}
+          </CardTitle>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -302,6 +312,7 @@ function GerenciadorRelacionamentos({
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }
 

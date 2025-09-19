@@ -9,6 +9,7 @@ import fetch from "node-fetch";
 // Importar rotas
 import projectRoutes from "./src/routes/projetos.js";
 import authRoutes from "./src/routes/auth.js";
+import recommendationsRoutes from "./src/routes/recommendations.js";
 import { authenticateToken } from "./src/middleware/auth.js";
 
 dotenv.config();
@@ -121,6 +122,9 @@ app.use("/api/auth", authRoutes);
 
 // Rotas
 app.use("/api/projetos", projectRoutes);
+
+// Rotas de recomendações
+app.use("/api", recommendationsRoutes);
 
 // Rota de estatísticas
 app.get("/api/stats", authenticateToken, async (req, res) => {

@@ -204,7 +204,7 @@ function GrafoRelacionamentos({
     : className;
 
   return (
-    <Card className={containerClass}>
+    <Card className={containerClass + "flex-1"}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="flex items-center gap-2">
           <NetworkIcon className="h-5 w-5" />
@@ -252,8 +252,8 @@ function GrafoRelacionamentos({
             <ForceGraph2D
               ref={graphRef}
               graphData={graphData}
-              width={isFullscreen ? window.innerWidth : 800}
-              height={isFullscreen ? window.innerHeight - 120 : 500}
+              width={isFullscreen ? window.innerWidth : 1400}
+              height={isFullscreen ? window.innerHeight - 120 : 800}
               nodeLabel={(node) => `
                 <div style="padding: 8px; border-radius: 4px; max-width: 200px;">
                   <strong >${node.title}</strong><br/>
