@@ -505,6 +505,16 @@ export const deleteArticle = async (req, res) => {
       });
     }
 
+    // Remover relacionamentos bidirecionais antes de deletar
+    const articleToDelete = await Article.findById(id);
+    if (articleToDelete && articleToDelete.relatedArticles.length > 0) {
+      // Remover referências deste artigo dos outros artigos
+      await Article.updateMany(
+        { _id: { $in: articleToDelete.relatedArticles } },
+        { $pull: { relatedArticles: id } }
+      );
+    }
+
     await Article.findByIdAndDelete(id);
 
     res.json({
@@ -563,10 +573,17 @@ export const addArticleRelationship = async (req, res) => {
       });
     }
 
-    // Adicionar relacionamento se não existir
+    // Adicionar relacionamento bidirecional se não existir
     if (!article.relatedArticles.includes(relatedArticleId)) {
+      // Adicionar relacionamento no artigo atual
       article.relatedArticles.push(relatedArticleId);
       await article.save();
+
+      // Adicionar relacionamento no artigo relacionado (bidirecional)
+      if (!relatedArticle.relatedArticles.includes(id)) {
+        relatedArticle.relatedArticles.push(id);
+        await relatedArticle.save();
+      }
     }
 
     res.json({
@@ -611,11 +628,20 @@ export const removeArticleRelationship = async (req, res) => {
       });
     }
 
-    // Remover relacionamento
+    // Remover relacionamento bidirecional
     article.relatedArticles = article.relatedArticles.filter(
       (relatedArticleId) => relatedArticleId.toString() !== relatedId
     );
     await article.save();
+
+    // Remover relacionamento do artigo relacionado também
+    const relatedArticle = await Article.findById(relatedId);
+    if (relatedArticle) {
+      relatedArticle.relatedArticles = relatedArticle.relatedArticles.filter(
+        (relatedArticleId) => relatedArticleId.toString() !== id
+      );
+      await relatedArticle.save();
+    }
 
     res.json({
       success: true,
