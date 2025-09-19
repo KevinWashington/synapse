@@ -86,10 +86,33 @@ class ApiService {
   }
 
   async post(endpoint, data) {
+    // Adicionar configurações de IA se disponíveis
+    const aiConfig = this.getAIConfig();
+    const requestData = aiConfig ? { ...data, aiConfig } : data;
+
     return this.request(endpoint, {
       method: "POST",
-      body: data,
+      body: requestData,
     });
+  }
+
+  getAIConfig() {
+    try {
+      const aiProvider = localStorage.getItem("aiProvider");
+      const ollamaConfig = localStorage.getItem("ollamaConfig");
+      const geminiConfig = localStorage.getItem("geminiConfig");
+
+      if (!aiProvider) return null;
+
+      return {
+        provider: aiProvider,
+        ollama: ollamaConfig ? JSON.parse(ollamaConfig) : null,
+        gemini: geminiConfig ? JSON.parse(geminiConfig) : null,
+      };
+    } catch (error) {
+      console.error("Erro ao obter configurações de IA:", error);
+      return null;
+    }
   }
 
   async postFormData(endpoint, formData) {

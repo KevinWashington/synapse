@@ -10,38 +10,44 @@ import Perfil from "./pages/Perfil";
 import Configuracoes from "./pages/Configuracoes";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AuthProvider from "./context/authContext.jsx";
+import { AIConfigProvider } from "./context/aiConfigContext.jsx";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 function App() {
   return (
     <AuthProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      <AIConfigProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="projetos" element={<Projetos />} />
-          <Route path="projetos/:id" element={<ProjetoDetalhes />} />
-          <Route path="projetos/:projetoId/grafo" element={<GrafoProject />} />
           <Route
-            path="projetos/:projetoId/artigos/:artigoId"
-            element={<ArtigoDetalhes />}
-          />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="perfil" element={<Perfil />} />
-          <Route path="configuracoes" element={<Configuracoes />} />
-        </Route>
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Dashboard />} />
+            <Route path="projetos" element={<Projetos />} />
+            <Route path="projetos/:id" element={<ProjetoDetalhes />} />
+            <Route
+              path="projetos/:projetoId/grafo"
+              element={<GrafoProject />}
+            />
+            <Route
+              path="projetos/:projetoId/artigos/:artigoId"
+              element={<ArtigoDetalhes />}
+            />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="perfil" element={<Perfil />} />
+            <Route path="configuracoes" element={<Configuracoes />} />
+          </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AIConfigProvider>
     </AuthProvider>
   );
 }

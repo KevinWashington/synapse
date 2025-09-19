@@ -4,7 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import fetch from "node-fetch"; // Adicione este import no topo
+import fetch from "node-fetch";
 
 // Importar rotas
 import projectRoutes from "./src/routes/projetos.js";
@@ -16,8 +16,54 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Inicializar Google Gemini
-const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+// Função para obter o modelo de IA baseado na configuração
+const getAIModel = (aiConfig) => {
+  if (!aiConfig || !aiConfig.provider) {
+    const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+    return genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  }
+
+  if (aiConfig.provider === "gemini") {
+    const apiKey = aiConfig.gemini?.apiKey || process.env.API_KEY;
+    const model = aiConfig.gemini?.model || "gemini-2.0-flash";
+    const genAI = new GoogleGenerativeAI(apiKey);
+    return genAI.getGenerativeModel({ model });
+  }
+
+  return null;
+};
+
+const generateWithOllama = async (prompt, ollamaConfig) => {
+  const url = ollamaConfig?.url || "http://localhost:11434";
+  const model = ollamaConfig?.model || "phi3";
+
+  try {
+    const response = await fetch(`${url}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Ollama retornou status ${response.status}: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.response) {
+      throw new Error("Ollama não retornou resposta válida");
+    }
+    return data.response;
+  } catch (error) {
+    throw new Error(`Falha na comunicação com Ollama: ${error.message}`);
+  }
+};
 
 // Middlewares
 app.use(cors());
@@ -144,7 +190,6 @@ app.get("/api/stats", authenticateToken, async (req, res) => {
       });
     }
 
-    // Calcular percentual de progresso
     const progressPercentage =
       totalArticles > 0
         ? Math.round((totalArticlesReviewed / totalArticles) * 100)
@@ -175,7 +220,7 @@ app.post(
   "/api/generate-research-questions",
   authenticateToken,
   async (req, res) => {
-    const { picocData, projeto } = req.body;
+    const { picocData, projeto, aiConfig } = req.body;
 
     try {
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -188,7 +233,6 @@ app.post(
         "Content-Type, Authorization"
       );
 
-      // Prompt específico para gerar research questions baseadas no PICOC
       const systemMessage = `Você é um especialista em metodologia de pesquisa acadêmica. 
 Sua tarefa é gerar perguntas de pesquisa específicas e bem estruturadas baseadas nos dados do framework PICOC fornecidos.
 
@@ -209,21 +253,17 @@ Instruções:
 
 Gere as perguntas agora:`;
 
-      const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-      const ollamaResponse = await fetch(`${ollamaUrl}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "phi3",
-          prompt: systemMessage,
-          stream: false,
-        }),
-      });
+      let text;
+      if (aiConfig?.provider === "ollama") {
+        text = await generateWithOllama(systemMessage, aiConfig.ollama);
+      } else {
+        const model = getAIModel(aiConfig);
+        const result = await model.generateContent(systemMessage);
+        const response = await result.response;
+        text = response.text();
+      }
 
-      const data = await ollamaResponse.json();
-
-      // Processar resposta para extrair perguntas individuais
-      const questions = data.response
+      const questions = text
         .split("\n")
         .filter(
           (line) => line.trim() && (line.includes("?") || line.match(/^\d+\./))
@@ -233,9 +273,11 @@ Gere as perguntas agora:`;
 
       res.json({ researchQuestions: questions });
     } catch (error) {
-      console.error("Erro ao gerar research questions:", error);
       if (!res.headersSent) {
-        res.status(500).json({ error: "Falha na geração de perguntas" });
+        res.status(500).json({
+          error: "Falha na geração de perguntas",
+          details: error.message,
+        });
       }
     }
   }
@@ -246,7 +288,7 @@ app.post(
   "/api/generate-search-strings",
   authenticateToken,
   async (req, res) => {
-    const { researchQuestions, picocData, projeto } = req.body;
+    const { researchQuestions, picocData, projeto, aiConfig } = req.body;
 
     try {
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -259,7 +301,6 @@ app.post(
         "Content-Type, Authorization"
       );
 
-      // Prompt específico para gerar strings de busca baseadas nas research questions
       const systemMessage = `Você é um especialista em estratégias de busca bibliográfica para revisões sistemáticas. 
 Sua tarefa é gerar strings de busca eficazes baseadas nas perguntas de pesquisa e dados do PICOC fornecidos.
 
@@ -284,21 +325,17 @@ Instruções:
 
 Gere as strings de busca agora:`;
 
-      const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-      const ollamaResponse = await fetch(`${ollamaUrl}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "phi3",
-          prompt: systemMessage,
-          stream: false,
-        }),
-      });
+      let text;
+      if (aiConfig?.provider === "ollama") {
+        text = await generateWithOllama(systemMessage, aiConfig.ollama);
+      } else {
+        const model = getAIModel(aiConfig);
+        const result = await model.generateContent(systemMessage);
+        const response = await result.response;
+        text = response.text();
+      }
 
-      const data = await ollamaResponse.json();
-
-      // Processar resposta para extrair strings individuais
-      const searchStrings = data.response
+      const searchStrings = text
         .split("\n")
         .filter((line) => line.trim() && line.match(/^\d+\./))
         .map((s) => s.replace(/^\d+\.\s*/, "").trim())
@@ -316,7 +353,7 @@ Gere as strings de busca agora:`;
 
 // Rota de chat
 app.post("/api/chat", authenticateToken, async (req, res) => {
-  const { messages, artigo } = req.body;
+  const { messages, artigo, aiConfig } = req.body;
 
   try {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -408,26 +445,23 @@ app.post("/api/chat", authenticateToken, async (req, res) => {
       userInput +
       "\n\n[LEMBRE-SE: Resposta em no máximo 2 parágrafos pequenos. Seja extremamente conciso.]";
 
-    const ollamaUrl = process.env.OLLAMA_URL || "http://localhost:11434";
-    const ollamaResponse = await fetch(`${ollamaUrl}/api/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "phi3",
-        prompt: finalPrompt,
-        stream: false,
-      }),
-    });
+    let text;
+    if (aiConfig?.provider === "ollama") {
+      text = await generateWithOllama(finalPrompt, aiConfig.ollama);
+    } else {
+      const model = getAIModel(aiConfig);
+      const result = await model.generateContent(finalPrompt);
+      const response = await result.response;
+      text = response.text();
+    }
 
-    const data = await ollamaResponse.json();
-
-    res.json({ content: data.response });
+    res.json({ content: text });
   } catch (error) {
     console.error("Erro no chat:", error);
     if (!res.headersSent) {
       res
         .status(500)
-        .json({ error: "Falha na comunicação com o modelo local" });
+        .json({ error: "Falha na comunicação com o modelo de IA" });
     }
   }
 });
