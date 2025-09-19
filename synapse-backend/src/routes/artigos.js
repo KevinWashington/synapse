@@ -24,6 +24,23 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024, // Limite de 10MB
   },
   fileFilter: (req, file, cb) => {
+    // Se há arquivo, deve ser PDF
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Apenas arquivos PDF são permitidos"), false);
+    }
+  },
+});
+
+// Upload opcional para criação de artigos (PDF não obrigatório)
+const uploadOptional = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // Limite de 10MB
+  },
+  fileFilter: (req, file, cb) => {
+    // Se há arquivo, deve ser PDF
     if (file.mimetype === "application/pdf") {
       cb(null, true);
     } else {
@@ -46,8 +63,8 @@ router.use(authenticateToken);
 // Rotas CRUD de artigos
 router.get("/", getArticlesByProject); // GET /api/projetos/:projetoId/artigos
 router.get("/:id", getArticleById); // GET /api/projetos/:projetoId/artigos/:id
-router.post("/", upload.single("pdf"), createArticle); // POST /api/projetos/:projetoId/artigos
-router.put("/:id", updateArticle); // PUT /api/projetos/:projetoId/artigos/:id
+router.post("/", uploadOptional.any(), createArticle); // POST /api/projetos/:projetoId/artigos
+router.put("/:id", upload.single("pdf"), updateArticle); // PUT /api/projetos/:projetoId/artigos/:id
 router.patch("/:id/status", updateArticleStatus); // PATCH /api/projetos/:projetoId/artigos/:id/status
 router.patch("/:id/notes", updateArticleNotes); // PATCH /api/projetos/:projetoId/artigos/:id/notes
 router.delete("/:id", deleteArticle); // DELETE /api/projetos/:projetoId/artigos/:id

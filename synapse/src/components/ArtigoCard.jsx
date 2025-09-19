@@ -11,9 +11,20 @@ import {
   CheckIcon,
   ClockIcon,
   XIcon,
+  EditIcon,
+  TrashIcon,
+  EyeIcon,
+  UploadIcon,
 } from "lucide-react";
 
-function ArtigoCard({ artigo, onClick, onChangeStatus, onDelete }) {
+function ArtigoCard({
+  artigo,
+  onClick,
+  onChangeStatus,
+  onDelete,
+  onEdit,
+  onUploadPDF,
+}) {
   const getStatusIndicator = (status) => {
     switch (status) {
       case "analisado":
@@ -55,12 +66,25 @@ function ArtigoCard({ artigo, onClick, onChangeStatus, onDelete }) {
     >
       {/* Capa do Artigo */}
       <div className="relative aspect-[3/4] bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-        <FileIcon className="w-16 h-16 text-blue-500" />
+        <FileIcon
+          className={`w-16 h-16 ${
+            artigo.pdfFile ? "text-blue-500" : "text-gray-400"
+          }`}
+        />
 
         {/* Status */}
         <div className="absolute top-2 left-2 z-10">
           {getStatusIndicator(artigo.status)}
         </div>
+
+        {/* Indicador de PDF */}
+        {!artigo.pdfFile && (
+          <div className="absolute bottom-2 left-2 z-10">
+            <span className="text-xs text-amber-600 bg-amber-100 px-2 py-1 rounded-full">
+              Sem PDF
+            </span>
+          </div>
+        )}
 
         {/* Menu de opções */}
         <div className="absolute top-2 right-2 z-10">
@@ -76,6 +100,43 @@ function ArtigoCard({ artigo, onClick, onChangeStatus, onDelete }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onClick) onClick(artigo);
+                }}
+              >
+                <EyeIcon className="mr-2 h-4 w-4" />
+                Revisar
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onEdit) onEdit(artigo);
+                }}
+              >
+                <EditIcon className="mr-2 h-4 w-4" />
+                Editar
+              </DropdownMenuItem>
+
+              {!artigo.pdfFile && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onUploadPDF) onUploadPDF(artigo);
+                  }}
+                >
+                  <UploadIcon className="mr-2 h-4 w-4" />
+                  Upload PDF
+                </DropdownMenuItem>
+              )}
+
+              {/* Submenu de Status */}
+              <DropdownMenuItem>
+                <span className="mr-2">Status:</span>
+              </DropdownMenuItem>
+
               {artigo.status !== "analisado" && (
                 <DropdownMenuItem
                   onClick={(e) => {
@@ -119,7 +180,8 @@ function ArtigoCard({ artigo, onClick, onChangeStatus, onDelete }) {
                 }}
                 className="text-red-600"
               >
-                Deletar artigo
+                <TrashIcon className="mr-2 h-4 w-4" />
+                Deletar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

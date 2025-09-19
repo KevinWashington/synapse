@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import {
@@ -9,121 +9,75 @@ import {
   SelectValue,
 } from "./ui/select";
 import ArtigoCard from "./ArtigoCard";
+import ArtigosTabela from "./ArtigosTabela";
 import NovoArtigoModal from "./NovoArtigoModal";
+import ImportarBibTeXModal from "./ImportarBibTeXModal";
+import EditarArtigoModal from "./EditarArtigoModal";
+import UploadPDFModal from "./UploadPDFModal";
 import {
   PlusIcon,
   SearchIcon,
   FilterIcon,
   FileTextIcon,
   LoaderIcon,
+  TableIcon,
+  GridIcon,
+  UploadIcon,
 } from "lucide-react";
-import { articleService } from "../services/artigosService.js";
+import { useArtigos } from "../hooks/useArtigos.js";
 
 function ArtigosProjeto({ projeto, onNavigate }) {
-  const [loadingArtigos, setLoadingArtigos] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("todos");
-  const [artigos, setArtigos] = useState([]);
+  const [viewMode, setViewMode] = useState("tabela"); // "tabela" ou "cards"
   const [showNovoArtigoModal, setShowNovoArtigoModal] = useState(false);
-  const [pagination, setPagination] = useState({});
+  const [showImportarModal, setShowImportarModal] = useState(false);
+  const [showEditarModal, setShowEditarModal] = useState(false);
+  const [showUploadPDFModal, setShowUploadPDFModal] = useState(false);
+  const [artigoParaEditar, setArtigoParaEditar] = useState(null);
+  const [artigoParaUploadPDF, setArtigoParaUploadPDF] = useState(null);
 
-  const fetchArtigos = async (filters = {}) => {
-    try {
-      setLoadingArtigos(true);
-
-      const params = {
-        page: 1,
-        limit: 50,
-        ...filters,
-      };
-
-      if (searchTerm) params.search = searchTerm;
-      if (filterStatus !== "todos") params.status = filterStatus;
-
-      const response = await articleService.getArticlesByProject(
-        projeto._id,
-        params
-      );
-
-      setArtigos(response.articles || []);
-      setPagination(response.pagination || {});
-    } catch (err) {
-      console.error("Erro ao carregar artigos:", err);
-    } finally {
-      setLoadingArtigos(false);
-    }
-  };
-
-  useEffect(() => {
-    if (projeto) {
-      fetchArtigos();
-    }
-  }, [projeto]);
-
-  useEffect(() => {
-    if (projeto) {
-      const timeoutId = setTimeout(() => {
-        fetchArtigos();
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [searchTerm, filterStatus]);
-
-  const handleArtigoClick = (artigo) => {
-    onNavigate(`/projetos/${projeto._id}/artigos/${artigo._id}`);
-  };
+  const {
+    loadingArtigos,
+    searchTerm,
+    setSearchTerm,
+    filterStatus,
+    setFilterStatus,
+    artigos,
+    pagination,
+    handleAtualizarStatusArtigo,
+    handleDeletarArtigo,
+    handleNovoArtigoSuccess,
+    handleImportarSuccess,
+    handleEditarSuccess,
+    handleUploadPDFSuccess,
+    statusList,
+  } = useArtigos(projeto);
 
   const handleAdicionarArtigo = () => {
     setShowNovoArtigoModal(true);
   };
 
-  const handleNovoArtigoSuccess = () => {
-    fetchArtigos();
+  const handleImportarBibTeX = () => {
+    setShowImportarModal(true);
   };
 
-  const handleAtualizarStatusArtigo = async (artigo, novoStatus) => {
-    try {
-      await articleService.updateArticleStatus(
-        projeto._id,
-        artigo._id,
-        novoStatus
-      );
-      fetchArtigos();
-      alert(`Status do artigo atualizado para ${novoStatus}`);
-    } catch (err) {
-      console.error("Erro ao atualizar status do artigo:", err);
-      alert("Erro ao atualizar status: " + err.message);
-    }
+  const handleEditarArtigo = (artigo) => {
+    setArtigoParaEditar(artigo);
+    setShowEditarModal(true);
   };
 
-  const handleDeletarArtigo = async (artigo) => {
-    if (
-      !confirm(`Tem certeza que deseja deletar o artigo "${artigo.title}"?`)
-    ) {
-      return;
-    }
-
-    try {
-      await articleService.deleteArticle(projeto._id, artigo._id);
-      alert("Artigo deletado com sucesso!");
-      fetchArtigos();
-    } catch (err) {
-      console.error("Erro ao deletar artigo:", err);
-      alert("Erro ao deletar artigo: " + err.message);
+  const handleRevisarArtigo = (artigo) => {
+    if (!artigo.pdfFile) {
+      setArtigoParaUploadPDF(artigo);
+      setShowUploadPDFModal(true);
+    } else {
+      // Se tem PDF, navegar para detalhes
+      onNavigate(`/projetos/${projeto._id}/artigos/${artigo._id}`);
     }
   };
-
-  const statusList = [
-    { value: "todos", label: "Todos" },
-    { value: "pendente", label: "Pendentes" },
-    { value: "analisado", label: "Analisados" },
-    { value: "excluido", label: "Excluídos" },
-  ];
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho */}
+      {/* Cabeçalho com seletor de visualização */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">
@@ -136,89 +90,157 @@ function ArtigosProjeto({ projeto, onNavigate }) {
             )}
           </h2>
         </div>
-      </div>
 
-      {/* Barra de pesquisa e filtros */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            type="text"
-            placeholder="Pesquisar artigos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <FilterIcon className="h-4 w-4 text-muted-foreground" />
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Filtrar por..." />
-            </SelectTrigger>
-            <SelectContent>
-              {statusList.map((status) => (
-                <SelectItem key={status.value} value={status.value}>
-                  {status.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button
-          className="flex items-center gap-2"
-          onClick={handleAdicionarArtigo}
-        >
-          <PlusIcon className="h-4 w-4" />
-          Adicionar Artigo
-        </Button>
-      </div>
-
-      {/* Loading para artigos */}
-      {loadingArtigos && (
-        <div className="flex justify-center items-center py-8">
-          <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2">Carregando artigos...</span>
-        </div>
-      )}
-
-      {/* Grid de artigos */}
-      {!loadingArtigos && artigos.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4">
-          {artigos.map((artigo) => (
-            <ArtigoCard
-              key={artigo._id}
-              artigo={artigo}
-              onClick={() => handleArtigoClick(artigo)}
-              onChangeStatus={(status) =>
-                handleAtualizarStatusArtigo(artigo, status)
-              }
-              onDelete={() => handleDeletarArtigo(artigo)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Janela vazia */}
-      {!loadingArtigos && artigos.length === 0 && (
-        <div className="text-center py-12">
-          <FileTextIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">
-            Nenhum artigo encontrado
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            {searchTerm || filterStatus !== "todos"
-              ? "Tente ajustar os filtros de pesquisa"
-              : "Comece adicionando artigos a este projeto"}
-          </p>
+        {/* Seletor de visualização */}
+        <div className="flex items-center gap-1 border rounded-lg p-1">
           <Button
-            className="flex items-center gap-2 mx-auto"
-            onClick={handleAdicionarArtigo}
+            variant={viewMode === "tabela" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("tabela")}
+            className="h-8 px-3"
           >
-            <PlusIcon className="h-4 w-4" />
-            Adicionar {artigos.length === 0 ? "Primeiro " : ""}Artigo
+            <TableIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "cards" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("cards")}
+            className="h-8 px-3"
+          >
+            <GridIcon className="h-4 w-4" />
           </Button>
         </div>
+      </div>
+
+      {/* Renderizar visualização baseada no modo selecionado */}
+      {viewMode === "tabela" ? (
+        <ArtigosTabela
+          projeto={projeto}
+          onNavigate={onNavigate}
+          artigos={artigos}
+          loadingArtigos={loadingArtigos}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          statusList={statusList}
+          handleAtualizarStatusArtigo={handleAtualizarStatusArtigo}
+          handleDeletarArtigo={handleDeletarArtigo}
+          handleRevisarArtigo={handleRevisarArtigo}
+          handleEditarArtigo={handleEditarArtigo}
+          handleImportarBibTeX={handleImportarBibTeX}
+          handleAdicionarArtigo={handleAdicionarArtigo}
+        />
+      ) : (
+        <>
+          {/* Barra de pesquisa e filtros para visualização em cards */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="Pesquisar artigos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <FilterIcon className="h-4 w-4 text-muted-foreground" />
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Filtrar por..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusList.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={handleImportarBibTeX}
+              >
+                <UploadIcon className="h-4 w-4" />
+                Importar BibTeX
+              </Button>
+              <Button
+                className="flex items-center gap-2"
+                onClick={handleAdicionarArtigo}
+              >
+                <PlusIcon className="h-4 w-4" />
+                Adicionar Artigo
+              </Button>
+            </div>
+          </div>
+
+          {/* Loading para artigos */}
+          {loadingArtigos && (
+            <div className="flex justify-center items-center py-8">
+              <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2">Carregando artigos...</span>
+            </div>
+          )}
+
+          {/* Grid de artigos */}
+          {!loadingArtigos && artigos.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4">
+              {artigos.map((artigo) => (
+                <ArtigoCard
+                  key={artigo._id}
+                  artigo={artigo}
+                  onClick={() => handleRevisarArtigo(artigo)}
+                  onChangeStatus={(status) =>
+                    handleAtualizarStatusArtigo(artigo, status)
+                  }
+                  onDelete={() => handleDeletarArtigo(artigo)}
+                  onEdit={() => handleEditarArtigo(artigo)}
+                  onUploadPDF={() => {
+                    setArtigoParaUploadPDF(artigo);
+                    setShowUploadPDFModal(true);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Janela vazia */}
+          {!loadingArtigos && artigos.length === 0 && (
+            <div className="text-center py-12">
+              <FileTextIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
+                Nenhum artigo encontrado
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {searchTerm || filterStatus !== "todos"
+                  ? "Tente ajustar os filtros de pesquisa"
+                  : "Comece adicionando artigos a este projeto"}
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={handleImportarBibTeX}
+                >
+                  <UploadIcon className="h-4 w-4" />
+                  Importar BibTeX
+                </Button>
+                <Button
+                  className="flex items-center gap-2"
+                  onClick={handleAdicionarArtigo}
+                >
+                  <PlusIcon className="h-4 w-4" />
+                  Adicionar {artigos.length === 0 ? "Primeiro " : ""}Artigo
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Modal para adicionar artigo */}
@@ -227,6 +249,38 @@ function ArtigosProjeto({ projeto, onNavigate }) {
         onClose={() => setShowNovoArtigoModal(false)}
         onSuccess={handleNovoArtigoSuccess}
         projectId={projeto._id}
+      />
+
+      {/* Modal para importar BibTeX */}
+      <ImportarBibTeXModal
+        isOpen={showImportarModal}
+        onClose={() => setShowImportarModal(false)}
+        onSuccess={handleImportarSuccess}
+        projectId={projeto._id}
+      />
+
+      {/* Modal para editar artigo */}
+      <EditarArtigoModal
+        isOpen={showEditarModal}
+        onClose={() => {
+          setShowEditarModal(false);
+          setArtigoParaEditar(null);
+        }}
+        onSuccess={handleEditarSuccess}
+        projeto={projeto}
+        artigo={artigoParaEditar}
+      />
+
+      {/* Modal para upload de PDF */}
+      <UploadPDFModal
+        isOpen={showUploadPDFModal}
+        onClose={() => {
+          setShowUploadPDFModal(false);
+          setArtigoParaUploadPDF(null);
+        }}
+        onSuccess={handleUploadPDFSuccess}
+        projeto={projeto}
+        artigo={artigoParaUploadPDF}
       />
     </div>
   );

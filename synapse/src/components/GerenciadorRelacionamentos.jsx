@@ -166,7 +166,7 @@ function GerenciadorRelacionamentos({
               Adicionar
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Adicionar Relacionamento</DialogTitle>
               <DialogDescription>
@@ -197,11 +197,19 @@ function GerenciadorRelacionamentos({
                   artigosDisponiveis.map((artigo) => (
                     <div
                       key={artigo._id}
-                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                      className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 gap-3"
                     >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{artigo.title}</h4>
-                        <p className="text-sm text-muted-foreground truncate">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <h4
+                          className="font-medium line-clamp-2 text-sm leading-tight"
+                          title={artigo.title}
+                        >
+                          {artigo.title}
+                        </h4>
+                        <p
+                          className="text-xs text-muted-foreground line-clamp-1"
+                          title={`${artigo.authors} • ${artigo.year}`}
+                        >
                           {artigo.authors} • {artigo.year}
                         </p>
                         <Badge
@@ -212,7 +220,7 @@ function GerenciadorRelacionamentos({
                               ? "secondary"
                               : "destructive"
                           }
-                          className="text-xs mt-1"
+                          className="text-xs"
                         >
                           {artigo.status}
                         </Badge>
@@ -221,6 +229,7 @@ function GerenciadorRelacionamentos({
                         size="sm"
                         onClick={() => adicionarRelacionamento(artigo._id)}
                         disabled={loadingAdd}
+                        className="flex-shrink-0"
                       >
                         {loadingAdd ? (
                           <LoaderIcon className="h-4 w-4 animate-spin" />
@@ -251,11 +260,19 @@ function GerenciadorRelacionamentos({
             {relacionamentos.map((artigo) => (
               <div
                 key={artigo._id}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 gap-3"
               >
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium truncate">{artigo.title}</h4>
-                  <p className="text-sm text-muted-foreground truncate">
+                <div className="flex-1 min-w-0 space-y-1">
+                  <h4
+                    className="font-medium line-clamp-2 text-sm leading-tight"
+                    title={artigo.title}
+                  >
+                    {artigo.title}
+                  </h4>
+                  <p
+                    className="text-xs text-muted-foreground line-clamp-1"
+                    title={`${artigo.authors} • ${artigo.year}`}
+                  >
                     {artigo.authors} • {artigo.year}
                   </p>
                   <Badge
@@ -266,7 +283,7 @@ function GerenciadorRelacionamentos({
                         ? "secondary"
                         : "destructive"
                     }
-                    className="text-xs mt-1"
+                    className="text-xs"
                   >
                     {artigo.status}
                   </Badge>
@@ -275,7 +292,7 @@ function GerenciadorRelacionamentos({
                   size="sm"
                   variant="ghost"
                   onClick={() => removerRelacionamento(artigo._id)}
-                  className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
                 >
                   <XIcon className="h-4 w-4" />
                 </Button>

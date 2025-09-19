@@ -192,14 +192,24 @@ export const createArticle = async (req, res) => {
       });
     }
 
-    const { title, authors, year, journal, doi, abstract, notas } = req.body;
+    const {
+      title,
+      authors,
+      year,
+      journal,
+      doi,
+      abstract,
+      notas,
+      keywords,
+      pages,
+      volume,
+      number,
+      issn,
+    } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({
-        error: "Arquivo PDF é obrigatório",
-        message: "Você deve enviar um arquivo PDF",
-      });
-    }
+    // PDF é opcional agora - buscar arquivo PDF nos files
+    const pdfFile =
+      req.files && req.files.find((file) => file.fieldname === "pdf");
 
     const article = new Article({
       title,
@@ -209,9 +219,14 @@ export const createArticle = async (req, res) => {
       doi,
       abstract,
       notas: notas || "",
-      pdfFile: req.file.originalname,
-      pdfData: req.file.buffer,
-      pdfContentType: req.file.mimetype,
+      keywords: keywords || "",
+      pages: pages || "",
+      volume: volume || "",
+      number: number || "",
+      issn: issn || "",
+      pdfFile: pdfFile ? pdfFile.originalname : "",
+      pdfData: pdfFile ? pdfFile.buffer : null,
+      pdfContentType: pdfFile ? pdfFile.mimetype : "application/pdf",
       projectId,
       owner: userId,
     });
@@ -230,6 +245,11 @@ export const createArticle = async (req, res) => {
         doi: article.doi,
         abstract: article.abstract,
         notas: article.notas,
+        keywords: article.keywords,
+        pages: article.pages,
+        volume: article.volume,
+        number: article.number,
+        issn: article.issn,
         status: article.status,
         projectId: article.projectId,
         createdAt: article.createdAt,
@@ -282,23 +302,70 @@ export const updateArticle = async (req, res) => {
       });
     }
 
-    const { title, authors, year, journal, doi, abstract, notas } = req.body;
+    // Se for FormData (upload de arquivo), processar campos do FormData
+    if (req.file) {
+      // Atualizar PDF se um arquivo foi enviado
+      article.pdfFile = req.file.originalname;
+      article.pdfData = req.file.buffer;
+      article.pdfContentType = req.file.mimetype;
+    }
 
-    // Atualizar campos
-    if (title) article.title = title;
-    if (authors) article.authors = authors;
-    if (year) article.year = year;
-    if (journal) article.journal = journal;
+    // Processar campos do body (pode ser JSON ou FormData)
+    const {
+      title,
+      authors,
+      year,
+      journal,
+      doi,
+      abstract,
+      notas,
+      keywords,
+      pages,
+      volume,
+      number,
+      issn,
+      status,
+    } = req.body;
+
+    // Atualizar campos se fornecidos
+    if (title !== undefined) article.title = title;
+    if (authors !== undefined) article.authors = authors;
+    if (year !== undefined) article.year = year;
+    if (journal !== undefined) article.journal = journal;
     if (doi !== undefined) article.doi = doi;
     if (abstract !== undefined) article.abstract = abstract;
     if (notas !== undefined) article.notas = notas;
+    if (keywords !== undefined) article.keywords = keywords;
+    if (pages !== undefined) article.pages = pages;
+    if (volume !== undefined) article.volume = volume;
+    if (number !== undefined) article.number = number;
+    if (issn !== undefined) article.issn = issn;
+    if (status !== undefined) article.status = status;
 
     await article.save();
 
     res.json({
       success: true,
       message: "Artigo atualizado com sucesso",
-      article,
+      article: {
+        _id: article._id,
+        title: article.title,
+        authors: article.authors,
+        year: article.year,
+        journal: article.journal,
+        doi: article.doi,
+        abstract: article.abstract,
+        notas: article.notas,
+        keywords: article.keywords,
+        pages: article.pages,
+        volume: article.volume,
+        number: article.number,
+        issn: article.issn,
+        status: article.status,
+        projectId: article.projectId,
+        createdAt: article.createdAt,
+        updatedAt: article.updatedAt,
+      },
     });
   } catch (error) {
     console.error("Erro ao atualizar artigo:", error);

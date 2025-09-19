@@ -74,12 +74,8 @@ class ArtigosService {
       }
 
       // Validação básica
-      if (
-        !formData.get("title") ||
-        !formData.get("authors") ||
-        !formData.get("pdf")
-      ) {
-        throw new Error("Título, autores e PDF são obrigatórios");
+      if (!formData.get("title") || !formData.get("authors")) {
+        throw new Error("Título e autores são obrigatórios");
       }
 
       // Usar apiService para upload de arquivo
@@ -93,16 +89,24 @@ class ArtigosService {
     }
   }
 
-  async updateArticle(projectId, articleId, formData) {
+  async updateArticle(projectId, articleId, updateData) {
     try {
       if (!projectId || !articleId) {
         throw new Error("IDs do projeto e artigo são obrigatórios");
       }
 
-      return await apiService.putFormData(
-        `${this.getProjectEndpoint(projectId)}/${articleId}`,
-        formData
-      );
+      // Se updateData contém FormData, usar putFormData, senão usar put
+      if (updateData instanceof FormData) {
+        return await apiService.putFormData(
+          `${this.getProjectEndpoint(projectId)}/${articleId}`,
+          updateData
+        );
+      } else {
+        return await apiService.put(
+          `${this.getProjectEndpoint(projectId)}/${articleId}`,
+          updateData
+        );
+      }
     } catch (error) {
       console.error(`Erro ao atualizar artigo ${articleId}:`, error);
       throw error;

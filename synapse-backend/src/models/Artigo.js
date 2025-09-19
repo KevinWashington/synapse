@@ -41,6 +41,31 @@ const articleSchema = new mongoose.Schema(
       trim: true,
       maxLength: [3000, "Resumo não pode ter mais que 3000 caracteres"],
     },
+    keywords: {
+      type: String,
+      trim: true,
+      maxLength: [500, "Palavras-chave não podem ter mais que 500 caracteres"],
+    },
+    pages: {
+      type: String,
+      trim: true,
+      maxLength: [20, "Páginas não podem ter mais que 20 caracteres"],
+    },
+    volume: {
+      type: String,
+      trim: true,
+      maxLength: [20, "Volume não pode ter mais que 20 caracteres"],
+    },
+    number: {
+      type: String,
+      trim: true,
+      maxLength: [20, "Número não pode ter mais que 20 caracteres"],
+    },
+    issn: {
+      type: String,
+      trim: true,
+      maxLength: [20, "ISSN não pode ter mais que 20 caracteres"],
+    },
     status: {
       type: String,
       enum: ["pendente", "analisado", "excluido"],
@@ -48,11 +73,11 @@ const articleSchema = new mongoose.Schema(
     },
     pdfFile: {
       type: String,
-      required: [true, "Arquivo PDF é obrigatório"],
+      default: "",
     },
     pdfData: {
       type: Buffer,
-      required: [true, "Dados do PDF são obrigatórios"],
+      default: null,
     },
     pdfContentType: {
       type: String,
