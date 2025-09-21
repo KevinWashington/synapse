@@ -5,6 +5,8 @@ import dotenv from "dotenv";
 import multer from "multer";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import fetch from "node-fetch";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpecs from "./src/config/swagger.js";
 
 // Importar rotas
 import projectRoutes from "./src/routes/projetos.js";
@@ -96,6 +98,16 @@ app.use((err, req, res, next) => {
   next();
 });
 
+// Swagger UI
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpecs, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "Synapse API Documentation",
+  })
+);
+
 // Rotas
 app.get("/", (req, res) => {
   res.json({
@@ -105,6 +117,7 @@ app.get("/", (req, res) => {
       auth: "/api/auth",
       projetos: "/api/projetos",
       health: "/health",
+      docs: "/api-docs",
     },
   });
 });
@@ -125,6 +138,152 @@ app.use("/api/projetos", projectRoutes);
 
 // Rotas de recomendações
 app.use("/api", recommendationsRoutes);
+
+/**
+ * @swagger
+ * /api/stats:
+ *   get:
+ *     summary: Obter estatísticas do usuário
+ *     tags: [Estatísticas]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Estatísticas obtidas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StatsResponse'
+ *       401:
+ *         description: Token inválido ou expirado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+/**
+ * @swagger
+ * /api/generate-research-questions:
+ *   post:
+ *     summary: Gerar perguntas de pesquisa baseadas no framework PICOC
+ *     tags: [IA]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ResearchQuestionsRequest'
+ *     responses:
+ *       200:
+ *         description: Perguntas de pesquisa geradas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ResearchQuestionsResponse'
+ *       400:
+ *         description: Dados inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Token inválido ou expirado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro na geração de perguntas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+/**
+ * @swagger
+ * /api/generate-search-strings:
+ *   post:
+ *     summary: Gerar strings de busca baseadas nas perguntas de pesquisa
+ *     tags: [IA]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/SearchStringsRequest'
+ *     responses:
+ *       200:
+ *         description: Strings de busca geradas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SearchStringsResponse'
+ *       400:
+ *         description: Dados inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Token inválido ou expirado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro na geração de strings de busca
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+/**
+ * @swagger
+ * /api/chat:
+ *   post:
+ *     summary: Chat com IA para análise de artigos
+ *     tags: [IA]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ChatRequest'
+ *     responses:
+ *       200:
+ *         description: Resposta do chat obtida com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ChatResponse'
+ *       400:
+ *         description: Dados inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Token inválido ou expirado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro na comunicação com IA
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 
 // Rota de estatísticas
 app.get("/api/stats", authenticateToken, async (req, res) => {

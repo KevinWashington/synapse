@@ -3,7 +3,15 @@ import { projectService } from "../services/projetosService.js";
 import { statsService } from "../services/statsService.js";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardHeader, CardContent } from "../components/ui/card.tsx";
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle,
+  CardDescription,
+  CardAction,
+  CardFooter,
+} from "../components/ui/card.tsx";
 import {
   FolderIcon,
   FileTextIcon,
@@ -11,6 +19,7 @@ import {
   PlusCircleIcon,
   ClockIcon,
   TrendingUpIcon,
+  File,
 } from "lucide-react";
 import {
   Table,
@@ -20,6 +29,7 @@ import {
   TableBody,
   TableCell,
 } from "../components/ui/table.tsx";
+import { ChartAreaInteractive } from "../components/ChartAreaInteractive.jsx";
 
 function Dashboard() {
   const [loading, setLoading] = useState(false);
@@ -83,81 +93,49 @@ function Dashboard() {
         textos para revisar.
       </p>
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-        <Card className="gap-0 pr-3 bg-background dark:bg-dark-background">
-          <div className="flex items-center">
-            <div className="flex-1">
-              <CardHeader>
-                <h2 className="text-md font-semibold text-muted-foreground">
-                  Total de projetos
-                </h2>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <p className="text-3xl font-semibold">
-                    {statsLoading ? "..." : stats?.totalProjects || 0}
-                  </p>
-                </div>
-              </CardContent>
-            </div>
-            <FolderIcon className="h-12 w-12" />
-          </div>
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Total de projetos</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {statsLoading ? "..." : stats?.totalProjects || 0}
+            </CardTitle>
+            <CardAction>
+              <FolderIcon className="h-6 w-6 text-green-500" />
+            </CardAction>
+          </CardHeader>
         </Card>
-        <Card className="gap-0 pr-3 bg-background dark:bg-dark-background">
-          <div className="flex items-center">
-            <div className="flex-1">
-              <CardHeader>
-                <h2 className="text-md font-semibold text-muted-foreground">
-                  Total de Artigos
-                </h2>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <p className="text-3xl font-semibold">
-                    {statsLoading ? "..." : stats?.totalArticles || 0}
-                  </p>
-                </div>
-              </CardContent>
-            </div>
-            <FileTextIcon className="h-12 w-12" />
-          </div>
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Total de Artigos</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {statsLoading ? "..." : stats?.totalArticles || 0}
+            </CardTitle>
+            <CardAction>
+              <FileTextIcon className="h-6 w-6 text-green-500" />
+            </CardAction>
+          </CardHeader>
         </Card>
-        <Card className="gap-0 pr-3 bg-background dark:bg-dark-background">
-          <div className="flex items-center">
-            <div className="flex-1">
-              <CardHeader>
-                <h2 className="text-md font-semibold text-muted-foreground">
-                  Artigos Revisados
-                </h2>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <p className="text-3xl font-semibold">
-                    {statsLoading ? "..." : stats?.totalArticlesReviewed || 0}
-                  </p>
-                </div>
-              </CardContent>
-            </div>
-            <CheckCircle2Icon className="h-12 w-12" />
-          </div>
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Artigos Revisados</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {statsLoading ? "..." : stats?.totalArticlesReviewed || 0}
+            </CardTitle>
+            <CardAction>
+              <CheckCircle2Icon className="h-6 w-6 text-green-500" />
+            </CardAction>
+          </CardHeader>
         </Card>
-        <Card className="gap-0 pr-3 bg-background dark:bg-dark-background">
-          <div className="flex items-center">
-            <div className="flex-1">
-              <CardHeader>
-                <h2 className="text-md font-semibold text-muted-foreground">
-                  Último projeto criado
-                </h2>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between">
-                  <p className="text-3xl font-semibold">
-                    {statsLoading ? "..." : stats?.lastProject?.title || "N/A"}
-                  </p>
-                </div>
-              </CardContent>
-            </div>
-            <PlusCircleIcon className="h-12 w-12" />
-          </div>
+        <Card className="@container/card">
+          <CardHeader>
+            <CardDescription>Último projeto criado</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+              {statsLoading ? "..." : stats?.lastProject?.title || "N/A"}
+            </CardTitle>
+            <CardAction>
+              <PlusCircleIcon className="h-6 w-6 text-green-500" />
+            </CardAction>
+          </CardHeader>
         </Card>
       </div>
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
@@ -185,7 +163,7 @@ function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(pendingArticles || []).map((article) => (
+                    {(pendingArticles || []).slice(0, 7).map((article) => (
                       <TableRow
                         key={article._id}
                         onClick={() => {
@@ -197,12 +175,19 @@ function Dashboard() {
                       >
                         <TableCell className="flex items-center gap-2">
                           <FileTextIcon className="h-4 w-4" />
-                          {article.title}
+                          <span
+                            className="truncate max-w-[200px]"
+                            title={article.title}
+                          >
+                            {article.title}
+                          </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="truncate max-w-[100px]">
                           {article.projectId?.title || "N/A"}
                         </TableCell>
-                        <TableCell>{article.authors}</TableCell>
+                        <TableCell className="truncate max-w-[100px]">
+                          {article.authors}
+                        </TableCell>
                         <TableCell>
                           {new Date(article.createdAt).toLocaleDateString()}
                         </TableCell>
@@ -218,6 +203,17 @@ function Dashboard() {
                         </TableCell>
                       </TableRow>
                     )}
+                    {(pendingArticles || []).length > 10 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="text-center text-muted-foreground"
+                        >
+                          ... e mais {(pendingArticles || []).length - 10}{" "}
+                          artigos
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}
@@ -226,54 +222,23 @@ function Dashboard() {
         </div>
 
         <div className="lg:col-span-1 flex flex-col">
-          <Card className="gap-0 flex-1 flex flex-col">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <TrendingUpIcon className="h-5 w-5 text-green-500" />
-                <h2 className="text-lg font-semibold text-muted-foreground">
-                  Revisões por Dia
-                </h2>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 flex items-center">
-              {statsLoading ? (
-                <p>Carregando...</p>
-              ) : (
-                <div className="space-y-2 w-full">
-                  {dailyReviews.map((day) => {
-                    const maxCount = Math.max(
-                      ...dailyReviews.map((d) => d.count),
-                      1
-                    );
-                    const width = (day.count / maxCount) * 100;
-
-                    return (
-                      <div key={day.date} className="flex items-center gap-3">
-                        <div className="w-8 text-xs text-muted-foreground">
-                          {day.dayName}
-                        </div>
-                        <div className="flex-1 relative h-6 bg-gray-200 rounded dark:bg-gray-700">
-                          <div
-                            className="absolute top-0 left-0 bg-green-500 h-full rounded transition-all duration-500 ease-out"
-                            style={{
-                              width: `${width}%`,
-                              minWidth: day.count > 0 ? "4px" : "0px",
-                            }}
-                          />
-                        </div>
-                        <div className="w-6 text-xs font-medium text-right">
-                          {day.count}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="text-xs text-muted-foreground text-center mt-3">
-                    Últimos 5 dias
-                  </div>
+          {statsLoading ? (
+            <Card className="gap-0 flex-1 flex flex-col">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <TrendingUpIcon className="h-5 w-5 text-green-500" />
+                  <h2 className="text-lg font-semibold text-muted-foreground">
+                    Revisões por Dia
+                  </h2>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="flex-1 flex items-center">
+                <p>Carregando...</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <ChartAreaInteractive data={dailyReviews} />
+          )}
         </div>
       </div>
       <div className="flex-grow">
@@ -300,7 +265,7 @@ function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(projetos || []).map((project) => (
+                  {(projetos || []).slice(0, 7).map((project) => (
                     <TableRow
                       key={project._id}
                       onClick={() => {
@@ -309,7 +274,13 @@ function Dashboard() {
                       className="cursor-pointer hover:bg-accent"
                     >
                       <TableCell className="flex items-center gap-2">
-                        <FolderIcon className="h-4 w-4" /> {project.title}
+                        <FolderIcon className="h-4 w-4" />
+                        <span
+                          className="truncate max-w-[200px]"
+                          title={project.title}
+                        >
+                          {project.title}
+                        </span>
                       </TableCell>
                       <TableCell>{project.status}</TableCell>
                       <TableCell>
@@ -332,6 +303,16 @@ function Dashboard() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {(projetos || []).length > 10 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="text-center text-muted-foreground"
+                      >
+                        ... e mais {(projetos || []).length - 10} projetos
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             )}

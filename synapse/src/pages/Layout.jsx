@@ -25,7 +25,7 @@ const Layout = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(true);
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-sidebar">
       <Menu
         className=""
         setIsMenuOpen={setIsMenuOpen}
@@ -33,7 +33,7 @@ const Layout = () => {
       />
       <Card
         className={cn(
-          "flex-1 flex flex-col transition-all duration-300 my-2 mr-2 p-4 rounded-xl shadow-lg gap-2",
+          "bg-background flex-1 flex flex-col transition-all duration-300 my-2 mr-2 p-4 rounded-xl shadow-lg gap-2",
           isMenuOpen ? "ml-63" : "ml-16"
         )}
       >
