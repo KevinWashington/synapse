@@ -550,8 +550,6 @@ app.post("/api/chat", authenticateToken, async (req, res) => {
               PROTOCOLO DE OPERAÇÃO (SEGUIR ESTRITAMENTE):
               ANÁLISE DA CONSULTA: Analise a pergunta do usuário para identificar as palavras-chave e a intenção principal da busca.
 
-              VARREDURA LITERAL: Execute uma busca exata no artigo-fonte por sentenças que contenham as palavras-chave e correspondam à intenção da consulta. A busca é por correspondência direta de informação, não por inferência.
-
               EXTRAÇÃO E RETORNO:
 
               Se uma ou mais sentenças forem uma correspondência direta e inequívoca, copie-as verbatim (palavra por palavra, sem nenhuma alteração) para a saída, respeitando as regras de formatação abaixo.
