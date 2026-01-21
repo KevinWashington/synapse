@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useAIConfig } from "@/hooks/useAIConfig";
+import { useAIConfig } from "@/features/ai";
 import { useState } from "react";
 
 function Configuracoes() {

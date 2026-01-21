@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button } from "../components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   ArrowLeftIcon,
   LoaderIcon,
@@ -10,10 +10,13 @@ import {
   TrashIcon,
   LinkIcon,
 } from "lucide-react";
-import EditorNotas from "@/components/EditorNotas.jsx";
-import ChatIA from "@/components/ChatIA.jsx";
-import GerenciadorRelacionamentos from "@/components/GerenciadorRelacionamentos.jsx";
-import { articleService } from "../services/artigosService.js";
+import {
+  EditorNotas,
+  GerenciadorRelacionamentos,
+  VizualizadorPDF,
+  articleService,
+} from "@/features/articles";
+import { ChatIA } from "@/features/ai";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +25,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu.js";
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +34,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import VizualizadorPDF from "@/components/VizualizadorPDF.jsx";
 
 function ArtigoDetalhes() {
   const { projetoId, artigoId } = useParams();

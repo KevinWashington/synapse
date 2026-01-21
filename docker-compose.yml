@@ -1,11 +1,20 @@
 services:
-  mongo:
-    image: mongo:7.0
-    container_name: mongo
+  postgres:
+    image: postgres:16-alpine
+    container_name: synapse-postgres
     ports:
-      - "27017:27017"
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: synapse
+      POSTGRES_DB: synapse
     volumes:
-      - mongo-data:/data/db
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U synapse" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   ollama:
@@ -23,18 +32,21 @@ services:
 
   backend:
     build: ./synapse-backend
+    container_name: synapse-backend
     ports:
       - "5000:5000"
     depends_on:
-      - mongo
+      postgres:
+        condition: service_healthy
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/synapse
+      - DATABASE_URL=postgresql+asyncpg://synapse:synapse@postgres:5432/synapse
     env_file:
       - ./synapse-backend/.env
     restart: unless-stopped
 
   frontend:
     build: ./synapse
+    container_name: synapse-frontend
     ports:
       - "3000:3000"
     depends_on:
@@ -42,5 +54,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  mongo-data:
+  postgres-data:
   ollama-data:

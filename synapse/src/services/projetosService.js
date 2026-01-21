@@ -61,18 +61,19 @@ class ProjectService {
         objetivo,
         status,
         picoc,
-        researchQuestions,
+        research_questions,
         keywords,
-        searchStrings,
-        criteriosInclusao,
-        criteriosExclusao,
+        search_strings,
+        criterios_inclusao,
+        criterios_exclusao,
         // Excluir campos que não devem ser enviados
         articles: _articles,
         stats: _stats,
-        _id: _projectId,
+        id: _projectId,
         owner: _owner,
-        createdAt: _createdAt,
-        updatedAt: _updatedAt,
+        owner_id: _ownerId,
+        created_at: _createdAt,
+        updated_at: _updatedAt,
         ..._otherFields
       } = projectData;
 
@@ -81,11 +82,11 @@ class ProjectService {
         objetivo,
         status,
         picoc,
-        researchQuestions,
+        research_questions,
         keywords,
-        searchStrings,
-        criteriosInclusao,
-        criteriosExclusao,
+        search_strings,
+        criterios_inclusao,
+        criterios_exclusao,
       };
 
       Object.keys(updateData).forEach((key) => {

@@ -1,0 +1,21 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copiar arquivos de dependência
+COPY package*.json ./
+RUN npm install
+
+# Copiar arquivos de configuração essenciais
+COPY vite.config.js ./
+COPY components.json ./
+COPY tsconfig.json ./
+COPY index.html ./
+
+# Criar pasta src vazia (será montada via volume)
+RUN mkdir -p src public
+
+EXPOSE 3000
+
+# Rodar em modo desenvolvimento
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

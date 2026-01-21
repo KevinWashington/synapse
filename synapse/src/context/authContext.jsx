@@ -45,7 +45,7 @@ const AuthProvider = ({ children }) => {
 
       if (response.success) {
         const userData = {
-          id: response.user._id,
+          id: response.user.id,
           name: response.user.name,
           email: response.user.email,
           role: response.user.role,
@@ -89,7 +89,7 @@ const AuthProvider = ({ children }) => {
 
       if (response.success) {
         const newUserData = {
-          id: response.user._id,
+          id: response.user.id,
           name: response.user.name,
           email: response.user.email,
           role: response.user.role,

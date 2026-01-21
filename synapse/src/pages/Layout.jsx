@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeftIcon, UserIcon, LogOut } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "../hooks/useAuth.js";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/features/auth";
 
 const Layout = () => {
   const navigate = useNavigate();

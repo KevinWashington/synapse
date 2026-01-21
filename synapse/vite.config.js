@@ -14,4 +14,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "src"),
     },
   },
+  server: {
+    host: "0.0.0.0",  // Aceita conexões externas (necessário para Docker)
+    port: 3000,
+    watch: {
+      usePolling: true,  // Necessário para Windows/WSL/Docker
+    },
+  },
 });

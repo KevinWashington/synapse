@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import GrafoRelacionamentos from "../components/GrafoRelacionamentos";
+import { GrafoRelacionamentos } from "@/features/projects";
 
 function GrafoProject() {
   const { projetoId } = useParams();

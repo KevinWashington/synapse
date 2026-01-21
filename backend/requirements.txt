@@ -1,0 +1,35 @@
+# Core
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.9
+
+# Database - PostgreSQL
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# Auth
+python-jose[cryptography]==3.4.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+
+# Validation
+pydantic==2.10.0
+pydantic-settings==2.6.0
+email-validator==2.2.0
+
+# LangChain - Gemini only
+langchain==0.3.14
+langchain-google-genai==2.0.0
+langchain-core==0.3.29
+
+# PDF Processing
+pypdf==5.1.0
+
+# Utils
+python-dotenv==1.0.1
+httpx==0.28.0
+
+# Dev
+pytest==8.3.0
+pytest-asyncio==0.24.0

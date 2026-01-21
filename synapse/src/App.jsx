@@ -1,5 +1,10 @@
-import Login from "./pages/Login";
-import Register from "./pages/Register";
+import { Routes, Route, Navigate } from "react-router-dom";
+
+// Features imports
+import { LoginPage, RegisterPage, AuthProvider } from "./features/auth";
+import { AIConfigProvider } from "./features/ai";
+
+// Pages
 import Dashboard from "./pages/Dashboard";
 import Projetos from "./pages/Projetos";
 import ProjetoDetalhes from "./pages/ProjetoDetalhes";
@@ -7,18 +12,17 @@ import ArtigoDetalhes from "./pages/ArtigoDetalhes";
 import GrafoProject from "./pages/GrafoProject";
 import Layout from "./pages/Layout";
 import Configuracoes from "./pages/Configuracoes";
+
+// Components
 import ProtectedRoute from "./components/ProtectedRoute";
-import AuthProvider from "./context/authContext.jsx";
-import { AIConfigProvider } from "./context/aiConfigContext.jsx";
-import { Routes, Route, Navigate } from "react-router-dom";
 
 function App() {
   return (
     <AuthProvider>
       <AIConfigProvider>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           <Route
             path="/"

@@ -10,7 +10,7 @@ export const useArtigos = (projeto) => {
 
   const fetchArtigos = useCallback(
     async (filters = {}) => {
-      if (!projeto?._id) return;
+      if (!projeto?.id) return;
 
       try {
         setLoadingArtigos(true);
@@ -25,7 +25,7 @@ export const useArtigos = (projeto) => {
         if (filterStatus !== "todos") params.status = filterStatus;
 
         const response = await articleService.getArticlesByProject(
-          projeto._id,
+          projeto.id,
           params
         );
 
@@ -37,7 +37,7 @@ export const useArtigos = (projeto) => {
         setLoadingArtigos(false);
       }
     },
-    [projeto?._id, searchTerm, filterStatus]
+    [projeto?.id, searchTerm, filterStatus]
   );
 
   // Buscar artigos quando o projeto muda
@@ -61,8 +61,8 @@ export const useArtigos = (projeto) => {
   const handleAtualizarStatusArtigo = async (artigo, novoStatus) => {
     try {
       await articleService.updateArticleStatus(
-        projeto._id,
-        artigo._id,
+        projeto.id,
+        artigo.id,
         novoStatus
       );
       fetchArtigos();
@@ -81,7 +81,7 @@ export const useArtigos = (projeto) => {
     }
 
     try {
-      await articleService.deleteArticle(projeto._id, artigo._id);
+      await articleService.deleteArticle(projeto.id, artigo.id);
       alert("Artigo deletado com sucesso!");
       fetchArtigos();
     } catch (err) {
