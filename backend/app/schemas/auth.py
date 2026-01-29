@@ -20,8 +20,8 @@ class UserUpdate(BaseModel):
 
 
 class PasswordChange(BaseModel):
-    current_password: str
-    new_password: str = Field(..., min_length=6)
+    currentPassword: str
+    newPassword: str = Field(..., min_length=6)
 
 
 # Response schemas
@@ -30,11 +30,11 @@ class UserResponse(BaseModel):
     name: str
     email: str
     role: str
-    is_active: bool
+    isActive: bool
     avatar: str | None = None
-    last_login: datetime | None = None
-    created_at: datetime
-    updated_at: datetime
+    lastLogin: datetime | None = None
+    createdAt: datetime
+    updatedAt: datetime
 
     class Config:
         from_attributes = True
@@ -48,5 +48,5 @@ class AuthResponse(BaseModel):
 
 
 class TokenPayload(BaseModel):
-    user_id: int
+    userId: int
     exp: datetime

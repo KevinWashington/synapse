@@ -19,17 +19,17 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(prepared, salt).decode('utf-8')
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashedPassword: str) -> bool:
     """Verify a password against its hash."""
     prepared = _prepare_password(plain_password)
-    return bcrypt.checkpw(prepared, hashed_password.encode('utf-8'))
+    return bcrypt.checkpw(prepared, hashedPassword.encode('utf-8'))
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(userId: int) -> str:
     """Create a JWT access token."""
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     payload = {
-        "user_id": user_id,
+        "userId": userId,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     }

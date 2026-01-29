@@ -6,11 +6,11 @@ from app.database import Base
 
 
 # Association table for article relationships (many-to-many self-referential)
-article_relationships = Table(
-    "article_relationships",
+articleRelationships = Table(
+    "articleRelationships",
     Base.metadata,
-    Column("article_id", Integer, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True),
-    Column("related_article_id", Integer, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True)
+    Column("articleId", Integer, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True),
+    Column("relatedArticleId", Integer, ForeignKey("articles.id", ondelete="CASCADE"), primary_key=True)
 )
 
 
@@ -37,17 +37,22 @@ class Article(Base):
     status: Mapped[str] = mapped_column(String(20), default="pendente")
     
     # PDF storage (binary in DB - can be moved to filesystem later)
-    pdf_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    pdf_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    pdf_content_type: Mapped[str] = mapped_column(String(50), default="application/pdf")
+    pdfFilename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pdfData: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    pdfContentType: Mapped[str] = mapped_column(String(50), default="application/pdf")
+
+    # AI Evaluation
+    aiEvaluation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aiSuggestedStatus: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    aiRelevanceScore: Mapped[int | None] = mapped_column(Integer, nullable=True)
     
     # Foreign keys
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    projectId: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    ownerId: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         default=datetime.utcnow, 
         onupdate=datetime.utcnow
@@ -58,11 +63,11 @@ class Article(Base):
     owner: Mapped["User"] = relationship(back_populates="articles")
     
     # Self-referential many-to-many for related articles
-    related_articles: Mapped[list["Article"]] = relationship(
-        secondary=article_relationships,
-        primaryjoin=id == article_relationships.c.article_id,
-        secondaryjoin=id == article_relationships.c.related_article_id,
-        backref="related_by"
+    relatedArticles: Mapped[list["Article"]] = relationship(
+        secondary=articleRelationships,
+        primaryjoin=id == articleRelationships.c.articleId,
+        secondaryjoin=id == articleRelationships.c.relatedArticleId,
+        backref="relatedBy"
     )
 
     def __repr__(self):

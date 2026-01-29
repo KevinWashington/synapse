@@ -8,6 +8,8 @@ from app.schemas.ai import (
     SearchStringsResponse,
     ChatRequest,
     ChatResponse,
+    CriteriaRequest,
+    CriteriaResponse,
 )
 from app.services.ai_service import get_ai_service
 from app.core.dependencies import get_current_user
@@ -25,10 +27,10 @@ async def generate_research_questions(
     try:
         ai_service = get_ai_service()
         
-        picoc = data.picoc_data.model_dump()
+        picoc = data.picocData.model_dump()
         questions = await ai_service.generate_research_questions(picoc)
         
-        return ResearchQuestionsResponse(research_questions=questions)
+        return ResearchQuestionsResponse(researchQuestions=questions)
     
     except Exception as e:
         raise HTTPException(
@@ -49,13 +51,13 @@ async def generate_search_strings(
     try:
         ai_service = get_ai_service()
         
-        picoc = data.picoc_data.model_dump()
-        search_strings = await ai_service.generate_search_strings(
-            data.research_questions, 
+        picoc = data.picocData.model_dump()
+        searchStrings = await ai_service.generate_search_strings(
+            data.researchQuestions, 
             picoc
         )
         
-        return SearchStringsResponse(search_strings=search_strings)
+        return SearchStringsResponse(searchStrings=searchStrings)
     
     except Exception as e:
         raise HTTPException(
@@ -104,6 +106,37 @@ async def chat(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "error": "Falha na comunicação com o modelo de IA",
+                "message": str(e)
+            }
+        )
+
+
+@router.post("/generate-criteria", response_model=CriteriaResponse)
+async def generate_criteria(
+    data: CriteriaRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Gerar critérios de inclusão e exclusão baseados no PICOC e perguntas de pesquisa."""
+    try:
+        ai_service = get_ai_service()
+        
+        picoc = data.picocData.model_dump()
+        result = await ai_service.generate_criteria(
+            data.researchQuestions, 
+            picoc,
+            data.projeto.model_dump() if data.projeto else None
+        )
+        
+        return CriteriaResponse(
+            inclusao=result["inclusao"],
+            exclusao=result["exclusao"]
+        )
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Falha na geração de critérios",
                 "message": str(e)
             }
         )

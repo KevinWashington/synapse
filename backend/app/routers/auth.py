@@ -38,8 +38,8 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
     user = User(
         name=data.name,
         email=data.email,
-        password_hash=hash_password(data.password),
-        last_login=datetime.now(timezone.utc)
+        passwordHash=hash_password(data.password),
+        lastLogin=datetime.now(timezone.utc)
     )
     
     db.add(user)
@@ -62,7 +62,7 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(data.password, user.password_hash):
+    if not user or not verify_password(data.password, user.passwordHash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -71,7 +71,7 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
             }
         )
     
-    if not user.is_active:
+    if not user.isActive:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
@@ -81,7 +81,7 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
         )
     
     # Update last login
-    user.last_login = datetime.now(timezone.utc)
+    user.lastLogin = datetime.now(timezone.utc)
     await db.commit()
     
     token = create_access_token(user.id)
@@ -147,7 +147,7 @@ async def change_password(
     db: AsyncSession = Depends(get_db)
 ):
     """Alterar senha do usuário."""
-    if not verify_password(data.current_password, current_user.password_hash):
+    if not verify_password(data.current_password, current_user.passwordHash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -156,7 +156,7 @@ async def change_password(
             }
         )
     
-    current_user.password_hash = hash_password(data.new_password)
+    current_user.passwordHash = hash_password(data.newPassword)
     await db.commit()
     
     return {

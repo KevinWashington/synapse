@@ -18,18 +18,18 @@ class Project(Base):
     picoc: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     
     # Arrays stored as PostgreSQL ARRAY type
-    research_questions: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
+    researchQuestions: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
     keywords: Mapped[list[str] | None] = mapped_column(ARRAY(String(100)), default=list)
-    search_strings: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
-    criterios_inclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
-    criterios_exclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
+    searchStrings: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
+    criteriosInclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
+    criteriosExclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
     
     # Foreign key
-    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ownerId: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         default=datetime.utcnow, 
         onupdate=datetime.utcnow

@@ -15,22 +15,22 @@ class ProjectContext(BaseModel):
 
 
 class ResearchQuestionsRequest(BaseModel):
-    picoc_data: PICOCInput
+    picocData: PICOCInput
     projeto: ProjectContext | None = None
 
 
 class ResearchQuestionsResponse(BaseModel):
-    research_questions: list[str]
+    researchQuestions: list[str]
 
 
 class SearchStringsRequest(BaseModel):
-    research_questions: list[str]
-    picoc_data: PICOCInput
+    researchQuestions: list[str]
+    picocData: PICOCInput
     projeto: ProjectContext | None = None
 
 
 class SearchStringsResponse(BaseModel):
-    search_strings: list[str]
+    searchStrings: list[str]
 
 
 class ArticleContext(BaseModel):
@@ -51,3 +51,14 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     content: str
+
+
+class CriteriaRequest(BaseModel):
+    researchQuestions: list[str]
+    picocData: PICOCInput
+    projeto: ProjectContext | None = None
+
+
+class CriteriaResponse(BaseModel):
+    inclusao: list[str]
+    exclusao: list[str]

@@ -26,23 +26,23 @@ async def get_all_projects(
     """Listar projetos do usuário logado."""
     result = await db.execute(
         select(Project)
-        .where(Project.owner_id == current_user.id)
-        .order_by(Project.created_at.desc())
+        .where(Project.ownerId == current_user.id)
+        .order_by(Project.createdAt.desc())
     )
     projects = result.scalars().all()
     
     # Get article count for each project
-    projects_with_count = []
+    projectsWithCount = []
     for project in projects:
         count_result = await db.execute(
-            select(func.count(Article.id)).where(Article.project_id == project.id)
+            select(func.count(Article.id)).where(Article.projectId == project.id)
         )
-        article_count = count_result.scalar()
-        project_dict = ProjectResponse.model_validate(project).model_dump()
-        project_dict["article_count"] = article_count
-        projects_with_count.append(ProjectResponse(**project_dict))
+        articleCount = count_result.scalar()
+        projectResponse = ProjectResponse.model_validate(project).model_dump()
+        projectResponse["articleCount"] = articleCount
+        projectsWithCount.append(ProjectResponse(**projectResponse))
     
-    return ProjectListResponse(projects=projects_with_count, total=len(projects_with_count))
+    return ProjectListResponse(projects=projectsWithCount, total=len(projectsWithCount))
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -57,12 +57,12 @@ async def create_project(
         objetivo=data.objetivo,
         status=data.status,
         picoc=data.picoc.model_dump() if data.picoc else {},
-        research_questions=data.research_questions or [],
+        researchQuestions=data.researchQuestions or [],
         keywords=data.keywords or [],
-        search_strings=data.search_strings or [],
-        criterios_inclusao=data.criterios_inclusao or [],
-        criterios_exclusao=data.criterios_exclusao or [],
-        owner_id=current_user.id
+        searchStrings=data.searchStrings or [],
+        criteriosInclusao=data.criteriosInclusao or [],
+        criteriosExclusao=data.criteriosExclusao or [],
+        ownerId=current_user.id
     )
     
     db.add(project)
@@ -72,17 +72,17 @@ async def create_project(
     return ProjectResponse.model_validate(project)
 
 
-@router.get("/{project_id}", response_model=ProjectResponse)
+@router.get("/{projectId}", response_model=ProjectResponse)
 async def get_project_by_id(
-    project_id: int,
+    projectId: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Buscar projeto específico."""
     result = await db.execute(
         select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id
+            Project.id == projectId,
+            Project.ownerId == current_user.id
         )
     )
     project = result.scalar_one_or_none()
@@ -97,20 +97,20 @@ async def get_project_by_id(
         )
     
     # Get article count
-    count_result = await db.execute(
-        select(func.count(Article.id)).where(Article.project_id == project.id)
+    countResult = await db.execute(
+        select(func.count(Article.id)).where(Article.projectId == project.id)
     )
-    article_count = count_result.scalar()
+    articleCount = countResult.scalar()
     
     response = ProjectResponse.model_validate(project)
-    response.article_count = article_count
+    response.articleCount = articleCount
     
     return response
 
 
-@router.put("/{project_id}", response_model=ProjectResponse)
+@router.put("/{projectId}", response_model=ProjectResponse)
 async def update_project(
-    project_id: int,
+    projectId: int,
     data: ProjectUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -118,8 +118,8 @@ async def update_project(
     """Atualizar projeto."""
     result = await db.execute(
         select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id
+            Project.id == projectId,
+            Project.ownerId == current_user.id
         )
     )
     project = result.scalar_one_or_none()
@@ -134,8 +134,8 @@ async def update_project(
         )
     
     # Update only provided fields
-    update_data = data.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
+    updateData = data.model_dump(exclude_unset=True)
+    for field, value in updateData.items():
         if field == "picoc" and value:
             setattr(project, field, value.model_dump() if hasattr(value, 'model_dump') else value)
         else:
@@ -147,17 +147,17 @@ async def update_project(
     return ProjectResponse.model_validate(project)
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{projectId}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(
-    project_id: int,
+    projectId: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Deletar projeto."""
     result = await db.execute(
         select(Project).where(
-            Project.id == project_id,
-            Project.owner_id == current_user.id
+            Project.id == projectId,
+            Project.ownerId == current_user.id
         )
     )
     project = result.scalar_one_or_none()

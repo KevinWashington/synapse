@@ -17,6 +17,19 @@ services:
       retries: 5
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./entrypoint-ollama.sh:/entrypoint-ollama.sh
+    entrypoint: /entrypoint-ollama.sh
+    restart: unless-stopped
+    profiles:
+      - ollama
+
   backend:
     build: ./backend
     container_name: synapse-backend
@@ -29,9 +42,17 @@ services:
       - DATABASE_URL=postgresql+asyncpg://synapse:synapse@postgres:5432/synapse
     env_file:
       - ./backend/.env
-    volumes:
-      - ./backend/app:/app/app # Hot-reload para backend Python
+    restart: unless-stopped
+
+  frontend:
+    build: ./synapse
+    container_name: synapse-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:
   postgres-data:
+  ollama-data:

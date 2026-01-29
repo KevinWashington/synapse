@@ -11,13 +11,13 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    passwordHash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="user")
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    isActive: Mapped[bool] = mapped_column(Boolean, default=True)
     avatar: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
+    lastLogin: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updatedAt: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         default=datetime.utcnow, 
         onupdate=datetime.utcnow

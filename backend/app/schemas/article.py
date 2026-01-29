@@ -55,12 +55,15 @@ class ArticleResponse(BaseModel):
     issn: str | None = None
     notas: str | None = None
     status: str
-    pdf_filename: str | None = None
-    has_pdf: bool = False
-    project_id: int
-    owner_id: int
-    created_at: datetime
-    updated_at: datetime
+    pdfFilename: str | None = None
+    hasPdf: bool = False
+    aiEvaluation: str | None = None
+    aiSuggestedStatus: str | None = None
+    aiRelevanceScore: int | None = None
+    projectId: int
+    ownerId: int
+    createdAt: datetime
+    updatedAt: datetime
 
     class Config:
         from_attributes = True
@@ -68,14 +71,16 @@ class ArticleResponse(BaseModel):
     @classmethod
     def from_orm_with_pdf_check(cls, article):
         data = cls.model_validate(article)
-        data.has_pdf = article.pdf_data is not None
+        data.hasPdf = article.pdfData is not None
         return data
 
 
 class ArticleListResponse(BaseModel):
     articles: list[ArticleResponse]
     total: int
+    page: int = 1
+    limit: int = 50
 
 
 class RelationshipCreate(BaseModel):
-    related_article_id: int
+    relatedArticleId: int
