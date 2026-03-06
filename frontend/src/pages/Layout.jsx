@@ -1,10 +1,9 @@
 import Menu from "../components/Menu";
-import Breadcrumbs from "../components/Breadcrumbs";
 import ThemeToggle from "../components/ThemeToggle";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeftIcon, UserIcon, LogOut } from "lucide-react";
+import { UserIcon, LogOut, Bell, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -14,10 +13,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth";
+import { PageTitleProvider, usePageTitleValue } from "@/context/pageTitleContext";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -25,72 +23,94 @@ const Layout = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(true);
 
   return (
-    <div className="flex min-h-screen bg-sidebar">
-      <Menu
-        className=""
-        setIsMenuOpen={setIsMenuOpen}
-        isMenuOpen={isMenuOpen}
-      />
-      <Card
+    <div className="flex min-h-screen" style={{ backgroundColor: "var(--syn-sidebar-bg)" }}>
+      <Menu setIsMenuOpen={setIsMenuOpen} isMenuOpen={isMenuOpen} />
+
+      {/* Main content area */}
+      <div
         className={cn(
-          "bg-background flex-1 flex flex-col transition-all duration-300 my-2 mr-2 p-4 rounded-xl shadow-lg gap-2",
-          isMenuOpen ? "ml-63" : "ml-16"
+          "flex-1 flex flex-col min-h-screen transition-all",
+          isMenuOpen ? "md:ml-[220px]" : "md:ml-16"
         )}
+        style={{ transition: "margin var(--syn-transition)" }}
       >
-        <header className="flex items-center justify-between rounded-t-xl">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Button>
-            <Breadcrumbs />
-          </div>
+        {/* Content card wrapper */}
+        <div className="flex-1 flex flex-col m-0 md:m-2 md:ml-0 rounded-none md:rounded-xl bg-[var(--syn-bg-secondary)] dark:bg-[var(--syn-bg-secondary)] overflow-hidden">
+          <PageTitleProvider>
+            <HeaderBar navigate={navigate} logout={logout} user={user} />
 
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <span className="text-sm font-medium">
-                    {user?.name || "Usuário"}
-                  </span>
-                  <Avatar>
-                    <AvatarImage src="/avatar.png" alt="Perfil" />
-                    <AvatarFallback>
-                      <UserIcon className="h-5 w-5" />
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    logout();
-                    navigate("/login");
-                  }}
-                >
-                  <LogOut size={18} />
-                  <span>Sair</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
-
-        <Separator className="py-0" />
-
-        <div className="flex-1 rounded-b-xl pt-2">
-          <Outlet />
+            {/* Page content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <Outlet />
+            </div>
+          </PageTitleProvider>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };
+
+function HeaderBar({ navigate, logout, user }) {
+  const { title, backUrl, actions, badge } = usePageTitleValue();
+
+  return (
+    <header className="flex items-center justify-between px-6 py-3 bg-[var(--syn-bg-primary)] dark:bg-[var(--syn-bg-primary)] border-b border-[var(--syn-border)]">
+      <div className="flex items-center gap-3 min-w-0">
+        {backUrl && (
+          <button
+            onClick={() => navigate(backUrl)}
+            className="h-8 w-8 rounded-lg border border-[var(--syn-border)] flex items-center justify-center text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)] transition-colors shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        )}
+        {title && (
+          <h1 className="text-lg font-semibold text-[var(--syn-text-primary)] truncate">
+            {title}
+          </h1>
+        )}
+        {badge}
+      </div>
+
+      <div className="flex items-center gap-3">
+        {actions && (
+          <div className="flex items-center gap-2">{actions}</div>
+        )}
+        <ThemeToggle />
+        <Button variant="ghost" size="icon" className="h-9 w-9 text-[var(--syn-text-secondary)]">
+          <Bell className="h-4 w-4" />
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="flex items-center gap-2 h-9 px-2">
+              <Avatar className="h-7 w-7">
+                <AvatarImage src="/avatar.png" alt="Perfil" />
+                <AvatarFallback className="text-[10px]">
+                  <UserIcon className="h-4 w-4" />
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-medium text-[var(--syn-text-primary)] hidden sm:block">
+                {user?.name || "Usuário"}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              <LogOut size={16} />
+              <span>Sair</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  );
+}
 
 export default Layout;

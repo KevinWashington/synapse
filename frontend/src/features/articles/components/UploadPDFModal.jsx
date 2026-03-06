@@ -40,9 +40,9 @@ function UploadPDFModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
       setError("");
 
       const formData = new FormData();
-      formData.append("pdf", selectedFile);
+      formData.append("file", selectedFile);
 
-      await articleService.updateArticle(projeto.id, artigo.id, formData);
+      await articleService.uploadPdf(projeto.id, artigo.id, selectedFile);
 
       toast.success("PDF atualizado com sucesso!");
       onSuccess();

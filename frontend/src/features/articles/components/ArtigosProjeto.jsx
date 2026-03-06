@@ -71,38 +71,47 @@ function ArtigosProjeto({ projeto, onNavigate }) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho com seletor de visualização */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">
-            Artigos do Projeto
-            {pagination.totalDocuments > 0 && (
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                ({pagination.totalDocuments}{" "}
-                {pagination.totalDocuments === 1 ? "artigo" : "artigos"})
-              </span>
-            )}
-          </h2>
+    <div className="space-y-4">
+      {/* Toolbar: view toggle + actions */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 rounded-lg border border-[var(--syn-border)] p-0.5">
+            <button
+              onClick={() => setViewMode("tabela")}
+              className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
+                viewMode === "tabela"
+                  ? "bg-[var(--syn-sidebar-bg)] text-white"
+                  : "text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
+              }`}
+            >
+              <TableIcon className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("cards")}
+              className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
+                viewMode === "cards"
+                  ? "bg-[var(--syn-sidebar-bg)] text-white"
+                  : "text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
+              }`}
+            >
+              <GridIcon className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {pagination.totalDocuments > 0 && (
+            <span className="text-xs text-[var(--syn-text-secondary)]">
+              {pagination.totalDocuments} {pagination.totalDocuments === 1 ? "artigo" : "artigos"}
+            </span>
+          )}
         </div>
 
-        {/* Seletor de visualização */}
-        <div className="flex items-center gap-1 border rounded-lg p-1">
-          <Button
-            variant={viewMode === "tabela" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("tabela")}
-            className="h-8 px-3"
-          >
-            <TableIcon className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-2 text-xs" onClick={handleImportarBibTeX}>
+            <UploadIcon className="h-3.5 w-3.5" />
+            Importar BibTeX
           </Button>
-          <Button
-            variant={viewMode === "cards" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("cards")}
-            className="h-8 px-3"
-          >
-            <GridIcon className="h-4 w-4" />
+          <Button size="sm" className="gap-2 text-xs" onClick={handleAdicionarArtigo}>
+            <PlusIcon className="h-3.5 w-3.5" />
+            Adicionar Artigo
           </Button>
         </div>
       </div>
@@ -128,22 +137,22 @@ function ArtigosProjeto({ projeto, onNavigate }) {
         />
       ) : (
         <>
-          {/* Barra de pesquisa e filtros para visualização em cards */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          {/* Search + filter for cards mode */}
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--syn-text-secondary)] h-4 w-4" />
               <Input
                 type="text"
                 placeholder="Pesquisar artigos..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-9"
               />
             </div>
             <div className="flex items-center gap-2">
-              <FilterIcon className="h-4 w-4 text-muted-foreground" />
+              <FilterIcon className="h-4 w-4 text-[var(--syn-text-secondary)]" />
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[140px] h-9">
                   <SelectValue placeholder="Filtrar por..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -155,34 +164,17 @@ function ArtigosProjeto({ projeto, onNavigate }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-                onClick={handleImportarBibTeX}
-              >
-                <UploadIcon className="h-4 w-4" />
-                Importar BibTeX
-              </Button>
-              <Button
-                className="flex items-center gap-2"
-                onClick={handleAdicionarArtigo}
-              >
-                <PlusIcon className="h-4 w-4" />
-                Adicionar Artigo
-              </Button>
-            </div>
           </div>
 
-          {/* Loading para artigos */}
+          {/* Loading */}
           {loadingArtigos && (
             <div className="flex justify-center items-center py-8">
-              <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
-              <span className="ml-2">Carregando artigos...</span>
+              <LoaderIcon className="h-5 w-5 animate-spin text-[var(--syn-text-secondary)]" />
+              <span className="ml-2 text-sm text-[var(--syn-text-secondary)]">Carregando artigos...</span>
             </div>
           )}
 
-          {/* Grid de artigos */}
+          {/* Card grid */}
           {!loadingArtigos && artigos.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4">
               {artigos.map((artigo) => (
@@ -204,35 +196,18 @@ function ArtigosProjeto({ projeto, onNavigate }) {
             </div>
           )}
 
-          {/* Janela vazia */}
+          {/* Empty state */}
           {!loadingArtigos && artigos.length === 0 && (
             <div className="text-center py-12">
-              <FileTextIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">
+              <FileTextIcon className="h-12 w-12 text-[var(--syn-text-secondary)] mx-auto mb-3" />
+              <h3 className="text-sm font-medium text-[var(--syn-text-primary)] mb-1">
                 Nenhum artigo encontrado
               </h3>
-              <p className="text-muted-foreground mb-4">
+              <p className="text-xs text-[var(--syn-text-secondary)]">
                 {searchTerm || filterStatus !== "todos"
                   ? "Tente ajustar os filtros de pesquisa"
-                  : "Comece adicionando artigos a este projeto"}
+                  : "Adicione artigos usando os botões acima"}
               </p>
-              <div className="flex gap-2 justify-center">
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2"
-                  onClick={handleImportarBibTeX}
-                >
-                  <UploadIcon className="h-4 w-4" />
-                  Importar BibTeX
-                </Button>
-                <Button
-                  className="flex items-center gap-2"
-                  onClick={handleAdicionarArtigo}
-                >
-                  <PlusIcon className="h-4 w-4" />
-                  Adicionar {artigos.length === 0 ? "Primeiro " : ""}Artigo
-                </Button>
-              </div>
             </div>
           )}
         </>

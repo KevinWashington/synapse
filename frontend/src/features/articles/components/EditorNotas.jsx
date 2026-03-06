@@ -1,17 +1,20 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { Check, Loader2 } from "lucide-react";
 
 function EditorNotas({ valorInicial = "", onSalvar }) {
   const [texto, setTexto] = useState(valorInicial || "");
   const [linhas, setLinhas] = useState([1]);
+  const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved
   const textareaRef = useRef(null);
   const linhasRef = useRef(null);
+  const debounceRef = useRef(null);
+  const lastSavedRef = useRef(valorInicial || "");
 
   useEffect(() => {
     setTexto(valorInicial || "");
+    lastSavedRef.current = valorInicial || "";
   }, [valorInicial]);
 
   useEffect(() => {
@@ -21,39 +24,66 @@ function EditorNotas({ valorInicial = "", onSalvar }) {
     );
   }, [texto]);
 
+  // Debounced auto-save
+  const saveNotas = useCallback(
+    async (value) => {
+      if (!onSalvar || value === lastSavedRef.current) return;
+
+      setSaveStatus("saving");
+      try {
+        await onSalvar(value);
+        lastSavedRef.current = value;
+        setSaveStatus("saved");
+        // Reset status after 2 seconds
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        setSaveStatus("idle");
+      }
+    },
+    [onSalvar]
+  );
+
+  const handleChange = (e) => {
+    const newValue = e.target.value;
+    setTexto(newValue);
+
+    // Clear previous debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Set new debounce (1.5s)
+    debounceRef.current = setTimeout(() => {
+      saveNotas(newValue);
+    }, 1500);
+  };
+
+  // Cleanup debounce on unmount + save pending changes
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
   const handleScroll = (e) => {
     if (linhasRef.current) {
       linhasRef.current.scrollTop = e.target.scrollTop;
     }
   };
 
-  const handleSalvar = () => {
-    if (onSalvar) onSalvar(texto);
-  };
-
   return (
-    <div className="flex flex-col h-full p-4 border bg-muted/50 rounded-xl">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xl font-semibold ">Notas</h2>
-        <Button onClick={handleSalvar} variant="default">
-          Salvar
-        </Button>
-      </div>
-
-      <div className="flex flex-1 rounded-md border overflow-hidden shadow-inner min-h-0">
+    <div className="flex flex-col h-full">
+      {/* Editor */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
         <div
           ref={linhasRef}
-          className="border-r py-2 overflow-hidden select-none"
-          style={{
-            width: "3rem",
-            overflowY: "hidden",
-          }}
+          className="border-r border-[var(--syn-border)] py-2 overflow-hidden select-none bg-[var(--syn-bg-secondary)]"
+          style={{ width: "3rem", overflowY: "hidden" }}
         >
           {linhas.map((num) => (
-            <div
-              key={num}
-              className="text-amber-800/70 text-right px-2 h-6 text-sm font-mono"
-            >
+            <div key={num} className="text-[var(--syn-text-secondary)] text-right px-2 h-6 text-xs font-mono">
               {num}
             </div>
           ))}
@@ -62,26 +92,40 @@ function EditorNotas({ valorInicial = "", onSalvar }) {
         <Textarea
           ref={textareaRef}
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={handleChange}
           onScroll={handleScroll}
           placeholder="Digite suas notas aqui..."
           className={cn(
-            "flex-1 resize-none border-none rounded-none p-2",
+            "flex-1 resize-none border-none rounded-none p-3",
             "focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-none",
-            "font-mono text-sm h-full"
+            "font-mono text-sm h-full text-[var(--syn-text-primary)] placeholder:text-[var(--syn-text-secondary)]"
           )}
           style={{
-            background:
-              "linear-gradient(transparent 0%, transparent calc(1.5rem - 1px), #e5e7eb calc(1.5rem), transparent calc(1.5rem + 1px))",
-            backgroundSize: "100% 1.5rem",
             lineHeight: "1.5rem",
           }}
         />
       </div>
 
-      <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
-        <span>Caracteres: {texto.length}</span>
-        <span>Linhas: {texto.split("\n").length}</span>
+      {/* Footer */}
+      <div className="flex items-center justify-between text-[10px] text-[var(--syn-text-secondary)] px-4 py-2 border-t border-[var(--syn-border)]">
+        <span>Caracteres: {texto.length} · Linhas: {texto.split("\n").length}</span>
+        <div className="flex items-center gap-1.5">
+          {saveStatus === "saving" && (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Salvando...</span>
+            </>
+          )}
+          {saveStatus === "saved" && (
+            <>
+              <Check className="h-3 w-3 text-emerald-500" />
+              <span className="text-emerald-500">Salvo</span>
+            </>
+          )}
+          {saveStatus === "idle" && (
+            <span>Salvamento automático</span>
+          )}
+        </div>
       </div>
     </div>
   );

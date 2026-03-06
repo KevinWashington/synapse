@@ -3,8 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Plus, X, Save, Loader2, Sparkles, Pencil, Check } from "lucide-react";
 import { projectService } from "@/features/projects";
 import { toast } from "@/lib/toast";
@@ -229,7 +227,7 @@ function PlanejamentoProjeto({ projeto = {} }) {
 
     return (
       <div className="space-y-3">
-        <Label>{label}</Label>
+        <Label className="text-[var(--syn-text-primary)]">{label}</Label>
 
         {/* Lista de items */}
         {data[field].length > 0 && (
@@ -279,7 +277,7 @@ function PlanejamentoProjeto({ projeto = {} }) {
                 ) : (
                   <div className="flex items-start gap-1 group">
                     <div
-                      className="flex-1 p-2 px-3 rounded-md bg-secondary/30 text-sm border border-transparent group-hover:bg-secondary/50 transition-all cursor-pointer"
+                      className="flex-1 p-2 px-3 rounded-lg bg-[var(--syn-bg-secondary)] text-sm text-[var(--syn-text-primary)] border border-transparent group-hover:border-[var(--syn-border)] transition-all cursor-pointer"
                       onClick={() => startEditing(index, item)}
                     >
                       {item}
@@ -342,225 +340,134 @@ function PlanejamentoProjeto({ projeto = {} }) {
     );
   };
 
+  const Section = ({ title, actions, children }) => (
+    <div className="rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] shadow-[var(--syn-shadow-card)] overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--syn-border)]">
+        <h3 className="text-sm font-semibold text-[var(--syn-text-primary)]">{title}</h3>
+        {actions}
+      </div>
+      <div className="px-6 py-5 space-y-4">{children}</div>
+    </div>
+  );
+
+  const AIButton = ({ onClick, disabled, loading: isLoading, label = "Gerar com IA" }) => (
+    <Button variant="outline" size="sm" onClick={onClick} disabled={disabled} className="gap-2 text-xs">
+      {isLoading ? (
+        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Gerando...</>
+      ) : (
+        <><Sparkles className="w-3.5 h-3.5" /> {label}</>
+      )}
+    </Button>
+  );
+
   return (
     <div className="space-y-6">
       {/* Informações Básicas */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações Básicas</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="title">Título *</Label>
-            <Input
-              id="title"
-              value={data.title}
-              onChange={(e) => updateField("title", e.target.value)}
-              placeholder="Ex: Revisão Sistemática - IA na Educação"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="objetivo">Objetivo</Label>
-            <Textarea
-              id="objetivo"
-              value={data.objetivo}
-              onChange={(e) => updateField("objetivo", e.target.value)}
-              placeholder="Descreva o objetivo do seu projeto..."
-              rows={3}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <Section title="Informações Básicas">
+        <div className="space-y-2">
+          <Label htmlFor="title" className="text-[var(--syn-text-primary)]">Título *</Label>
+          <Input
+            id="title"
+            value={data.title}
+            onChange={(e) => updateField("title", e.target.value)}
+            placeholder="Ex: Revisão Sistemática - IA na Educação"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="objetivo" className="text-[var(--syn-text-primary)]">Objetivo</Label>
+          <Textarea
+            id="objetivo"
+            value={data.objetivo}
+            onChange={(e) => updateField("objetivo", e.target.value)}
+            placeholder="Descreva o objetivo do seu projeto..."
+            rows={3}
+          />
+        </div>
+      </Section>
 
       {/* PICOC */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Framework PICOC</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {[
-            {
-              key: "pessoa",
-              label: "Pessoa/População",
-              placeholder: "Descreva a população...",
-            },
-            {
-              key: "intervencao",
-              label: "Intervenção",
-              placeholder: "Descreva a intervenção...",
-            },
-            {
-              key: "comparacao",
-              label: "Comparação",
-              placeholder: "Descreva a comparação...",
-            },
-            {
-              key: "outcome",
-              label: "Resultado",
-              placeholder: "Descreva os resultados...",
-            },
-            {
-              key: "contexto",
-              label: "Contexto",
-              placeholder: "Descreva o contexto...",
-            },
-          ].map(({ key, label, placeholder }) => (
-            <div key={key}>
-              <Label>{label}</Label>
-              <Input
-                value={data.picoc[key]}
-                onChange={(e) => updatePICOC(key, e.target.value)}
-                placeholder={placeholder}
-              />
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Perguntas de Pesquisa */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Perguntas de Pesquisa
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={generateResearchQuestions}
-              disabled={generatingQuestions}
-              className="ml-2"
-            >
-              {generatingQuestions ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Gerar com IA
-                </>
-              )}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ArrayField
-            label="Perguntas"
-            field="researchQuestions"
-            placeholder="Digite uma pergunta de pesquisa..."
-            isLongText={true}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Palavras-chave */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Palavras-chave</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ArrayField
-            label="Palavras-chave"
-            field="keywords"
-            placeholder="Digite uma palavra-chave..."
-          />
-        </CardContent>
-      </Card>
-
-      {/* Strings de Busca */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Strings de Busca
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={generateSearchStrings}
-              disabled={generatingStrings}
-              className="ml-2"
-            >
-              {generatingStrings ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Gerar com IA
-                </>
-              )}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ArrayField
-            label="Strings"
-            field="searchStrings"
-            placeholder="Digite uma string de busca..."
-            isLongText={true}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Critérios */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Critérios de Inclusão e Exclusão
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={generateCriteria}
-              disabled={generatingCriteria}
-              className="ml-2"
-            >
-              {generatingCriteria ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Gerar com IA
-                </>
-              )}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-6">
-            <ArrayField
-              label="Critérios de Inclusão"
-              field="criteriosInclusao"
-              placeholder="Digite um critério de inclusão..."
-              isLongText={true}
-            />
-            <ArrayField
-              label="Critérios de Exclusão"
-              field="criteriosExclusao"
-              placeholder="Digite um critério de exclusão..."
-              isLongText={true}
+      <Section title="Framework PICOC">
+        {[
+          { key: "pessoa", label: "Pessoa/População", placeholder: "Descreva a população..." },
+          { key: "intervencao", label: "Intervenção", placeholder: "Descreva a intervenção..." },
+          { key: "comparacao", label: "Comparação", placeholder: "Descreva a comparação..." },
+          { key: "outcome", label: "Resultado", placeholder: "Descreva os resultados..." },
+          { key: "contexto", label: "Contexto", placeholder: "Descreva o contexto..." },
+        ].map(({ key, label, placeholder }) => (
+          <div key={key} className="space-y-2">
+            <Label className="text-[var(--syn-text-primary)]">{label}</Label>
+            <Input
+              value={data.picoc[key]}
+              onChange={(e) => updatePICOC(key, e.target.value)}
+              placeholder={placeholder}
             />
           </div>
-        </CardContent>
-      </Card>
+        ))}
+      </Section>
+
+      {/* Perguntas de Pesquisa */}
+      <Section
+        title="Perguntas de Pesquisa"
+        actions={<AIButton onClick={generateResearchQuestions} disabled={generatingQuestions} loading={generatingQuestions} />}
+      >
+        <ArrayField
+          label="Perguntas"
+          field="researchQuestions"
+          placeholder="Digite uma pergunta de pesquisa..."
+          isLongText={true}
+        />
+      </Section>
+
+      {/* Palavras-chave */}
+      <Section title="Palavras-chave">
+        <ArrayField
+          label="Palavras-chave"
+          field="keywords"
+          placeholder="Digite uma palavra-chave..."
+        />
+      </Section>
+
+      {/* Strings de Busca */}
+      <Section
+        title="Strings de Busca"
+        actions={<AIButton onClick={generateSearchStrings} disabled={generatingStrings} loading={generatingStrings} />}
+      >
+        <ArrayField
+          label="Strings"
+          field="searchStrings"
+          placeholder="Digite uma string de busca..."
+          isLongText={true}
+        />
+      </Section>
+
+      {/* Critérios */}
+      <Section
+        title="Critérios de Inclusão e Exclusão"
+        actions={<AIButton onClick={generateCriteria} disabled={generatingCriteria} loading={generatingCriteria} />}
+      >
+        <div className="grid md:grid-cols-2 gap-6">
+          <ArrayField
+            label="Critérios de Inclusão"
+            field="criteriosInclusao"
+            placeholder="Digite um critério de inclusão..."
+            isLongText={true}
+          />
+          <ArrayField
+            label="Critérios de Exclusão"
+            field="criteriosExclusao"
+            placeholder="Digite um critério de exclusão..."
+            isLongText={true}
+          />
+        </div>
+      </Section>
 
       {/* Botão Salvar */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={loading}>
+        <Button onClick={handleSave} disabled={loading} className="gap-2">
           {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Salvando...
-            </>
+            <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
           ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Salvar
-            </>
+            <><Save className="w-4 h-4" /> Salvar</>
           )}
         </Button>
       </div>

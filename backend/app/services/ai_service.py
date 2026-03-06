@@ -215,7 +215,7 @@ Gere os critérios de inclusão e exclusão agora:""")
         }
 
     async def evaluate_article(self, article_data: dict, project_data: dict) -> dict:
-        """Evaluate an article's relevance based on its abstract and project criteria."""
+        """Evaluate an article's relevance and extract metadata for graph relationships."""
         abstract = article_data.get("abstract", "")
         title = article_data.get("title", "")
         
@@ -223,7 +223,10 @@ Gere os critérios de inclusão e exclusão agora:""")
             return {
                 "suggestedStatus": "pendente",
                 "relevanceScore": 0,
-                "justification": "Artigo sem resumo disponível para análise automática."
+                "justification": "Artigo sem resumo disponível para análise automática.",
+                "methodology": None,
+                "domain": None,
+                "keywords": []
             }
 
         inclusion = "\n".join([f"- {c}" for c in project_data.get("criteriosInclusao", [])])
@@ -231,19 +234,26 @@ Gere os critérios de inclusão e exclusão agora:""")
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Você é um especialista em triagem de literatura científica.
-Sua tarefa é avaliar se um artigo deve ser incluído ou excluído de uma revisão sistemática baseando-se no resumo (abstract) e nos critérios fornecidos.
+Sua tarefa é avaliar se um artigo deve ser incluído ou excluído de uma revisão sistemática e extrair metadados do artigo.
 
 Instruções:
 1. Analise o título e o resumo do artigo.
 2. Compare-os com os critérios de inclusão e exclusão do projeto.
 3. Forneça uma pontuação de relevância de 0 a 100.
-4. Sugira o status: "incluido" (se atende aos critérios) ou "excluido" (se falha em critérios de inclusão ou atende a critérios de exclusão).
-5. Escreva uma justificativa curta e técnica (máximo 3 frases).
-6. Responda APENAS no formato JSON:
+4. Sugira o status: "incluido" ou "excluido".
+5. Escreva uma justificativa curta (máximo 3 frases).
+6. Extraia a metodologia do estudo. Analise cuidadosamente o abstract para identificar a metodologia REAL usada. Se o artigo descreve experimentos, é "experimental". Se faz revisão da literatura, é "literature-review" ou "systematic-review". Se propõe um framework/arquitetura, é "design-science". Se faz survey/questionário, é "survey". NÃO use "other" a menos que realmente nenhuma das opções se aplique.
+7. Identifique o domínio/área do estudo.
+8. Extraia 5 palavras-chave principais.
+
+Responda APENAS no formato JSON:
 {{
   "suggestedStatus": "incluido" | "excluido",
   "relevanceScore": number,
-  "justification": "string"
+  "justification": "string",
+  "methodology": "experimental" | "survey" | "case-study" | "literature-review" | "systematic-review" | "meta-analysis" | "design-science" | "simulation" | "theoretical" | "comparative-analysis" | "qualitative" | "mixed-methods" | "rct" | "cohort" | "cross-sectional" | "other" | null,
+  "domain": "string (área do estudo, ex: NLP, machine learning, educação)",
+  "keywords": ["palavra1", "palavra2", "palavra3", "palavra4", "palavra5"]
 }}"""),
             ("user", f"""
 Dados do Projeto:
@@ -257,7 +267,7 @@ Dados do Artigo:
 Título: {title}
 Resumo: {abstract}
 
-Avalie o artigo agora:""")
+Avalie o artigo e extraia os metadados agora:""")
         ])
         
         chain = prompt | self.llm | StrOutputParser()
@@ -269,18 +279,32 @@ Avalie o artigo agora:""")
             if json_match:
                 import json
                 eval_data = json.loads(json_match.group(0))
-                return eval_data
+                # Ensure all expected fields are present
+                return {
+                    "suggestedStatus": eval_data.get("suggestedStatus", "pendente"),
+                    "relevanceScore": eval_data.get("relevanceScore", 0),
+                    "justification": eval_data.get("justification", ""),
+                    "methodology": eval_data.get("methodology"),
+                    "domain": eval_data.get("domain"),
+                    "keywords": eval_data.get("keywords", [])
+                }
             return {
                 "suggestedStatus": "pendente",
                 "relevanceScore": 0,
-                "justification": "Falha ao processar avaliação da IA."
+                "justification": "Falha ao processar avaliação da IA.",
+                "methodology": None,
+                "domain": None,
+                "keywords": []
             }
         except Exception as e:
             print(f"Erro na avaliação da IA: {e}")
             return {
                 "suggestedStatus": "pendente",
                 "relevanceScore": 0,
-                "justification": f"Erro na análise: {str(e)}"
+                "justification": f"Erro na análise: {str(e)}",
+                "methodology": None,
+                "domain": None,
+                "keywords": []
             }
 
     async def chat(self, message: str, article_context: dict | None = None) -> str:
@@ -335,6 +359,81 @@ REGRAS:
         
         return await chain.ainvoke({"message": message})
     
+    async def chat_project(
+        self,
+        message: str,
+        project_context: dict,
+        retrieved_articles: list[dict]
+    ) -> str:
+        """Chat with AI using RAG context from the project's articles.
+        
+        Args:
+            message: User's question
+            project_context: Dict with project info (title, objetivo, picoc, etc.)
+            retrieved_articles: List of article dicts retrieved by the RAG service
+        """
+        # Build the articles context block
+        articles_block = ""
+        for i, art in enumerate(retrieved_articles, 1):
+            articles_block += f"\n--- ARTIGO {i} ---\n"
+            articles_block += f"Título: {art.get('title', 'N/A')}\n"
+            articles_block += f"Autores: {art.get('authors', 'N/A')}\n"
+            articles_block += f"Ano: {art.get('year', 'N/A')}\n"
+            if art.get('journal'):
+                articles_block += f"Periódico: {art['journal']}\n"
+            if art.get('methodology'):
+                articles_block += f"Metodologia: {art['methodology']}\n"
+            if art.get('domain'):
+                articles_block += f"Domínio: {art['domain']}\n"
+            if art.get('abstract'):
+                articles_block += f"Resumo: {art['abstract']}\n"
+            if art.get('notas'):
+                articles_block += f"Notas do pesquisador: {art['notas']}\n"
+        
+        # Build PICOC block
+        picoc = project_context.get("picoc", {})
+        picoc_block = ""
+        if picoc:
+            picoc_block = f"""
+Framework PICOC:
+- População: {picoc.get('pessoa', 'N/A')}
+- Intervenção: {picoc.get('intervencao', 'N/A')}
+- Comparação: {picoc.get('comparacao', 'N/A')}
+- Outcome: {picoc.get('outcome', 'N/A')}
+- Contexto: {picoc.get('contexto', 'N/A')}"""
+
+        # Research questions
+        rq = project_context.get("researchQuestions", [])
+        rq_block = ""
+        if rq:
+            rq_block = "\nPerguntas de pesquisa:\n" + "\n".join(f"  {i+1}. {q}" for i, q in enumerate(rq))
+
+        system_prompt = f"""PERSONA: Você é um assistente especializado em revisão de literatura acadêmica. Você tem acesso ao contexto de um projeto de pesquisa e aos artigos mais relevantes da base do pesquisador.
+
+CONTEXTO DO PROJETO:
+Título: {project_context.get('title', 'N/A')}
+Objetivo: {project_context.get('objetivo', 'N/A')}{picoc_block}{rq_block}
+
+ARTIGOS RECUPERADOS DA BASE DO PESQUISADOR:
+{articles_block if articles_block else "(Nenhum artigo com embedding disponível neste projeto)"}
+
+REGRAS DE OPERAÇÃO:
+1. Responda à pergunta do pesquisador baseando-se PREFERENCIALMENTE nos artigos fornecidos acima.
+2. Ao citar informações de um artigo, use o formato [Autor, Ano] (ex: [Silva, 2023]).
+3. Se a informação não estiver coberta pelos artigos, você pode usar seu conhecimento geral, mas AVISE claramente que é uma informação externa aos artigos do projeto.
+4. Seja conciso e acadêmico.
+5. Quando fizer sínteses ou comparações, organize a resposta de forma clara (listas, tabelas quando apropriado).
+6. Se não houver artigos relevantes, responda com seu conhecimento geral e sugira ao pesquisador que adicione mais artigos à base."""
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("user", "{message}")
+        ])
+        
+        chain = prompt | self.llm | StrOutputParser()
+        
+        return await chain.ainvoke({"message": message})
+
     def _parse_numbered_list(self, text: str) -> list[str]:
         """Parse a numbered list from LLM output, ignoring non-numbered lines."""
         lines = text.strip().split("\n")

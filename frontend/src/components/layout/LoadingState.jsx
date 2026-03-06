@@ -22,7 +22,7 @@ function LoadingState({
     const content = (
         <div className={cn("flex items-center justify-center gap-2", className)}>
             <LoaderIcon className={cn("animate-spin text-primary", sizeClasses[size])} />
-            {message && <span className="text-muted-foreground">{message}</span>}
+            {message && <span className="text-[var(--syn-text-secondary)]">{message}</span>}
         </div>
     );
 

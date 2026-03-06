@@ -12,9 +12,9 @@ function PageHeader({ title, description, actions, children, className }) {
         <div className={cn("space-y-4", className)}>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+                    <h1 className="text-2xl font-bold text-[var(--syn-text-primary)]">{title}</h1>
                     {description && (
-                        <p className="text-muted-foreground mt-1">{description}</p>
+                        <p className="text-[var(--syn-text-secondary)] mt-1">{description}</p>
                     )}
                 </div>
                 {actions && (

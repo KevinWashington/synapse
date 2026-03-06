@@ -163,6 +163,22 @@ class ProjectService {
       throw error;
     }
   }
+
+  async chatWithProject(projectId, messages) {
+    try {
+      if (!projectId) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      return await apiService.post("/api/project-chat", {
+        projectId: parseInt(projectId),
+        messages,
+      });
+    } catch (error) {
+      console.error("Erro no chat com o projeto:", error);
+      throw error;
+    }
+  }
 }
 
 const projectService = new ProjectService();

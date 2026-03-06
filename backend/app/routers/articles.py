@@ -120,7 +120,7 @@ async def create_article(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Criar novo artigo com avaliação automática da IA."""
+    """Criar novo artigo com avaliação automática da IA, embedding e sincronização de grafo."""
     project = await get_project_or_404(projectId, current_user.id, db)
     
     article = Article(
@@ -129,17 +129,21 @@ async def create_article(
         ownerId=current_user.id
     )
     
-    # Avaliação automática por IA se tiver abstract
+    # Avaliação automática por IA e extração de metadados se tiver abstract
     if article.abstract:
         try:
             from app.services.ai_service import get_ai_service
+            from app.services.embedding_service import get_embedding_service
+            
             ai_service = get_ai_service()
+            embedding_service = get_embedding_service()
             
             project_data = {
                 "criteriosInclusao": project.criteriosInclusao or [],
                 "criteriosExclusao": project.criteriosExclusao or []
             }
             
+            # Avaliação + extração de metadados (single LLM call)
             eval_result = await ai_service.evaluate_article(
                 {"title": article.title, "abstract": article.abstract},
                 project_data
@@ -148,12 +152,49 @@ async def create_article(
             article.aiEvaluation = eval_result.get("justification")
             article.aiSuggestedStatus = eval_result.get("suggestedStatus")
             article.aiRelevanceScore = eval_result.get("relevanceScore")
+            article.aiMethodology = eval_result.get("methodology")
+            article.aiDatabase = eval_result.get("database")
+            article.aiDomain = eval_result.get("domain")
+            article.aiKeywords = eval_result.get("keywords", [])
+            print(f"[GRAPH] AI metadata extracted: methodology={article.aiMethodology}, database={article.aiDatabase}")
+            
         except Exception as e:
-            print(f"Erro ao avaliar artigo com IA: {e}")
+            import traceback
+            print(f"[GRAPH] Erro ao avaliar artigo com IA: {e}")
+            traceback.print_exc()
+        
+        # Gerar embedding separadamente para isolar erros
+        try:
+            from app.services.embedding_service import get_embedding_service
+            embedding_service = get_embedding_service()
+            
+            print(f"[GRAPH] Gerando embedding para: {article.title[:60]}...")
+            embedding = embedding_service.generate_embedding(article.abstract)
+            if embedding:
+                article.embedding = embedding
+                print(f"[GRAPH] Embedding gerado com sucesso: {len(embedding)} dimensões")
+            else:
+                print(f"[GRAPH] Embedding retornou vazio!")
+        except Exception as e:
+            import traceback
+            print(f"[GRAPH] Erro ao gerar embedding: {e}")
+            traceback.print_exc()
     
     db.add(article)
     await db.commit()
     await db.refresh(article)
+    
+    # Sincronizar com Neo4j (criar nó e relacionamentos)
+    try:
+        from app.services.graph_sync_service import get_graph_sync_service
+        graph_sync = get_graph_sync_service()
+        print(f"[GRAPH] Sincronizando artigo {article.id} com Neo4j...")
+        await graph_sync.sync_article_to_graph(article, db)
+        print(f"[GRAPH] Sincronização concluída para artigo {article.id}")
+    except Exception as e:
+        import traceback
+        print(f"[GRAPH] Erro ao sincronizar artigo com grafo: {e}")
+        traceback.print_exc()
     
     response = ArticleResponse.model_validate(article)
     response.hasPdf = False
@@ -280,8 +321,17 @@ async def delete_article(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Deletar artigo."""
+    """Deletar artigo e remover do grafo."""
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    
+    # Remover do Neo4j
+    try:
+        from app.services.graph_sync_service import get_graph_sync_service
+        graph_sync = get_graph_sync_service()
+        await graph_sync.delete_article_from_graph(articleId)
+    except Exception as e:
+        print(f"Erro ao remover artigo do grafo: {e}")
+    
     await db.delete(article)
     await db.commit()
     return {"success": True, "message": "Artigo removido com sucesso"}
@@ -404,33 +454,167 @@ async def get_relationships(
 @router.get("/{projectId}/grafo")
 async def get_project_graph(
     projectId: int,
+    relationship_type: str = "all",
+    min_similarity: float = 0.5,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Obter grafo de relacionamentos do projeto."""
+    """Obter grafo de relacionamentos do projeto.
+    
+    Args:
+        relationship_type: Tipo de relacionamento - 'all', 'semantic', 'methodology', 'database', 'authors'
+        min_similarity: Threshold mínimo para relações de similaridade semântica (0.0 a 1.0)
+    """
     await get_project_or_404(projectId, current_user.id, db)
     
+    try:
+        from app.services.neo4j_service import get_neo4j_service
+        neo4j_service = get_neo4j_service()
+        
+        graph_data = await neo4j_service.get_project_graph(
+            project_id=projectId,
+            relationship_type=relationship_type,
+            min_similarity=min_similarity
+        )
+        return graph_data
+    except Exception as e:
+        print(f"Erro ao obter grafo do Neo4j: {e}")
+        # Fallback para o comportamento antigo usando PostgreSQL
+        result = await db.execute(
+            select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+        )
+        articles = result.scalars().all()
+        
+        nodes = []
+        links = []
+        
+        for article in articles:
+            nodes.append({
+                "id": str(article.id),
+                "title": article.title,
+                "authors": article.authors,
+                "year": article.year,
+                "status": article.status,
+                "methodology": article.aiMethodology,
+                "domain": article.aiDomain
+            })
+            
+            for related in article.relatedArticles:
+                links.append({
+                    "source": str(article.id),
+                    "target": str(related.id),
+                    "type": "manual"
+                })
+        
+        return {"nodes": nodes, "links": links}
+
+
+@router.post("/{projectId}/reprocessar-grafo")
+async def reprocess_project_graph(
+    projectId: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Reprocessar todos os artigos do projeto: gerar embeddings, extrair metadados e reconstruir grafo."""
+    project = await get_project_or_404(projectId, current_user.id, db)
+    
     result = await db.execute(
-        select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+        select(Article).where(
+            Article.projectId == projectId,
+            Article.ownerId == current_user.id
+        )
     )
     articles = result.scalars().all()
     
-    nodes = []
-    links = []
+    if not articles:
+        return {"success": True, "message": "Nenhum artigo encontrado", "processed": 0}
+    
+    from app.services.ai_service import get_ai_service
+    from app.services.embedding_service import get_embedding_service
+    from app.services.graph_sync_service import get_graph_sync_service
+    from app.services.neo4j_service import get_neo4j_service
+    
+    ai_service = get_ai_service()
+    embedding_service = get_embedding_service()
+    graph_sync = get_graph_sync_service()
+    neo4j_service = get_neo4j_service()
+    
+    # Limpar grafo Neo4j do projeto
+    try:
+        await neo4j_service.delete_project_graph(projectId)
+        print(f"[REPROCESS] Grafo Neo4j limpo para projeto {projectId}")
+    except Exception as e:
+        print(f"[REPROCESS] Erro ao limpar grafo: {e}")
+    
+    project_data = {
+        "criteriosInclusao": project.criteriosInclusao or [],
+        "criteriosExclusao": project.criteriosExclusao or []
+    }
+    
+    processed = 0
+    errors = []
     
     for article in articles:
-        nodes.append({
-            "id": str(article.id),
-            "title": article.title,
-            "authors": article.authors,
-            "year": article.year,
-            "status": article.status
-        })
+        if not article.abstract:
+            print(f"[REPROCESS] Artigo {article.id} sem abstract, pulando")
+            continue
         
-        for related in article.relatedArticles:
-            links.append({
-                "source": str(article.id),
-                "target": str(related.id)
-            })
+        try:
+            # Re-extract AI metadata
+            eval_result = await ai_service.evaluate_article(
+                {"title": article.title, "abstract": article.abstract},
+                project_data
+            )
+            article.aiEvaluation = eval_result.get("justification")
+            article.aiSuggestedStatus = eval_result.get("suggestedStatus")
+            article.aiRelevanceScore = eval_result.get("relevanceScore")
+            article.aiMethodology = eval_result.get("methodology")
+            article.aiDatabase = eval_result.get("database")
+            article.aiDomain = eval_result.get("domain")
+            article.aiKeywords = eval_result.get("keywords", [])
+            print(f"[REPROCESS] AI metadata for article {article.id}: methodology={article.aiMethodology}")
+        except Exception as e:
+            print(f"[REPROCESS] Erro AI para artigo {article.id}: {e}")
+            errors.append(f"AI error for {article.id}: {str(e)}")
+        
+        try:
+            # Generate embedding
+            embedding = embedding_service.generate_embedding(article.abstract)
+            if embedding:
+                article.embedding = embedding
+                print(f"[REPROCESS] Embedding gerado para artigo {article.id}: {len(embedding)} dims")
+            else:
+                print(f"[REPROCESS] Embedding vazio para artigo {article.id}")
+        except Exception as e:
+            print(f"[REPROCESS] Erro embedding para artigo {article.id}: {e}")
+            errors.append(f"Embedding error for {article.id}: {str(e)}")
+        
+        processed += 1
     
-    return {"nodes": nodes, "links": links}
+    # Commit all embedding and metadata updates
+    await db.commit()
+    print(f"[REPROCESS] Commits salvos para {processed} artigos")
+    
+    # Refresh articles to get updated data
+    for article in articles:
+        await db.refresh(article)
+    
+    # Now sync each article to Neo4j (create nodes first, then relationships)
+    for article in articles:
+        if not article.abstract:
+            continue
+        try:
+            await graph_sync.sync_article_to_graph(article, db)
+        except Exception as e:
+            print(f"[REPROCESS] Erro sync artigo {article.id}: {e}")
+            errors.append(f"Sync error for {article.id}: {str(e)}")
+    
+    print(f"[REPROCESS] Concluído: {processed} artigos processados, {len(errors)} erros")
+    
+    return {
+        "success": True,
+        "message": f"Reprocessamento concluído: {processed} artigos",
+        "processed": processed,
+        "total": len(articles),
+        "errors": errors if errors else None
+    }

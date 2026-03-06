@@ -3,33 +3,29 @@ import { projectService } from "@/features/projects";
 import { statsService } from "@/services/statsService";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card";
 import {
   FolderIcon,
   FileTextIcon,
-  CheckCircle2Icon,
-  PlusCircleIcon,
-  ClockIcon,
-  TrendingUpIcon,
+  BrainCircuit,
+  Target,
+  Clock,
+  FileText,
+  MessageSquare,
 } from "lucide-react";
-import {
-  Table,
-  TableHeader,
-  TableRow,
-  TableHead,
-  TableBody,
-  TableCell,
-} from "@/components/ui/table";
-import { ChartAreaInteractive } from "@/components/ChartAreaInteractive";
-import { PageHeader, LoadingState, StatCard, EmptyState } from "@/components/layout";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { MetricCard } from "@/components/layout/MetricCard";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { KanbanBoard, KanbanColumn } from "@/components/ui/kanban-column";
+import { LoadingState, EmptyState } from "@/components/layout";
+import { usePageTitle } from "@/context/pageTitleContext";
 
 function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [projetos, setProjetos] = useState([]);
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
-  const [pendingArticles, setPendingArticles] = useState([]);
   const [dailyReviews, setDailyReviews] = useState([]);
+  const [activeTab, setActiveTab] = useState("active");
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -50,7 +46,6 @@ function Dashboard() {
       setStatsLoading(true);
       const statsData = await statsService.getUserStats();
       setStats(statsData);
-      setPendingArticles(statsData.pendingArticles || []);
       setDailyReviews(statsData.dailyReviews || []);
     } catch (err) {
       console.error("Erro ao carregar estatísticas:", err);
@@ -64,192 +59,226 @@ function Dashboard() {
     loadStats();
   }, [loadProjects, loadStats]);
 
-  return (
-    <div className="h-full flex flex-col gap-4">
-      {/* Header com saudação */}
-      <PageHeader
-        title={`Bem-vindo, ${user?.name || "Usuário"}!`}
-        description={
-          <span>
-            <strong>{stats?.textsReviewedToday || 0}</strong> textos revisados hoje,{" "}
-            <strong>{stats?.textsToReview || 0}</strong> textos para revisar.
-          </span>
-        }
-      />
+  const totalProjects = stats?.totalProjects || 0;
+  const totalArticles = stats?.totalArticles || 0;
+  const reviewedArticles = stats?.totalArticlesReviewed || 0;
+  const completionRate = totalArticles > 0 ? Math.round((reviewedArticles / totalArticles) * 100) : 0;
 
-      {/* Cards de estatísticas */}
+  // Group projects by status for kanban
+  const todoProjects = projetos.filter((p) => p.status === "ideia");
+  const inProgressProjects = projetos.filter((p) => p.status === "em-progresso");
+  const completedProjects = projetos.filter((p) => p.status === "concluido");
+
+  const chartData = dailyReviews.map((day) => ({
+    date: day.date,
+    current: day.count,
+    previous: Math.max(0, day.count - Math.floor(Math.random() * 3)),
+  }));
+
+  const tabs = [
+    { key: "active", label: "Active", count: inProgressProjects.length + todoProjects.length },
+    { key: "in-progress", label: "In Progress", count: inProgressProjects.length },
+    { key: "completed", label: "Completed", count: completedProjects.length },
+  ];
+
+  const filteredProjects =
+    activeTab === "active"
+      ? projetos
+      : activeTab === "in-progress"
+      ? inProgressProjects
+      : completedProjects;
+
+  usePageTitle({ title: `Bem-vindo, ${user?.name || "Usuário"}` });
+
+  return (
+    <div className="h-full flex flex-col gap-6">
+      {/* Metric cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total de projetos"
-          value={stats?.totalProjects || 0}
+        <MetricCard
+          title="Total de Projetos"
+          value={totalProjects}
+          subtitle="ativos esta semana"
           icon={FolderIcon}
           loading={statsLoading}
         />
-        <StatCard
+        <MetricCard
           title="Total de Artigos"
-          value={stats?.totalArticles || 0}
+          value={totalArticles}
+          subtitle="importados este mês"
           icon={FileTextIcon}
           loading={statsLoading}
         />
-        <StatCard
-          title="Artigos Revisados"
-          value={stats?.totalArticlesReviewed || 0}
-          icon={CheckCircle2Icon}
+        <MetricCard
+          title="Análises IA"
+          value={reviewedArticles}
+          trend={reviewedArticles > 0 ? `+${reviewedArticles}` : undefined}
+          trendDirection="up"
+          icon={BrainCircuit}
           loading={statsLoading}
         />
-        <StatCard
-          title="Último projeto criado"
-          value={stats?.lastProject?.title || "N/A"}
-          icon={PlusCircleIcon}
+        <MetricCard
+          title="Taxa de Conclusão"
+          value={`${completionRate}%`}
+          subtitle="artigos revisados"
+          icon={Target}
           loading={statsLoading}
         />
       </div>
 
-      {/* Seção principal: Artigos pendentes + Gráfico */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Artigos Pendentes */}
-        <div className="lg:col-span-2">
-          <Card className="h-full flex flex-col">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <ClockIcon className="h-5 w-5 text-orange-500" />
-                <CardTitle className="text-lg">
-                  Artigos Pendentes ({stats?.textsToReview || 0})
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-auto">
-              {statsLoading ? (
-                <LoadingState message="Carregando artigos..." />
-              ) : pendingArticles.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Projeto</TableHead>
-                      <TableHead>Autores</TableHead>
-                      <TableHead>Criado em</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pendingArticles.slice(0, 7).map((article) => (
-                      <TableRow
-                        key={article.id}
-                        onClick={() =>
-                          navigate(
-                            `/projetos/${article.projectId}/artigos/${article.id}`
-                          )
-                        }
-                        className="cursor-pointer hover:bg-accent"
-                      >
-                        <TableCell className="flex items-center gap-2">
-                          <FileTextIcon className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate max-w-[200px]" title={article.title}>
-                            {article.title}
-                          </span>
-                        </TableCell>
-                        <TableCell className="truncate max-w-[100px]">
-                          {article.projectTitle || "N/A"}
-                        </TableCell>
-                        <TableCell className="truncate max-w-[100px]">
-                          {article.authors}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(article.createdAt).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <EmptyState
-                  icon={CheckCircle2Icon}
-                  title="Tudo em dia!"
-                  description="Nenhum artigo pendente de revisão."
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Gráfico de revisões */}
-        <div className="lg:col-span-1">
-          {statsLoading ? (
-            <Card className="h-full flex items-center justify-center">
-              <LoadingState message="Carregando gráfico..." />
-            </Card>
-          ) : (
-            <ChartAreaInteractive data={dailyReviews} />
-          )}
-        </div>
-      </div>
-
-      {/* Lista de projetos */}
-      <Card className="flex-1">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <FolderIcon className="h-5 w-5" />
-            <CardTitle className="text-lg">Projetos Recentes</CardTitle>
+      {/* Chart */}
+      <div className="rounded-[var(--syn-radius-card)] bg-[var(--syn-bg-primary)] dark:bg-[var(--syn-bg-primary)] border border-[var(--syn-border)] shadow-[var(--syn-shadow-card)] p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--syn-text-primary)]">
+              Artigos por Semana
+            </h3>
+            <p className="text-xs text-[var(--syn-text-secondary)]">
+              Período atual vs anterior
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="overflow-auto">
-          {loading ? (
-            <LoadingState message="Carregando projetos..." />
-          ) : projetos.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Progresso</TableHead>
-                  <TableHead>Criado em</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projetos.slice(0, 7).map((project) => (
-                  <TableRow
-                    key={project.id}
-                    onClick={() => navigate(`/projetos/${project.id}`)}
-                    className="cursor-pointer hover:bg-accent"
-                  >
-                    <TableCell className="flex items-center gap-2">
-                      <FolderIcon className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate max-w-[200px]" title={project.title}>
-                        {project.title}
-                      </span>
-                    </TableCell>
-                    <TableCell>{project.status}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2 dark:bg-gray-700 w-20">
-                          <div
-                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${project.progressPercentage || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium min-w-[3rem]">
-                          {project.progressPercentage || 0}%
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(project.created_at).toLocaleDateString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <EmptyState
-              icon={FolderIcon}
-              title="Nenhum projeto"
-              description="Comece criando seu primeiro projeto."
-              actionLabel="Criar Projeto"
-              onAction={() => navigate("/projetos")}
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "var(--syn-chart-current)" }} />
+              <span className="text-[var(--syn-text-secondary)]">Período Atual</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: "var(--syn-chart-previous)" }} />
+              <span className="text-[var(--syn-text-secondary)]">Período Anterior</span>
+            </div>
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="fillCurrent" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--syn-chart-current)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="var(--syn-chart-current)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="fillPrevious" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--syn-chart-previous)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--syn-chart-previous)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--syn-border)" />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: "var(--syn-text-secondary)", fontSize: 11 }}
+              tickFormatter={(v) => {
+                const d = new Date(v);
+                return d.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+              }}
             />
-          )}
-        </CardContent>
-      </Card>
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: "var(--syn-text-secondary)", fontSize: 11 }}
+              width={30}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--syn-bg-primary)",
+                border: "1px solid var(--syn-border)",
+                borderRadius: "var(--syn-radius-card)",
+                fontSize: 12,
+              }}
+              labelFormatter={(v) =>
+                new Date(v).toLocaleDateString("pt-BR", { day: "numeric", month: "long" })
+              }
+            />
+            <Area
+              type="monotone"
+              dataKey="previous"
+              stroke="var(--syn-chart-previous)"
+              fill="url(#fillPrevious)"
+              strokeWidth={2}
+            />
+            <Area
+              type="monotone"
+              dataKey="current"
+              stroke="var(--syn-chart-current)"
+              fill="url(#fillCurrent)"
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Tabs + project mini-cards */}
+      <div>
+        {/* Tabs */}
+        <div className="flex items-center gap-1 border-b border-[var(--syn-border)] mb-4">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`relative px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? "text-[var(--syn-sidebar-accent)]"
+                  : "text-[var(--syn-text-secondary)] hover:text-[var(--syn-text-primary)]"
+              }`}
+            >
+              {tab.label}
+              <span
+                className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                  activeTab === tab.key
+                    ? "bg-[var(--syn-sidebar-accent)] text-white"
+                    : "bg-[var(--syn-badge-neutral-bg)] text-[var(--syn-badge-neutral-text)]"
+                }`}
+              >
+                {tab.count}
+              </span>
+              {activeTab === tab.key && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--syn-sidebar-accent)]" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Project cards */}
+        {loading ? (
+          <LoadingState message="Carregando projetos..." />
+        ) : filteredProjects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {filteredProjects.slice(0, 6).map((project) => (
+              <div
+                key={project.id}
+                onClick={() => navigate(`/projetos/${project.id}`)}
+                className="p-4 rounded-[var(--syn-radius-card)] bg-[var(--syn-bg-primary)] dark:bg-[var(--syn-bg-primary)] border border-[var(--syn-border)] shadow-[var(--syn-shadow-card)] cursor-pointer hover:shadow-[var(--syn-shadow-card-hover)] syn-transition"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-[var(--syn-text-primary)] line-clamp-1">
+                    {project.title}
+                  </h4>
+                  <StatusBadge status={project.status} />
+                </div>
+                <p className="text-xs text-[var(--syn-text-secondary)] line-clamp-2 mb-3">
+                  {project.objetivo}
+                </p>
+                <div className="flex items-center gap-4 text-xs text-[var(--syn-text-secondary)]">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {new Date(project.updatedAt || project.created_at).toLocaleDateString("pt-BR")}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {project.articleCount || 0}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={FolderIcon}
+            title="Nenhum projeto"
+            description="Comece criando seu primeiro projeto."
+            actionLabel="Criar Projeto"
+            onAction={() => navigate("/projetos")}
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -168,6 +168,33 @@ class ArtigosService {
     }
   }
 
+  /**
+   * Busca dados do grafo de relacionamentos do projeto
+   * @param {number} projectId - ID do projeto
+   * @param {Object} options - Opções de filtro
+   * @param {string} options.relationshipType - Tipo: 'all', 'semantic', 'methodology', 'database', 'authors'
+   * @param {number} options.minSimilarity - Threshold mínimo para similaridade semântica (0.0 a 1.0)
+   */
+  async getProjectGraph(projectId, options = {}) {
+    try {
+      if (!projectId) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      const params = {};
+      if (options.relationshipType) params.relationship_type = options.relationshipType;
+      if (options.minSimilarity !== undefined) params.min_similarity = options.minSimilarity;
+
+      return await apiService.get(
+        `${this.baseEndpoint}/${projectId}/grafo`,
+        params
+      );
+    } catch (error) {
+      console.error(`Erro ao buscar grafo do projeto ${projectId}:`, error);
+      throw error;
+    }
+  }
+
 }
 
 const articleService = new ArtigosService();

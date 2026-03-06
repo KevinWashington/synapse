@@ -175,6 +175,25 @@ class ArtigosService {
     }
   }
 
+  async uploadPdf(projectId, articleId, file) {
+    try {
+      if (!projectId || !articleId) {
+        throw new Error("IDs do projeto e artigo são obrigatórios");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      return await apiService.postFormData(
+        `${this.getProjectEndpoint(projectId)}/${articleId}/pdf`,
+        formData
+      );
+    } catch (error) {
+      console.error(`Erro ao fazer upload de PDF do artigo ${articleId}:`, error);
+      throw error;
+    }
+  }
+
   async deleteArticle(projectId, articleId) {
     try {
       if (!projectId || !articleId) {

@@ -3,21 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { LoaderIcon, SaveIcon, AlertTriangleIcon } from "lucide-react";
+import { SlidePanel } from "@/components/ui/slide-panel";
 import { articleService } from "@/services/artigosService";
 import { toast } from "@/lib/toast";
 
@@ -125,128 +113,133 @@ function EditarArtigoModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Artigo</DialogTitle>
-          <DialogDescription>
-            Atualize as informações do artigo "{artigo?.title}".
-          </DialogDescription>
-        </DialogHeader>
+    <SlidePanel
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Editar Artigo"
+      breadcrumb="Artigos"
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button variant="outline" onClick={handleClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={loading} className="gap-2">
+            {loading ? (
+              <>
+                <LoaderIcon className="h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <SaveIcon className="h-4 w-4" />
+                Salvar Alterações
+              </>
+            )}
+          </Button>
+        </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Section title */}
+        <div className="space-y-1">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--syn-text-secondary)]">
+            Informações do Artigo
+          </h3>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Título */}
+        {/* Título */}
+        <div className="space-y-2">
+          <Label htmlFor="title" className="text-[var(--syn-text-primary)]">Título <span className="text-red-500">*</span></Label>
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => handleInputChange("title", e.target.value)}
+            placeholder="Título do artigo"
+          />
+        </div>
+
+        {/* Autores */}
+        <div className="space-y-2">
+          <Label htmlFor="authors" className="text-[var(--syn-text-primary)]">Autores <span className="text-red-500">*</span></Label>
+          <Input
+            id="authors"
+            value={formData.authors}
+            onChange={(e) => handleInputChange("authors", e.target.value)}
+            placeholder="Nome dos autores"
+          />
+        </div>
+
+        {/* Ano e Revista */}
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Título *</Label>
+            <Label htmlFor="year" className="text-[var(--syn-text-primary)]">Ano</Label>
             <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => handleInputChange("title", e.target.value)}
-              placeholder="Título do artigo"
-              required
+              id="year"
+              type="number"
+              value={formData.year}
+              onChange={(e) => handleInputChange("year", e.target.value)}
+              placeholder="2023"
+              min="1900"
+              max="2030"
             />
           </div>
-
-          {/* Autores */}
           <div className="space-y-2">
-            <Label htmlFor="authors">Autores *</Label>
+            <Label htmlFor="journal" className="text-[var(--syn-text-primary)]">Revista/Conferência</Label>
             <Input
-              id="authors"
-              value={formData.authors}
-              onChange={(e) => handleInputChange("authors", e.target.value)}
-              placeholder="Nome dos autores"
-              required
+              id="journal"
+              value={formData.journal}
+              onChange={(e) => handleInputChange("journal", e.target.value)}
+              placeholder="Nome da revista ou conferência"
             />
           </div>
+        </div>
 
-          {/* Ano e Revista */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="year">Ano</Label>
-              <Input
-                id="year"
-                type="number"
-                value={formData.year}
-                onChange={(e) => handleInputChange("year", e.target.value)}
-                placeholder="2023"
-                min="1900"
-                max="2030"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="journal">Revista/Conferência</Label>
-              <Input
-                id="journal"
-                value={formData.journal}
-                onChange={(e) => handleInputChange("journal", e.target.value)}
-                placeholder="Nome da revista ou conferência"
-              />
-            </div>
-          </div>
+        {/* DOI */}
+        <div className="space-y-2">
+          <Label htmlFor="doi" className="text-[var(--syn-text-primary)]">DOI</Label>
+          <Input
+            id="doi"
+            value={formData.doi}
+            onChange={(e) => handleInputChange("doi", e.target.value)}
+            placeholder="10.1000/182"
+          />
+        </div>
 
-          {/* DOI e Status */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="doi">DOI</Label>
-              <Input
-                id="doi"
-                value={formData.doi}
-                onChange={(e) => handleInputChange("doi", e.target.value)}
-                placeholder="10.1000/182"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) => handleInputChange("status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="analisado">Analisado</SelectItem>
-                  <SelectItem value="excluido">Excluído</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Páginas, Volume e Número */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="pages">Páginas</Label>
-              <Input
-                id="pages"
-                value={formData.pages}
-                onChange={(e) => handleInputChange("pages", e.target.value)}
-                placeholder="1-6"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="volume">Volume</Label>
-              <Input
-                id="volume"
-                value={formData.volume}
-                onChange={(e) => handleInputChange("volume", e.target.value)}
-                placeholder="45"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="number">Número</Label>
-              <Input
-                id="number"
-                value={formData.number}
-                onChange={(e) => handleInputChange("number", e.target.value)}
-                placeholder="2"
-              />
-            </div>
-          </div>
-
-          {/* ISSN */}
+        {/* Páginas, Volume e Número */}
+        <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="issn">ISSN</Label>
+            <Label htmlFor="pages" className="text-[var(--syn-text-primary)]">Páginas</Label>
+            <Input
+              id="pages"
+              value={formData.pages}
+              onChange={(e) => handleInputChange("pages", e.target.value)}
+              placeholder="1-6"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="volume" className="text-[var(--syn-text-primary)]">Volume</Label>
+            <Input
+              id="volume"
+              value={formData.volume}
+              onChange={(e) => handleInputChange("volume", e.target.value)}
+              placeholder="45"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="number" className="text-[var(--syn-text-primary)]">Número</Label>
+            <Input
+              id="number"
+              value={formData.number}
+              onChange={(e) => handleInputChange("number", e.target.value)}
+              placeholder="2"
+            />
+          </div>
+        </div>
+
+        {/* ISSN e Palavras-chave */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="issn" className="text-[var(--syn-text-primary)]">ISSN</Label>
             <Input
               id="issn"
               value={formData.issn}
@@ -254,60 +247,59 @@ function EditarArtigoModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
               placeholder="2770-0682"
             />
           </div>
-
-          {/* Palavras-chave */}
           <div className="space-y-2">
-            <Label htmlFor="keywords">Palavras-chave</Label>
+            <Label htmlFor="keywords" className="text-[var(--syn-text-primary)]">Palavras-chave</Label>
             <Input
               id="keywords"
               value={formData.keywords}
               onChange={(e) => handleInputChange("keywords", e.target.value)}
-              placeholder="palavra1, palavra2, palavra3"
+              placeholder="palavra1, palavra2"
             />
           </div>
+        </div>
 
-          {/* Resumo */}
-          <div className="space-y-2">
-            <Label htmlFor="abstract">Resumo</Label>
-            <Textarea
-              id="abstract"
-              value={formData.abstract}
-              onChange={(e) => handleInputChange("abstract", e.target.value)}
-              placeholder="Resumo do artigo..."
-              rows={4}
-            />
+        {/* Resumo */}
+        <div className="space-y-2">
+          <Label htmlFor="abstract" className="text-[var(--syn-text-primary)]">Resumo</Label>
+          <Textarea
+            id="abstract"
+            value={formData.abstract}
+            onChange={(e) => handleInputChange("abstract", e.target.value)}
+            placeholder="Resumo do artigo..."
+            rows={4}
+          />
+        </div>
+
+        {/* Status */}
+        <div className="space-y-2">
+          <Label className="text-[var(--syn-text-primary)]">Status</Label>
+          <div className="flex flex-wrap gap-2">
+            {["pendente", "analisado", "excluido"].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handleInputChange("status", s)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  formData.status === s
+                    ? "bg-[var(--syn-sidebar-bg)] text-white border-transparent"
+                    : "border-[var(--syn-border)] text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
+                }`}
+              >
+                <StatusBadge status={s} />
+              </button>
+            ))}
           </div>
+        </div>
 
-          {/* Erro */}
-          {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 dark:bg-red-900 dark:border-red-800 dark:text-red-200">
-              <AlertTriangleIcon className="h-4 w-4" />
-              <span className="text-sm">{error}</span>
-            </div>
-          )}
-
-          {/* Botões */}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                <>
-                  <SaveIcon className="h-4 w-4 mr-2" />
-                  Salvar Alterações
-                </>
-              )}
-            </Button>
+        {/* Erro */}
+        {error && (
+          <div className="flex items-center gap-2 p-3 bg-[var(--syn-badge-high-bg)] border border-red-200 dark:border-red-800 rounded-[var(--syn-radius-card)] text-[var(--syn-badge-high-text)]">
+            <AlertTriangleIcon className="h-4 w-4" />
+            <span className="text-sm">{error}</span>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )}
+      </form>
+    </SlidePanel>
   );
 }
 

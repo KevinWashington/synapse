@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PlusCircle, Send } from "lucide-react";
 import { apiService } from "@/services/api";
+import ReactMarkdown from "react-markdown";
 
 const ChatIA = ({ artigo, onAdicionarNota, pdfData }) => {
   const [input, setInput] = useState("");
@@ -161,95 +162,109 @@ const ChatIA = ({ artigo, onAdicionarNota, pdfData }) => {
     } catch (err) {
       console.error("Erro:", err);
       setError(err.message);
-      // Remover a mensagem do assistente se houve erro
       setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <div className="flex flex-col h-full p-4 border bg-muted/50 rounded-xl">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold mb-2">Assistente</h2>
-      </div>
+  const handleAddToNotes = (content) => {
+    if (onAdicionarNota) {
+      onAdicionarNota(content);
+    }
+  };
 
+  return (
+    <div className="flex flex-col h-full">
+      {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto space-y-4 min-h-0 relative"
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
         ref={chatContainerRef}
       >
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex items-start gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"
-              }`}
+            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
-            <div
-              className={`rounded-xl relative px-4 py-2 max-w-[80%] whitespace-pre-wrap shadow-sm ${msg.role === "user"
-                  ? "bg-background rounded-br-none"
-                  : "bg-background rounded-bl-none border hover:pr-9 transition-all duration-200 group"
-                }`}
-            >
-              <p className="text-sm">
-                <strong>{msg.role}:</strong> {msg.content}
-              </p>
+            <div className={`relative max-w-[80%] ${msg.role === "assistant" ? "group/msg" : ""}`}>
+              <div
+                className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user"
+                    ? "bg-[var(--syn-sidebar-bg)] text-white rounded-br-md"
+                    : "bg-[var(--syn-bg-secondary)] border border-[var(--syn-border)] text-[var(--syn-text-primary)] rounded-bl-md"
+                  }`}
+              >
+                {msg.role === "assistant" ? (
+                  <div className="chat-markdown">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                )}
+              </div>
 
-              {msg.role === "assistant" && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className="hidden group-hover:flex mt-2 h-7 w-7 text-gray-500 hover:text-black absolute right-2 top-0 cursor-pointer items-center justify-center"
-                  onClick={() => onAdicionarNota(msg.content)}
-                  title="Adicionar às notas do projeto"
+              {msg.role === "assistant" && msg.id !== "welcome" && (
+                <button
+                  type="button"
+                  className="absolute -right-9 top-1 h-7 w-7 flex items-center justify-center rounded-full text-[var(--syn-text-secondary)] hover:text-[var(--syn-text-primary)] hover:bg-[var(--syn-badge-neutral-bg)] transition-all opacity-0 group-hover/msg:opacity-100 cursor-pointer"
+                  onClick={() => handleAddToNotes(msg.content)}
+                  title="Adicionar às notas"
                 >
                   <PlusCircle className="h-4 w-4" />
-                </span>
+                </button>
               )}
             </div>
           </div>
         ))}
 
         {isLoading && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Respondendo...</span>
+          <div className="flex justify-start">
+            <div className="bg-[var(--syn-bg-secondary)] border border-[var(--syn-border)] rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--syn-text-secondary)] animate-bounce [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--syn-text-secondary)] animate-bounce [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--syn-text-secondary)] animate-bounce [animation-delay:300ms]" />
+              </div>
+            </div>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <span className="text-red-700 text-sm">Erro: {error}</span>
+          <div className="rounded-lg p-3 bg-[var(--syn-badge-high-bg)] border border-pink-200">
+            <span className="text-[var(--syn-badge-high-text)] text-sm">Erro: {error}</span>
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSend} className="flex gap-2 w-full items-end mt-4">
-        <div className="flex-1">
-          <Textarea
-            ref={inputRef}
-            value={input}
-            onChange={handleInputChange}
-            placeholder="Faça uma pergunta sobre pesquisa acadêmica..."
-            className="resize-none max-h-20"
-            rows={1}
-            disabled={isLoading}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend(e);
-              }
-            }}
-          />
-        </div>
-
-        <Button
-          type="submit"
-          size="icon"
-          className="w-10 h-10 flex-shrink-0"
-          disabled={!input.trim() || isLoading}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
+      {/* Input */}
+      <div className="border-t border-[var(--syn-border)] p-3">
+        <form onSubmit={handleSend} className="flex items-end gap-2">
+          <div className="flex-1">
+            <Textarea
+              ref={inputRef}
+              value={input}
+              onChange={handleInputChange}
+              placeholder="Pergunte sobre o artigo..."
+              className="resize-none max-h-20 rounded-xl border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] text-sm"
+              rows={1}
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend(e);
+                }
+              }}
+            />
+          </div>
+          <Button
+            type="submit"
+            size="icon"
+            className="h-10 w-10 rounded-xl shrink-0"
+            disabled={!input.trim() || isLoading}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </form>
+      </div>
     </div>
   );
 };

@@ -1,30 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  LoaderIcon,
-  PlusIcon,
-  UploadIcon,
-  AlertCircleIcon,
-  FileIcon,
-} from "lucide-react";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { LoaderIcon, PlusIcon, UploadIcon, AlertCircleIcon, FileIcon } from "lucide-react";
+import { SlidePanel } from "@/components/ui/slide-panel";
 import { articleService } from "@/services/artigosService";
 import { toast } from "@/lib/toast";
 
@@ -130,10 +111,6 @@ function NovoArtigoModal({ isOpen, onClose, onSuccess, projectId }) {
       newErrors.abstract = "Resumo não pode ter mais que 3000 caracteres";
     }
 
-    if (!selectedFile) {
-      newErrors.pdf = "Arquivo PDF é obrigatório";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -148,31 +125,34 @@ function NovoArtigoModal({ isOpen, onClose, onSuccess, projectId }) {
     try {
       setLoading(true);
 
-      const formDataToSend = new FormData();
-      formDataToSend.append("title", formData.title);
-      formDataToSend.append("authors", formData.authors);
-      formDataToSend.append("year", formData.year);
-      formDataToSend.append("journal", formData.journal);
+      const articleData = {
+        title: formData.title,
+        authors: formData.authors,
+        year: parseInt(formData.year),
+        journal: formData.journal,
+      };
 
-      if (formData.doi) {
-        formDataToSend.append("doi", formData.doi);
-      }
+      if (formData.doi) articleData.doi = formData.doi;
+      if (formData.abstract) articleData.abstract = formData.abstract;
+      if (formData.notas) articleData.notas = formData.notas;
 
-      if (formData.abstract) {
-        formDataToSend.append("abstract", formData.abstract);
-      }
-
-      formDataToSend.append("status", formData.status);
-      formDataToSend.append("pdf", selectedFile);
-      formDataToSend.append("notas", formData.notas);
-
-      const response = await articleService.createArticle(
+      const response = await articleService.createArticleJson(
         projectId,
-        formDataToSend
+        articleData
       );
 
+      // Upload PDF separately if provided
+      if (selectedFile && response?.id) {
+        try {
+          await articleService.uploadPdf(projectId, response.id, selectedFile);
+        } catch (pdfErr) {
+          console.error("Erro ao enviar PDF:", pdfErr);
+          toast.error("Artigo criado, mas houve erro ao enviar o PDF.");
+        }
+      }
+
       if (onSuccess) {
-        onSuccess(response.article);
+        onSuccess(response);
       }
       handleClose();
 
@@ -231,264 +211,187 @@ function NovoArtigoModal({ isOpen, onClose, onSuccess, projectId }) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Adicionar Novo Artigo</DialogTitle>
-          <DialogDescription>
-            Adicione um novo artigo ao seu projeto de revisão literária.
-            Preencha as informações e faça upload do PDF.
-          </DialogDescription>
-        </DialogHeader>
+    <SlidePanel
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Novo Artigo"
+      breadcrumb="Artigos"
+      footer={
+        <div className="flex items-center justify-end gap-3">
+          <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit} disabled={loading} className="gap-2">
+            {loading ? (
+              <>
+                <LoaderIcon className="w-4 h-4 animate-spin" />
+                Adicionando...
+              </>
+            ) : (
+              <>
+                <PlusIcon className="w-4 h-4" />
+                Adicionar Artigo
+              </>
+            )}
+          </Button>
+        </div>
+      }
+    >
+      <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        {/* Section title */}
+        <div className="space-y-1">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--syn-text-secondary)]">
+            Informações do Artigo
+          </h3>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            {/* Título */}
-            <div className="grid gap-2">
-              <Label htmlFor="title">
-                Título <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => handleInputChange("title", e.target.value)}
-                placeholder="Ex: Artificial Intelligence in Higher Education: A Systematic Review"
-                className={errors.title ? "border-red-500" : ""}
-                maxLength={200}
-              />
-              {errors.title && (
-                <p className="text-sm text-red-500">{errors.title}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {formData.title.length}/200 caracteres
-              </p>
-            </div>
+        {/* Título */}
+        <div className="space-y-2">
+          <Label htmlFor="title">Título <span className="text-red-500">*</span></Label>
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => handleInputChange("title", e.target.value)}
+            placeholder="Ex: Artificial Intelligence in Higher Education"
+            className={errors.title ? "border-red-500" : ""}
+            maxLength={200}
+          />
+          {errors.title && <p className="text-sm text-red-500">{errors.title}</p>}
+          <p className="text-xs text-[var(--syn-text-secondary)]">{formData.title.length}/200 caracteres</p>
+        </div>
 
-            {/* Autores */}
-            <div className="grid gap-2">
-              <Label htmlFor="authors">
-                Autores <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="authors"
-                value={formData.authors}
-                onChange={(e) => handleInputChange("authors", e.target.value)}
-                placeholder="Ex: Smith, J.; Johnson, A.; Brown, M."
-                className={errors.authors ? "border-red-500" : ""}
-                maxLength={300}
-              />
-              {errors.authors && (
-                <p className="text-sm text-red-500">{errors.authors}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {formData.authors.length}/300 caracteres
-              </p>
-            </div>
+        {/* Autores */}
+        <div className="space-y-2">
+          <Label htmlFor="authors">Autores <span className="text-red-500">*</span></Label>
+          <Input
+            id="authors"
+            value={formData.authors}
+            onChange={(e) => handleInputChange("authors", e.target.value)}
+            placeholder="Ex: Smith, J.; Johnson, A.; Brown, M."
+            className={errors.authors ? "border-red-500" : ""}
+            maxLength={300}
+          />
+          {errors.authors && <p className="text-sm text-red-500">{errors.authors}</p>}
+          <p className="text-xs text-[var(--syn-text-secondary)]">{formData.authors.length}/300 caracteres</p>
+        </div>
 
-            {/* Ano e Periódico */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Ano */}
-              <div className="grid gap-2">
-                <Label htmlFor="year">
-                  Ano <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="year"
-                  type="number"
-                  min={1900}
-                  max={currentYear + 1}
-                  value={formData.year}
-                  onChange={(e) => handleInputChange("year", e.target.value)}
-                  className={errors.year ? "border-red-500" : ""}
-                />
-                {errors.year && (
-                  <p className="text-sm text-red-500">{errors.year}</p>
-                )}
-              </div>
-
-              {/* Periódico/Conferência */}
-              <div className="grid gap-2">
-                <Label htmlFor="journal">
-                  Periódico/Conferência <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="journal"
-                  value={formData.journal}
-                  onChange={(e) => handleInputChange("journal", e.target.value)}
-                  placeholder="Ex: Journal of Educational Technology"
-                  className={errors.journal ? "border-red-500" : ""}
-                  maxLength={200}
-                />
-                {errors.journal && (
-                  <p className="text-sm text-red-500">{errors.journal}</p>
-                )}
-              </div>
-            </div>
-
-            {/* DOI */}
-            <div className="grid gap-2">
-              <Label htmlFor="doi">
-                DOI{" "}
-                <span className="text-muted-foreground text-xs">
-                  (opcional)
-                </span>
-              </Label>
-              <Input
-                id="doi"
-                value={formData.doi}
-                onChange={(e) => handleInputChange("doi", e.target.value)}
-                placeholder="Ex: 10.1234/journal.2023.001"
-                className={errors.doi ? "border-red-500" : ""}
-                maxLength={50}
-              />
-              {errors.doi && (
-                <p className="text-sm text-red-500">{errors.doi}</p>
-              )}
-            </div>
-
-            {/* Resumo */}
-            <div className="grid gap-2">
-              <Label htmlFor="abstract">
-                Resumo{" "}
-                <span className="text-muted-foreground text-xs">
-                  (opcional)
-                </span>
-              </Label>
-              <Textarea
-                id="abstract"
-                value={formData.abstract}
-                onChange={(e) => handleInputChange("abstract", e.target.value)}
-                placeholder="Insira o resumo do artigo..."
-                className={errors.abstract ? "border-red-500" : ""}
-                rows={4}
-                maxLength={3000}
-              />
-              {errors.abstract && (
-                <p className="text-sm text-red-500">{errors.abstract}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {formData.abstract.length}/3000 caracteres
-              </p>
-            </div>
-
-            {/* Upload de PDF */}
-            <div className="grid gap-2">
-              <Label htmlFor="pdf">
-                Arquivo PDF <span className="text-red-500">*</span>
-              </Label>
-
-              <div
-                className={`border-2 border-dashed rounded-md p-6 text-center ${errors.pdf
-                  ? "border-red-300 bg-red-50"
-                  : "border-muted-foreground/25 hover:bg-muted/25"
-                  }`}
-              >
-                <input
-                  type="file"
-                  id="pdf"
-                  accept="application/pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-
-                {selectedFile ? (
-                  <div className="flex flex-col items-center">
-                    <FileIcon className="h-8 w-8 text-primary mb-2" />
-                    <p className="text-sm font-medium">{selectedFile.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedFile(null)}
-                      className="mt-2"
-                    >
-                      Remover
-                    </Button>
-                  </div>
-                ) : (
-                  <label
-                    htmlFor="pdf"
-                    className="cursor-pointer flex flex-col items-center"
-                  >
-                    <UploadIcon className="h-8 w-8 text-muted-foreground mb-2" />
-                    <p className="text-sm font-medium">
-                      Clique para selecionar um PDF
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      ou arraste e solte
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Máximo: 10MB
-                    </p>
-                  </label>
-                )}
-              </div>
-
-              {errors.pdf && (
-                <div className="flex items-center gap-1 text-red-500">
-                  <AlertCircleIcon className="h-4 w-4" />
-                  <p className="text-sm">{errors.pdf}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Status */}
-            <div className="grid gap-2">
-              <Label htmlFor="status">Status Inicial</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(value) => handleInputChange("status", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pendente">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                      Pendente
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="analisado">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      Analisado
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Ano e Periódico */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="year">Ano <span className="text-red-500">*</span></Label>
+            <Input
+              id="year"
+              type="number"
+              min={1900}
+              max={currentYear + 1}
+              value={formData.year}
+              onChange={(e) => handleInputChange("year", e.target.value)}
+              className={errors.year ? "border-red-500" : ""}
+            />
+            {errors.year && <p className="text-sm text-red-500">{errors.year}</p>}
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="journal">Periódico/Conferência <span className="text-red-500">*</span></Label>
+            <Input
+              id="journal"
+              value={formData.journal}
+              onChange={(e) => handleInputChange("journal", e.target.value)}
+              placeholder="Ex: Journal of Educational Technology"
+              className={errors.journal ? "border-red-500" : ""}
+              maxLength={200}
+            />
+            {errors.journal && <p className="text-sm text-red-500">{errors.journal}</p>}
+          </div>
+        </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={loading}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <LoaderIcon className="w-4 h-4 mr-2 animate-spin" />
-                  Adicionando...
-                </>
-              ) : (
-                <>
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Adicionar Artigo
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        {/* DOI */}
+        <div className="space-y-2">
+          <Label htmlFor="doi">DOI <span className="text-xs text-[var(--syn-text-secondary)]">(opcional)</span></Label>
+          <Input
+            id="doi"
+            value={formData.doi}
+            onChange={(e) => handleInputChange("doi", e.target.value)}
+            placeholder="Ex: 10.1234/journal.2023.001"
+            className={errors.doi ? "border-red-500" : ""}
+            maxLength={50}
+          />
+          {errors.doi && <p className="text-sm text-red-500">{errors.doi}</p>}
+        </div>
+
+        {/* Resumo */}
+        <div className="space-y-2">
+          <Label htmlFor="abstract">Resumo <span className="text-xs text-[var(--syn-text-secondary)]">(opcional)</span></Label>
+          <Textarea
+            id="abstract"
+            value={formData.abstract}
+            onChange={(e) => handleInputChange("abstract", e.target.value)}
+            placeholder="Insira o resumo do artigo..."
+            className={errors.abstract ? "border-red-500" : ""}
+            rows={4}
+            maxLength={3000}
+          />
+          {errors.abstract && <p className="text-sm text-red-500">{errors.abstract}</p>}
+          <p className="text-xs text-[var(--syn-text-secondary)]">{formData.abstract.length}/3000 caracteres</p>
+        </div>
+
+        {/* Upload de PDF */}
+        <div className="space-y-2">
+          <Label htmlFor="pdf">Arquivo PDF <span className="text-xs text-[var(--syn-text-secondary)]">(opcional)</span></Label>
+          <div
+            className={`border-2 border-dashed rounded-[var(--syn-radius-card)] p-6 text-center ${
+              errors.pdf
+                ? "border-red-300 bg-red-50 dark:bg-red-950"
+                : "border-[var(--syn-border)] hover:bg-[var(--syn-bg-secondary)]"
+            }`}
+          >
+            <input type="file" id="pdf" accept="application/pdf" onChange={handleFileChange} className="hidden" />
+            {selectedFile ? (
+              <div className="flex flex-col items-center">
+                <FileIcon className="h-8 w-8 text-[var(--syn-badge-blue-text)] mb-2" />
+                <p className="text-sm font-medium text-[var(--syn-text-primary)]">{selectedFile.name}</p>
+                <p className="text-xs text-[var(--syn-text-secondary)]">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedFile(null)} className="mt-2">
+                  Remover
+                </Button>
+              </div>
+            ) : (
+              <label htmlFor="pdf" className="cursor-pointer flex flex-col items-center">
+                <UploadIcon className="h-8 w-8 text-[var(--syn-text-secondary)] mb-2" />
+                <p className="text-sm font-medium text-[var(--syn-text-primary)]">Clique para selecionar um PDF</p>
+                <p className="text-xs text-[var(--syn-text-secondary)] mt-1">Máximo: 10MB</p>
+              </label>
+            )}
+          </div>
+          {errors.pdf && (
+            <div className="flex items-center gap-1 text-red-500">
+              <AlertCircleIcon className="h-4 w-4" />
+              <p className="text-sm">{errors.pdf}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Status */}
+        <div className="space-y-2">
+          <Label>Status Inicial</Label>
+          <div className="flex flex-wrap gap-2">
+            {["pendente", "analisado"].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handleInputChange("status", s)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  formData.status === s
+                    ? "bg-[var(--syn-sidebar-bg)] text-white border-transparent"
+                    : "border-[var(--syn-border)] text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
+                }`}
+              >
+                <StatusBadge status={s} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </form>
+    </SlidePanel>
   );
 }
 

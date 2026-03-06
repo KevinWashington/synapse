@@ -7,6 +7,10 @@ python-multipart==0.0.9
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 alembic==1.14.0
+pgvector==0.4.1
+
+# Neo4j
+neo4j==5.27.0
 
 # Auth
 python-jose[cryptography]==3.4.0
@@ -23,6 +27,12 @@ langchain==0.3.14
 langchain-google-genai==2.0.0
 langchain-core==0.3.29
 
+# Embeddings (SPECTER2)
+sentence-transformers==3.4.1
+transformers==4.48.0
+torch==2.6.0
+peft
+
 # PDF Processing
 pypdf==5.1.0
 
@@ -33,3 +43,4 @@ httpx==0.28.0
 # Dev
 pytest==8.3.0
 pytest-asyncio==0.24.0
+

@@ -8,6 +8,7 @@ export { default as ImportarBibTeXModal } from "./components/ImportarBibTeXModal
 export { default as UploadPDFModal } from "./components/UploadPDFModal";
 export { default as VizualizadorPDF } from "./components/VizualizadorPDF";
 export { default as EditorNotas } from "./components/EditorNotas";
+export { default as GrafoArtigos } from "./components/GrafoArtigos";
 
 // Articles Feature - Hooks
 export { useArtigos } from "./hooks/useArtigos";

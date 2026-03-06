@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useAIConfig } from "@/features/ai";
 import { useState } from "react";
+import { usePageTitle } from "@/context/pageTitleContext";
 
 function Configuracoes() {
   const {
@@ -28,10 +29,11 @@ function Configuracoes() {
   };
 
   const isDark = document.documentElement.classList.contains("dark");
+
+  usePageTitle({ title: "Configurações" });
+
   return (
     <div>
-      <h1 className="text-3xl font-bold text-foreground mb-3">Configurações</h1>
-
       <div className="space-y-6">
         <div className="bg-card rounded-lg shadow border p-6">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">

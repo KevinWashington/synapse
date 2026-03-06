@@ -31,7 +31,11 @@ export const useArtigos = (projeto) => {
         );
 
         setArtigos(response.articles || []);
-        setPagination(response.pagination || {});
+        setPagination({
+          totalDocuments: response.total || 0,
+          page: response.page || 1,
+          limit: response.limit || 50,
+        });
       } catch (err) {
         console.error("Erro ao carregar artigos:", err);
       } finally {

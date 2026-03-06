@@ -11,6 +11,8 @@ import ProjetoDetalhes from "./pages/ProjetoDetalhes";
 import ArtigoDetalhes from "./pages/ArtigoDetalhes";
 import Layout from "./pages/Layout";
 import Configuracoes from "./pages/Configuracoes";
+import Artigos from "./pages/Artigos";
+import ChatIAPage from "./pages/ChatIA";
 
 // Components
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -33,15 +35,31 @@ function App() {
             }
           >
             <Route index element={<Dashboard />} />
+            <Route path="dashboard" element={<Dashboard />} />
             <Route path="projetos" element={<Projetos />} />
             <Route path="projetos/:id" element={<ProjetoDetalhes />} />
-
             <Route
               path="projetos/:projetoId/artigos/:artigoId"
               element={<ArtigoDetalhes />}
             />
-            <Route path="dashboard" element={<Dashboard />} />
+
+            {/* Articles */}
+            <Route path="artigos" element={<Artigos />} />
+            <Route path="artigos/importar" element={<Artigos />} />
+            <Route path="artigos/upload" element={<Artigos />} />
+
+            {/* AI */}
+            <Route path="ia/analise" element={<ChatIAPage />} />
+            <Route path="ia/recomendacoes" element={<ChatIAPage />} />
+            <Route path="ia/chat" element={<ChatIAPage />} />
+
+            {/* Visualizations */}
+            <Route path="visualizacoes/relacionamentos" element={<Dashboard />} />
+            <Route path="visualizacoes/estatisticas" element={<Dashboard />} />
+
+            {/* Settings */}
             <Route path="configuracoes" element={<Configuracoes />} />
+            <Route path="configuracoes/preferencias" element={<Configuracoes />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

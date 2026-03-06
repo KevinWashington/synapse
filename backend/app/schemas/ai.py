@@ -62,3 +62,20 @@ class CriteriaRequest(BaseModel):
 class CriteriaResponse(BaseModel):
     inclusao: list[str]
     exclusao: list[str]
+
+
+class ArticleSource(BaseModel):
+    id: int
+    title: str
+    authors: str | None = None
+    year: int | None = None
+
+
+class ProjectChatRequest(BaseModel):
+    messages: list[dict]
+    projectId: int
+
+
+class ProjectChatResponse(BaseModel):
+    content: str
+    sources: list[ArticleSource] = []

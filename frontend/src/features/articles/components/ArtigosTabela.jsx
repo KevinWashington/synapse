@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,8 +22,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
-  PlusIcon,
   SearchIcon,
   FilterIcon,
   FileTextIcon,
@@ -31,12 +32,14 @@ import {
   EditIcon,
   TrashIcon,
   EyeIcon,
-  UploadIcon,
   FileIcon,
   CheckIcon,
   ClockIcon,
   XIcon,
   Sparkles,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ArrowUpDownIcon,
 } from "lucide-react";
 
 function ArtigosTabela({
@@ -54,57 +57,63 @@ function ArtigosTabela({
   handleImportarBibTeX,
   handleAdicionarArtigo,
 }) {
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case "analisado":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-            <CheckIcon className="h-3 w-3" />
-            Analisado
-          </span>
-        );
-      case "pendente":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-            <ClockIcon className="h-3 w-3" />
-            Pendente
-          </span>
-        );
-      case "excluido":
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-            <XIcon className="h-3 w-3" />
-            Excluído
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
-            <ClockIcon className="h-3 w-3" />
-            Pendente
-          </span>
-        );
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState("asc");
+
+  const handleSort = (column) => {
+    if (sortColumn === column) {
+      if (sortDirection === "asc") setSortDirection("desc");
+      else { setSortColumn(null); setSortDirection("asc"); }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
     }
   };
 
+  const SortIcon = ({ column }) => {
+    if (sortColumn !== column) return <ArrowUpDownIcon className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDirection === "asc"
+      ? <ArrowUpIcon className="h-3 w-3 ml-1" />
+      : <ArrowDownIcon className="h-3 w-3 ml-1" />;
+  };
+
+  const sortedArtigos = useMemo(() => {
+    if (!sortColumn) return artigos;
+    return [...artigos].sort((a, b) => {
+      let valA, valB;
+      switch (sortColumn) {
+        case "title": valA = (a.title || "").toLowerCase(); valB = (b.title || "").toLowerCase(); break;
+        case "authors": valA = (a.authors || "").toLowerCase(); valB = (b.authors || "").toLowerCase(); break;
+        case "year": valA = a.year || 0; valB = b.year || 0; break;
+        case "journal": valA = (a.journal || "").toLowerCase(); valB = (b.journal || "").toLowerCase(); break;
+        case "status": valA = a.status || ""; valB = b.status || ""; break;
+        case "aiRelevanceScore": valA = a.aiRelevanceScore ?? -1; valB = b.aiRelevanceScore ?? -1; break;
+        default: return 0;
+      }
+      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [artigos, sortColumn, sortDirection]);
+
   return (
-    <div className="space-y-6">
-      {/* Barra de pesquisa e filtros */}
-      <div className="flex flex-col sm:flex-row gap-4">
+    <div className="space-y-4">
+      {/* Search + filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--syn-text-secondary)] h-4 w-4" />
           <Input
             type="text"
             placeholder="Pesquisar artigos..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-9"
           />
         </div>
         <div className="flex items-center gap-2">
-          <FilterIcon className="h-4 w-4 text-muted-foreground" />
+          <FilterIcon className="h-4 w-4 text-[var(--syn-text-secondary)]" />
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] h-9">
               <SelectValue placeholder="Filtrar por..." />
             </SelectTrigger>
             <SelectContent>
@@ -116,66 +125,71 @@ function ArtigosTabela({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex items-center gap-2"
-            onClick={handleImportarBibTeX}
-          >
-            <UploadIcon className="h-4 w-4" />
-            Importar BibTeX
-          </Button>
-          <Button
-            className="flex items-center gap-2"
-            onClick={handleAdicionarArtigo}
-          >
-            <PlusIcon className="h-4 w-4" />
-            Adicionar Artigo
-          </Button>
-        </div>
       </div>
 
-      {/* Loading para artigos */}
+      {/* Loading */}
       {loadingArtigos && (
         <div className="flex justify-center items-center py-8">
-          <LoaderIcon className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2">Carregando artigos...</span>
+          <LoaderIcon className="h-5 w-5 animate-spin text-[var(--syn-text-secondary)]" />
+          <span className="ml-2 text-sm text-[var(--syn-text-secondary)]">Carregando artigos...</span>
         </div>
       )}
 
-      {/* Tabela de artigos */}
+      {/* Table */}
       {!loadingArtigos && artigos.length > 0 && (
         <>
-          {/* Versão desktop - tabela */}
-          <div className="border rounded-lg overflow-x-auto">
+          <div className="rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] overflow-x-auto">
             <Table className="min-w-[800px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px] min-w-[250px]">
-                    Título
+                  <TableHead
+                    className="w-[300px] min-w-[250px] cursor-pointer select-none hover:bg-[var(--syn-bg-secondary)] transition-colors"
+                    onClick={() => handleSort("title")}
+                  >
+                    <span className="flex items-center">Título <SortIcon column="title" /></span>
                   </TableHead>
-                  <TableHead className="w-[200px] min-w-[150px]">
-                    Autores
+                  <TableHead
+                    className="w-[200px] min-w-[150px] cursor-pointer select-none hover:bg-[var(--syn-bg-secondary)] transition-colors"
+                    onClick={() => handleSort("authors")}
+                  >
+                    <span className="flex items-center">Autores <SortIcon column="authors" /></span>
                   </TableHead>
-                  <TableHead className="w-[80px]">Ano</TableHead>
-                  <TableHead className="w-[200px] min-w-[150px]">
-                    Revista/Conferência
+                  <TableHead
+                    className="w-[80px] cursor-pointer select-none hover:bg-[var(--syn-bg-secondary)] transition-colors"
+                    onClick={() => handleSort("year")}
+                  >
+                    <span className="flex items-center">Ano <SortIcon column="year" /></span>
                   </TableHead>
-                  <TableHead className="w-[100px]">Páginas</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="w-[100px]">Relevância IA</TableHead>
-                  <TableHead className="w-[100px]">Ações</TableHead>
+                  <TableHead
+                    className="w-[200px] min-w-[150px] cursor-pointer select-none hover:bg-[var(--syn-bg-secondary)] transition-colors"
+                    onClick={() => handleSort("journal")}
+                  >
+                    <span className="flex items-center">Revista/Conferência <SortIcon column="journal" /></span>
+                  </TableHead>
+                  <TableHead
+                    className="w-[120px] cursor-pointer select-none hover:bg-[var(--syn-bg-secondary)] transition-colors"
+                    onClick={() => handleSort("status")}
+                  >
+                    <span className="flex items-center">Status <SortIcon column="status" /></span>
+                  </TableHead>
+                  <TableHead
+                    className="w-[100px] cursor-pointer select-none hover:bg-[var(--syn-bg-secondary)] transition-colors"
+                    onClick={() => handleSort("aiRelevanceScore")}
+                  >
+                    <span className="flex items-center">Relevância IA <SortIcon column="aiRelevanceScore" /></span>
+                  </TableHead>
+                  <TableHead className="w-[80px]">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {artigos.map((artigo) => (
+                {sortedArtigos.map((artigo) => (
                   <TableRow key={artigo.id}>
                     <TableCell className="font-medium max-w-[300px]">
                       <div className="flex items-center gap-2">
                         <FileIcon
                           className={`h-4 w-4 flex-shrink-0 ${artigo.hasPdf
                             ? "text-blue-500"
-                            : "text-muted-foreground"
+                            : "text-[var(--syn-text-secondary)]"
                             }`}
                         />
                         <div className="flex-1 min-w-0">
@@ -210,12 +224,7 @@ function ArtigosTabela({
                         {artigo.journal}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center">
-                      <span className="text-sm text-muted-foreground">
-                        {artigo.pages || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(artigo.status)}</TableCell>
+                    <TableCell><StatusBadge status={artigo.status} /></TableCell>
                     <TableCell>
                       {artigo.aiRelevanceScore !== undefined && artigo.aiRelevanceScore !== null ? (
                         <div
@@ -229,7 +238,7 @@ function ArtigosTabela({
                           {artigo.aiRelevanceScore}%
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-xs italic">N/A</span>
+                        <span className="text-[var(--syn-text-secondary)] text-xs italic">N/A</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -310,35 +319,18 @@ function ArtigosTabela({
         </>
       )}
 
-      {/* Janela vazia */}
+      {/* Empty state */}
       {!loadingArtigos && artigos.length === 0 && (
         <div className="text-center py-12">
-          <FileTextIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-foreground mb-2">
+          <FileTextIcon className="h-12 w-12 text-[var(--syn-text-secondary)] mx-auto mb-3" />
+          <h3 className="text-sm font-medium text-[var(--syn-text-primary)] mb-1">
             Nenhum artigo encontrado
           </h3>
-          <p className="text-muted-foreground mb-4">
+          <p className="text-xs text-[var(--syn-text-secondary)]">
             {searchTerm || filterStatus !== "todos"
               ? "Tente ajustar os filtros de pesquisa"
-              : "Comece adicionando artigos a este projeto"}
+              : "Adicione artigos usando os botões acima"}
           </p>
-          <div className="flex gap-2 justify-center">
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={handleImportarBibTeX}
-            >
-              <UploadIcon className="h-4 w-4" />
-              Importar BibTeX
-            </Button>
-            <Button
-              className="flex items-center gap-2"
-              onClick={handleAdicionarArtigo}
-            >
-              <PlusIcon className="h-4 w-4" />
-              Adicionar {artigos.length === 0 ? "Primeiro " : ""}Artigo
-            </Button>
-          </div>
         </div>
       )}
     </div>
