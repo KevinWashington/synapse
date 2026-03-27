@@ -23,11 +23,19 @@ async_session_maker = async_sessionmaker(
 
 
 async def init_db():
-    """Create all tables on startup."""
+    """Create all tables on startup and run migrations."""
     async with engine.begin() as conn:
         # Enable pgvector extension for embedding support
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Migration: add framework column to existing projects
+        await conn.execute(text(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS framework VARCHAR(10) DEFAULT 'PICOC' NOT NULL"
+        ))
+        await conn.execute(text(
+            "UPDATE projects SET framework = 'PICOC' WHERE framework IS NULL"
+        ))
 
 
 async def get_db() -> AsyncSession:

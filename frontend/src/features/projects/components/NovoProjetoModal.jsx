@@ -10,10 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LoaderIcon, PlusIcon } from "lucide-react";
+import { LoaderIcon, PlusIcon, CheckIcon } from "lucide-react";
 import { SlidePanel } from "@/components/ui/slide-panel";
 import { projectService } from "@/features/projects";
 import { toast } from "@/lib/toast";
+import { FRAMEWORKS } from "@/lib/frameworkConfig";
 
 function NovoProjetoModal({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,7 @@ function NovoProjetoModal({ isOpen, onClose, onSuccess }) {
     title: "",
     objetivo: "",
     status: "ideia",
+    framework: "PICOC",
   });
   const [errors, setErrors] = useState({});
 
@@ -75,10 +77,12 @@ function NovoProjetoModal({ isOpen, onClose, onSuccess }) {
   };
 
   const handleClose = () => {
-    setFormData({ title: "", objetivo: "", status: "ideia" });
+    setFormData({ title: "", objetivo: "", status: "ideia", framework: "PICOC" });
     setErrors({});
     onClose();
   };
+
+  const frameworkKeys = Object.keys(FRAMEWORKS);
 
   return (
     <SlidePanel
@@ -152,6 +156,57 @@ function NovoProjetoModal({ isOpen, onClose, onSuccess }) {
           <p className="text-xs text-[var(--syn-text-secondary)]">
             {formData.objetivo.length}/1000 caracteres
           </p>
+        </div>
+
+        {/* Framework Selector */}
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--syn-text-secondary)]">
+              Framework de Pesquisa
+            </h3>
+            <p className="text-xs text-[var(--syn-text-secondary)]">
+              Selecione o framework de formulação da questão de pesquisa
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {frameworkKeys.map((fw) => {
+              const info = FRAMEWORKS[fw];
+              const isSelected = formData.framework === fw;
+              return (
+                <button
+                  key={fw}
+                  type="button"
+                  onClick={() => handleInputChange("framework", fw)}
+                  className={`relative text-left p-3 rounded-lg border-2 transition-all ${isSelected
+                      ? "border-[var(--syn-sidebar-accent)] bg-[var(--syn-sidebar-accent)]/5 shadow-sm"
+                      : "border-[var(--syn-border)] hover:border-[var(--syn-text-secondary)]/40 bg-[var(--syn-bg-secondary)]"
+                    }`}
+                >
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[var(--syn-sidebar-accent)] flex items-center justify-center">
+                      <CheckIcon className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  <div className="font-semibold text-sm text-[var(--syn-text-primary)]">
+                    {info.name}
+                  </div>
+                  <div className="text-[11px] text-[var(--syn-text-secondary)] mt-0.5 leading-snug">
+                    {info.description}
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {info.recommendedAreas.map((area) => (
+                      <span
+                        key={area}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--syn-bg-primary)] text-[var(--syn-text-secondary)] border border-[var(--syn-border)]"
+                      >
+                        {area}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Status Inicial */}

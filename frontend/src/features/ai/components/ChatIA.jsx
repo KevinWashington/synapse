@@ -189,8 +189,8 @@ const ChatIA = ({ artigo, onAdicionarNota, pdfData }) => {
             <div className={`relative max-w-[80%] ${msg.role === "assistant" ? "group/msg" : ""}`}>
               <div
                 className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user"
-                    ? "bg-[var(--syn-sidebar-bg)] text-white rounded-br-md"
-                    : "bg-[var(--syn-bg-secondary)] border border-[var(--syn-border)] text-[var(--syn-text-primary)] rounded-bl-md"
+                  ? "bg-[var(--syn-sidebar-bg)] text-white rounded-br-md"
+                  : "bg-[var(--syn-bg-secondary)] border border-[var(--syn-border)] text-[var(--syn-text-primary)] rounded-bl-md"
                   }`}
               >
                 {msg.role === "assistant" ? (

@@ -14,6 +14,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { getFrameworkInfo } from "@/lib/frameworkConfig";
 
 function ProjetoCard({ projeto, onEditar, onDeletar, onClick }) {
   const formatarData = (data) => {
@@ -25,6 +26,9 @@ function ProjetoCard({ projeto, onEditar, onDeletar, onClick }) {
     if (diffDays === 0) return "Hoje";
     return `${Math.abs(diffDays)} dias atrás`;
   };
+
+  const framework = projeto.framework || "PICOC";
+  const fwInfo = getFrameworkInfo(framework);
 
   return (
     <div
@@ -71,9 +75,18 @@ function ProjetoCard({ projeto, onEditar, onDeletar, onClick }) {
         </DropdownMenu>
       </div>
 
-      {/* Badge */}
-      <div className="mb-3">
+      {/* Badges */}
+      <div className="mb-3 flex items-center gap-2">
         <StatusBadge status={projeto.status} />
+        <span
+          className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+          style={{
+            backgroundColor: fwInfo.badgeBg,
+            color: fwInfo.badgeText,
+          }}
+        >
+          {framework}
+        </span>
       </div>
 
       {/* Description */}

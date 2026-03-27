@@ -78,21 +78,19 @@ function ArtigosProjeto({ projeto, onNavigate }) {
           <div className="flex items-center gap-1 rounded-lg border border-[var(--syn-border)] p-0.5">
             <button
               onClick={() => setViewMode("tabela")}
-              className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
-                viewMode === "tabela"
+              className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${viewMode === "tabela"
                   ? "bg-[var(--syn-sidebar-bg)] text-white"
                   : "text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
-              }`}
+                }`}
             >
               <TableIcon className="h-3.5 w-3.5" />
             </button>
             <button
               onClick={() => setViewMode("cards")}
-              className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${
-                viewMode === "cards"
+              className={`flex items-center justify-center h-7 w-7 rounded-md transition-colors ${viewMode === "cards"
                   ? "bg-[var(--syn-sidebar-bg)] text-white"
                   : "text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
-              }`}
+                }`}
             >
               <GridIcon className="h-3.5 w-3.5" />
             </button>

@@ -279,11 +279,10 @@ function EditarArtigoModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
                 key={s}
                 type="button"
                 onClick={() => handleInputChange("status", s)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                  formData.status === s
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${formData.status === s
                     ? "bg-[var(--syn-sidebar-bg)] text-white border-transparent"
                     : "border-[var(--syn-border)] text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
-                }`}
+                  }`}
               >
                 <StatusBadge status={s} />
               </button>

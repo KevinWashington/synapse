@@ -3,25 +3,52 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, X, Save, Loader2, Sparkles, Pencil, Check } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, X, Save, Loader2, Sparkles, Pencil, Check, Info } from "lucide-react";
 import { projectService } from "@/features/projects";
 import { toast } from "@/lib/toast";
+import {
+  getComponentsForFramework,
+  getFrameworkInfo,
+  normalizeFrameworkData,
+  denormalizeFrameworkData,
+  getRequiredKeys,
+  TARGET_DATABASES,
+} from "@/lib/frameworkConfig";
 
 function PlanejamentoProjeto({ projeto = {} }) {
+  const framework = projeto.framework || "PICOC";
+  const frameworkInfo = getFrameworkInfo(framework);
+  const frameworkComponents = getComponentsForFramework(framework);
+
   const [loading, setLoading] = useState(false);
   const [generatingQuestions, setGeneratingQuestions] = useState(false);
   const [generatingStrings, setGeneratingStrings] = useState(false);
   const [generatingCriteria, setGeneratingCriteria] = useState(false);
+  const [targetDatabase, setTargetDatabase] = useState("scopus");
+
+  // Initialize framework data with normalized keys
+  const buildInitialComponents = () => {
+    const raw = projeto.picoc || {};
+    const normalized = normalizeFrameworkData(raw);
+    // Ensure all component keys exist
+    const result = {};
+    for (const comp of frameworkComponents) {
+      result[comp.key] = normalized[comp.key] || "";
+    }
+    return result;
+  };
+
   const [data, setData] = useState({
     title: "",
     objetivo: "",
-    picoc: {
-      pessoa: "",
-      intervencao: "",
-      comparacao: "",
-      outcome: "",
-      contexto: "",
-    },
+    picoc: buildInitialComponents(),
     researchQuestions: [],
     keywords: [],
     searchStrings: [],
@@ -31,7 +58,17 @@ function PlanejamentoProjeto({ projeto = {} }) {
 
   useEffect(() => {
     if (projeto) {
-      setData((prev) => ({ ...prev, ...projeto }));
+      const raw = projeto.picoc || {};
+      const normalized = normalizeFrameworkData(raw);
+      const components = {};
+      for (const comp of frameworkComponents) {
+        components[comp.key] = normalized[comp.key] || "";
+      }
+      setData((prev) => ({
+        ...prev,
+        ...projeto,
+        picoc: components,
+      }));
     }
   }, [projeto]);
 
@@ -39,10 +76,10 @@ function PlanejamentoProjeto({ projeto = {} }) {
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updatePICOC = (field, value) => {
+  const updateComponent = (key, value) => {
     setData((prev) => ({
       ...prev,
-      picoc: { ...prev.picoc, [field]: value },
+      picoc: { ...prev.picoc, [key]: value },
     }));
   };
 
@@ -76,7 +113,12 @@ function PlanejamentoProjeto({ projeto = {} }) {
 
     try {
       setLoading(true);
-      await projectService.updateProject(projeto.id, data);
+      // Denormalize component data for backward compatibility with API
+      const saveData = {
+        ...data,
+        picoc: denormalizeFrameworkData(data.picoc),
+      };
+      await projectService.updateProject(projeto.id, saveData);
       toast.success("Projeto salvo com sucesso!");
     } catch (error) {
       toast.error("Erro ao salvar: " + error.message);
@@ -85,10 +127,23 @@ function PlanejamentoProjeto({ projeto = {} }) {
     }
   };
 
+  const getFilledRequiredLabel = () => {
+    const requiredKeys = getRequiredKeys(framework);
+    const requiredLabels = frameworkComponents
+      .filter((c) => c.required)
+      .map((c) => c.labelPt);
+    return requiredLabels.join(", ");
+  };
+
+  const hasRequiredComponentsFilled = () => {
+    const requiredKeys = getRequiredKeys(framework);
+    return requiredKeys.every((key) => data.picoc[key]?.trim());
+  };
+
   const generateResearchQuestions = async () => {
-    if (!data.picoc.pessoa || !data.picoc.intervencao || !data.picoc.outcome) {
+    if (!hasRequiredComponentsFilled()) {
       toast.warning(
-        "Preencha pelo menos População, Intervenção e Resultado no PICOC antes de gerar perguntas"
+        `Preencha pelo menos ${getFilledRequiredLabel()} antes de gerar perguntas`
       );
       return;
     }
@@ -100,10 +155,10 @@ function PlanejamentoProjeto({ projeto = {} }) {
         {
           title: data.title,
           objetivo: data.objetivo,
-        }
+        },
+        framework
       );
 
-      // Adicionar as perguntas geradas ao array existente
       setData((prev) => ({
         ...prev,
         researchQuestions: [
@@ -126,9 +181,9 @@ function PlanejamentoProjeto({ projeto = {} }) {
       return;
     }
 
-    if (!data.picoc.pessoa || !data.picoc.intervencao || !data.picoc.outcome) {
+    if (!hasRequiredComponentsFilled()) {
       toast.warning(
-        "Preencha pelo menos População, Intervenção e Resultado no PICOC antes de gerar strings"
+        `Preencha pelo menos ${getFilledRequiredLabel()} antes de gerar strings`
       );
       return;
     }
@@ -141,10 +196,11 @@ function PlanejamentoProjeto({ projeto = {} }) {
         {
           title: data.title,
           objetivo: data.objetivo,
-        }
+        },
+        framework,
+        targetDatabase
       );
 
-      // Adicionar as strings geradas ao array existente
       setData((prev) => ({
         ...prev,
         searchStrings: [...prev.searchStrings, ...response.searchStrings],
@@ -157,9 +213,9 @@ function PlanejamentoProjeto({ projeto = {} }) {
   };
 
   const generateCriteria = async () => {
-    if (!data.picoc.pessoa || !data.picoc.intervencao || !data.picoc.outcome) {
+    if (!hasRequiredComponentsFilled()) {
       toast.warning(
-        "Preencha pelo menos População, Intervenção e Resultado no PICOC antes de gerar critérios"
+        `Preencha pelo menos ${getFilledRequiredLabel()} antes de gerar critérios`
       );
       return;
     }
@@ -172,10 +228,10 @@ function PlanejamentoProjeto({ projeto = {} }) {
         {
           title: data.title,
           objetivo: data.objetivo,
-        }
+        },
+        framework
       );
 
-      // Adicionar os critérios gerados aos arrays existentes
       setData((prev) => ({
         ...prev,
         criteriosInclusao: [
@@ -385,21 +441,41 @@ function PlanejamentoProjeto({ projeto = {} }) {
         </div>
       </Section>
 
-      {/* PICOC */}
-      <Section title="Framework PICOC">
-        {[
-          { key: "pessoa", label: "Pessoa/População", placeholder: "Descreva a população..." },
-          { key: "intervencao", label: "Intervenção", placeholder: "Descreva a intervenção..." },
-          { key: "comparacao", label: "Comparação", placeholder: "Descreva a comparação..." },
-          { key: "outcome", label: "Resultado", placeholder: "Descreva os resultados..." },
-          { key: "contexto", label: "Contexto", placeholder: "Descreva o contexto..." },
-        ].map(({ key, label, placeholder }) => (
-          <div key={key} className="space-y-2">
-            <Label className="text-[var(--syn-text-primary)]">{label}</Label>
+      {/* Framework Components - Dynamic */}
+      <Section
+        title={`Framework ${framework}`}
+        actions={
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: frameworkInfo.badgeBg,
+              color: frameworkInfo.badgeText,
+            }}
+          >
+            {framework}
+          </span>
+        }
+      >
+        {frameworkComponents.map((comp) => (
+          <div key={comp.key} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label className="text-[var(--syn-text-primary)]">
+                {comp.labelPt}
+                {comp.required ? "" : (
+                  <span className="ml-1 text-xs font-normal text-[var(--syn-text-secondary)]">(opcional)</span>
+                )}
+              </Label>
+              <div className="group relative">
+                <Info className="h-3.5 w-3.5 text-[var(--syn-text-secondary)] cursor-help" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-[var(--syn-bg-secondary)] border border-[var(--syn-border)] text-xs text-[var(--syn-text-primary)] shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  {comp.tooltip}
+                </div>
+              </div>
+            </div>
             <Input
-              value={data.picoc[key]}
-              onChange={(e) => updatePICOC(key, e.target.value)}
-              placeholder={placeholder}
+              value={data.picoc[comp.key] || ""}
+              onChange={(e) => updateComponent(comp.key, e.target.value)}
+              placeholder={comp.placeholder}
             />
           </div>
         ))}
@@ -430,7 +506,23 @@ function PlanejamentoProjeto({ projeto = {} }) {
       {/* Strings de Busca */}
       <Section
         title="Strings de Busca"
-        actions={<AIButton onClick={generateSearchStrings} disabled={generatingStrings} loading={generatingStrings} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <Select value={targetDatabase} onValueChange={setTargetDatabase}>
+              <SelectTrigger className="h-8 w-[160px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TARGET_DATABASES.map((db) => (
+                  <SelectItem key={db.value} value={db.value}>
+                    {db.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <AIButton onClick={generateSearchStrings} disabled={generatingStrings} loading={generatingStrings} />
+          </div>
+        }
       >
         <ArrayField
           label="Strings"

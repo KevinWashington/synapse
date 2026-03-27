@@ -60,6 +60,7 @@ class ProjectService {
         title,
         objetivo,
         status,
+        framework,
         picoc,
         researchQuestions,
         keywords,
@@ -74,6 +75,7 @@ class ProjectService {
         ownerId: _ownerId,
         createdAt: _createdAt,
         updatedAt: _updatedAt,
+        articleCount: _articleCount,
         ..._otherFields
       } = projectData;
 
@@ -81,6 +83,7 @@ class ProjectService {
         title,
         objetivo,
         status,
+        framework,
         picoc,
         researchQuestions,
         keywords,
@@ -126,11 +129,12 @@ class ProjectService {
     });
   }
 
-  async generateResearchQuestions(picocData, projeto) {
+  async generateResearchQuestions(picocData, projeto, framework = "PICOC") {
     try {
       return await apiService.post("/api/generate-research-questions", {
         picocData,
         projeto,
+        framework,
       });
     } catch (error) {
       console.error("Erro ao gerar research questions:", error);
@@ -138,12 +142,14 @@ class ProjectService {
     }
   }
 
-  async generateSearchStrings(researchQuestions, picocData, projeto) {
+  async generateSearchStrings(researchQuestions, picocData, projeto, framework = "PICOC", targetDatabase = "scopus") {
     try {
       return await apiService.post("/api/generate-search-strings", {
         researchQuestions,
         picocData,
         projeto,
+        framework,
+        targetDatabase,
       });
     } catch (error) {
       console.error("Erro ao gerar strings de busca:", error);
@@ -151,12 +157,13 @@ class ProjectService {
     }
   }
 
-  async generateCriteria(researchQuestions, picocData, projeto) {
+  async generateCriteria(researchQuestions, picocData, projeto, framework = "PICOC") {
     try {
       return await apiService.post("/api/generate-criteria", {
         researchQuestions,
         picocData,
         projeto,
+        framework,
       });
     } catch (error) {
       console.error("Erro ao gerar critérios:", error);

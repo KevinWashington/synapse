@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { LoadingState, EmptyState } from "@/components/layout";
 import { toast } from "@/lib/toast";
 import { usePageTitle } from "@/context/pageTitleContext";
+import { getFrameworkInfo } from "@/lib/frameworkConfig";
 
 function Projetos() {
   const navigate = useNavigate();
@@ -226,7 +227,25 @@ function Projetos() {
         onClose={() => setDetailOpen(false)}
         title={selectedProjeto?.title || ""}
         breadcrumb="Projetos"
-        badge={selectedProjeto && <StatusBadge status={selectedProjeto.status} />}
+        badge={
+          selectedProjeto && (
+            <div className="flex items-center gap-2">
+              <StatusBadge status={selectedProjeto.status} />
+              {(() => {
+                const fw = selectedProjeto.framework || "PICOC";
+                const fwInfo = getFrameworkInfo(fw);
+                return (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                    style={{ backgroundColor: fwInfo.badgeBg, color: fwInfo.badgeText }}
+                  >
+                    {fw}
+                  </span>
+                );
+              })()}
+            </div>
+          )
+        }
         onExpand={selectedProjeto ? () => navigate(`/projetos/${selectedProjeto.id}`) : undefined}
       >
         {selectedProjeto && (

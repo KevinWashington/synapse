@@ -338,11 +338,10 @@ function NovoArtigoModal({ isOpen, onClose, onSuccess, projectId }) {
         <div className="space-y-2">
           <Label htmlFor="pdf">Arquivo PDF <span className="text-xs text-[var(--syn-text-secondary)]">(opcional)</span></Label>
           <div
-            className={`border-2 border-dashed rounded-[var(--syn-radius-card)] p-6 text-center ${
-              errors.pdf
+            className={`border-2 border-dashed rounded-[var(--syn-radius-card)] p-6 text-center ${errors.pdf
                 ? "border-red-300 bg-red-50 dark:bg-red-950"
                 : "border-[var(--syn-border)] hover:bg-[var(--syn-bg-secondary)]"
-            }`}
+              }`}
           >
             <input type="file" id="pdf" accept="application/pdf" onChange={handleFileChange} className="hidden" />
             {selectedFile ? (
@@ -379,11 +378,10 @@ function NovoArtigoModal({ isOpen, onClose, onSuccess, projectId }) {
                 key={s}
                 type="button"
                 onClick={() => handleInputChange("status", s)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                  formData.status === s
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${formData.status === s
                     ? "bg-[var(--syn-sidebar-bg)] text-white border-transparent"
                     : "border-[var(--syn-border)] text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
-                }`}
+                  }`}
               >
                 <StatusBadge status={s} />
               </button>

@@ -3,17 +3,27 @@ from pydantic import BaseModel, Field
 
 
 class PICOCSchema(BaseModel):
+    """Schema legado mantido por compatibilidade. Aceita chaves em português e inglês."""
+    # Chaves legadas (português)
     pessoa: str | None = Field(None, max_length=500)
     intervencao: str | None = Field(None, max_length=500)
     comparacao: str | None = Field(None, max_length=500)
     outcome: str | None = Field(None, max_length=500)
     contexto: str | None = Field(None, max_length=500)
+    # Chaves padronizadas (inglês) — usadas por novos projetos
+    population: str | None = Field(None, max_length=500)
+    intervention: str | None = Field(None, max_length=500)
+    comparison: str | None = Field(None, max_length=500)
+    exposure: str | None = Field(None, max_length=500)
+    context: str | None = Field(None, max_length=500)
+    studyDesign: str | None = Field(None, max_length=500)
 
 
 class ProjectCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=100)
     objetivo: str = Field(..., min_length=1, max_length=1000)
     status: str = Field(default="ideia")
+    framework: str = Field(default="PICOC")
     picoc: PICOCSchema | None = None
     researchQuestions: list[str] | None = []
     keywords: list[str] | None = []
@@ -26,6 +36,7 @@ class ProjectUpdate(BaseModel):
     title: str | None = Field(None, max_length=100)
     objetivo: str | None = Field(None, max_length=1000)
     status: str | None = None
+    framework: str | None = None
     picoc: PICOCSchema | None = None
     researchQuestions: list[str] | None = None
     keywords: list[str] | None = None
@@ -39,6 +50,7 @@ class ProjectResponse(BaseModel):
     title: str
     objetivo: str
     status: str
+    framework: str = "PICOC"
     picoc: dict | None = None
     researchQuestions: list[str] | None = []
     keywords: list[str] | None = []

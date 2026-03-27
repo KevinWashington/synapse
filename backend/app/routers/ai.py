@@ -19,6 +19,7 @@ from app.services.ai_service import get_ai_service
 from app.services.rag_service import get_rag_service
 from app.core.dependencies import get_current_user
 from app.database import get_db
+from app.frameworks import normalize_framework_data
 
 
 router = APIRouter()
@@ -29,12 +30,18 @@ async def generate_research_questions(
     data: ResearchQuestionsRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Gerar perguntas de pesquisa baseadas no framework PICOC."""
+    """Gerar perguntas de pesquisa baseadas no framework selecionado."""
     try:
         ai_service = get_ai_service()
         
-        picoc = data.picocData.model_dump()
-        questions = await ai_service.generate_research_questions(picoc)
+        framework = data.framework or "PICOC"
+        raw_components = data.picocData.model_dump()
+        components = normalize_framework_data(raw_components, framework)
+        project_ctx = data.projeto.model_dump() if data.projeto else None
+        
+        questions = await ai_service.generate_research_questions(
+            components, framework=framework, project_context=project_ctx
+        )
         
         return ResearchQuestionsResponse(researchQuestions=questions)
     
@@ -57,10 +64,17 @@ async def generate_search_strings(
     try:
         ai_service = get_ai_service()
         
-        picoc = data.picocData.model_dump()
+        framework = data.framework or "PICOC"
+        raw_components = data.picocData.model_dump()
+        components = normalize_framework_data(raw_components, framework)
+        project_ctx = data.projeto.model_dump() if data.projeto else None
+        
         searchStrings = await ai_service.generate_search_strings(
             data.researchQuestions, 
-            picoc
+            components,
+            framework=framework,
+            target_database=data.targetDatabase or "scopus",
+            project_context=project_ctx,
         )
         
         return SearchStringsResponse(searchStrings=searchStrings)
@@ -122,15 +136,20 @@ async def generate_criteria(
     data: CriteriaRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Gerar critérios de inclusão e exclusão baseados no PICOC e perguntas de pesquisa."""
+    """Gerar critérios de inclusão e exclusão baseados no framework e perguntas de pesquisa."""
     try:
         ai_service = get_ai_service()
         
-        picoc = data.picocData.model_dump()
+        framework = data.framework or "PICOC"
+        raw_components = data.picocData.model_dump()
+        components = normalize_framework_data(raw_components, framework)
+        project_ctx = data.projeto.model_dump() if data.projeto else None
+        
         result = await ai_service.generate_criteria(
             data.researchQuestions, 
-            picoc,
-            data.projeto.model_dump() if data.projeto else None
+            components,
+            framework=framework,
+            project_context=project_ctx,
         )
         
         return CriteriaResponse(

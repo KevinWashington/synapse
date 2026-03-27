@@ -14,7 +14,10 @@ class Project(Base):
     objetivo: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="ideia")
     
-    # PICOC fields stored as JSON for flexibility
+    # Framework type (PICO, PICOS, PECO, PICOC)
+    framework: Mapped[str] = mapped_column(String(10), default="PICOC", nullable=False)
+    
+    # Framework component fields stored as JSON for flexibility
     picoc: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     
     # Arrays stored as PostgreSQL ARRAY type

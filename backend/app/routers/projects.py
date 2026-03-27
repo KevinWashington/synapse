@@ -13,9 +13,24 @@ from app.schemas.project import (
     ProjectListResponse,
 )
 from app.core.dependencies import get_current_user
+from app.frameworks import FRAMEWORK_INFO, FRAMEWORK_COMPONENTS, FrameworkType
 
 
 router = APIRouter()
+
+
+@router.get("/frameworks")
+async def get_frameworks():
+    """Retorna a lista de frameworks disponíveis com descrições e áreas recomendadas."""
+    return {
+        "frameworks": [
+            {
+                **FRAMEWORK_INFO[fw.value],
+                "components": FRAMEWORK_COMPONENTS[fw.value],
+            }
+            for fw in FrameworkType
+        ]
+    }
 
 
 @router.get("", response_model=ProjectListResponse)
@@ -56,6 +71,7 @@ async def create_project(
         title=data.title,
         objetivo=data.objetivo,
         status=data.status,
+        framework=data.framework or "PICOC",
         picoc=data.picoc.model_dump() if data.picoc else {},
         researchQuestions=data.researchQuestions or [],
         keywords=data.keywords or [],
