@@ -39,10 +39,12 @@ Plans:
 **Goal:** Enforce `paper_id` consistency across vector and relational stores.
 **Requirements:** R4
 **Depends on:** Phase 2, Phase 3
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 4 to break down)
+- [ ] 04-01-PLAN.md - Add canonical paperId contract to relational records
+- [ ] 04-02-PLAN.md - Propagate paper_id through vector payload boundaries
+- [ ] 04-03-PLAN.md - Add anchor joinability diagnostics and checks
 
 ### Phase 5: Traceability and Validation
 **Goal:** Expose provenance in outputs and verify isolation/traceability through tests.
@@ -54,4 +56,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 5 to break down)
 
 ## Recommended Next Command
-/gsd-plan-phase 4
+/gsd-execute-phase 4
