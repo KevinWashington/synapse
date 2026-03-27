@@ -33,6 +33,13 @@ class MCPHostService:
     def register_server(self, name: str, capabilities: list[str]) -> None:
         self._servers[name] = MCPServerRegistration(name=name, capabilities=capabilities)
 
+    def set_server_health(self, name: str, healthy: bool, last_error: dict | None = None) -> None:
+        server = self._servers.get(name)
+        if server is None:
+            return
+        server.healthy = healthy
+        server.last_error = last_error
+
     def get_server_for_method(self, method: str) -> MCPServerRegistration | None:
         for server in self._servers.values():
             if method in server.capabilities:
@@ -105,7 +112,10 @@ class MCPHostService:
 
     def diagnostics(self) -> dict:
         servers = []
+        method_server_map = {}
         for server in self._servers.values():
+            for method in server.capabilities:
+                method_server_map[method] = server.name
             servers.append(
                 {
                     "name": server.name,
@@ -119,6 +129,7 @@ class MCPHostService:
             "timeoutSeconds": self.timeout_seconds,
             "maxRetries": self.max_retries,
             "registeredServerCount": len(self._servers),
+            "methodServerMap": method_server_map,
             "servers": servers,
         }
 

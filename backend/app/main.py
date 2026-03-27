@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db, engine
 from app.routers import auth, projects, articles, ai, stats
-from app.core.dependencies import get_mcp_host
+from app.core.dependencies import get_mcp_host, get_graph_mcp_service, get_sql_mcp_service
 
 
 @asynccontextmanager
@@ -21,8 +21,14 @@ async def lifespan(app: FastAPI):
         host.register_server("qdrant", ["vector.search", "vector.upsert", "vector.health"])
     if "neo4j" in configured_servers:
         host.register_server("neo4j", ["graph.query", "graph.write", "graph.health"])
+        graph = get_graph_mcp_service()
+        graph_health = await graph.mcp_health()
+        host.set_server_health("neo4j", graph_health.get("connected", False), graph_health.get("details"))
     if "postgres" in configured_servers:
         host.register_server("postgres", ["sql.query", "sql.write", "sql.health"])
+        sql = get_sql_mcp_service()
+        sql_health = await sql.mcp_health()
+        host.set_server_health("postgres", sql_health.get("connected", False), sql_health.get("details"))
 
     yield
     # Shutdown: close database connection

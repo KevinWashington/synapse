@@ -45,3 +45,23 @@ async def get_db() -> AsyncSession:
             yield session
         finally:
             await session.close()
+
+
+async def db_health_check() -> dict:
+    """Return DB connectivity and pgvector extension status."""
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+            vector_enabled = await conn.scalar(
+                text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')")
+            )
+        return {
+            "connected": True,
+            "vectorExtension": bool(vector_enabled),
+        }
+    except Exception as exc:
+        return {
+            "connected": False,
+            "vectorExtension": False,
+            "error": str(exc),
+        }

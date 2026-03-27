@@ -114,3 +114,36 @@ class MCPResponseEnvelope(BaseModel):
     id: str | int
     result: dict | None = None
     error: MCPError | None = None
+
+
+class GraphQueryPayload(BaseModel):
+    cypher: str
+    params: dict = {}
+
+
+class GraphWritePayload(BaseModel):
+    cypher: str
+    params: dict = {}
+
+
+class GraphHealthResponse(BaseModel):
+    connected: bool
+    server: str = "neo4j"
+    details: dict = {}
+
+
+class SQLQueryPayload(BaseModel):
+    query: str
+    params: dict = {}
+    max_rows: int | None = None
+
+
+class SQLWritePayload(BaseModel):
+    query: str
+    params: dict = {}
+
+
+class SQLHealthResponse(BaseModel):
+    connected: bool
+    vectorExtension: bool
+    server: str = "postgres"

@@ -7,9 +7,11 @@ from app.database import get_db
 from app.models.user import User
 from app.models.project import Project
 from app.models.article import Article
-from app.core.dependencies import get_current_user, get_mcp_host
+from app.core.dependencies import get_current_user, get_mcp_host, get_graph_mcp_service, get_sql_mcp_service
 from app.services.mcp_host_service import MCPHostService
 from app.services.rag_service import get_rag_service
+from app.services.neo4j_service import Neo4jService
+from app.services.postgres_mcp_service import PostgresMCPService
 
 
 router = APIRouter()
@@ -155,4 +157,22 @@ async def get_retrieval_stats(
     return {
         "viewerUserId": current_user.id,
         "diagnostics": rag.diagnostics(),
+    }
+
+
+@router.get("/stats/mcp-services")
+async def get_mcp_service_stats(
+    current_user: User = Depends(get_current_user),
+    host: MCPHostService = Depends(get_mcp_host),
+    graph: Neo4jService = Depends(get_graph_mcp_service),
+    sql: PostgresMCPService = Depends(get_sql_mcp_service),
+):
+    """Return graph/sql MCP health details along with host diagnostics."""
+    graph_health = await graph.mcp_health()
+    sql_health = await sql.mcp_health()
+    return {
+        "viewerUserId": current_user.id,
+        "host": host.diagnostics(),
+        "graph": graph_health,
+        "sql": sql_health,
     }

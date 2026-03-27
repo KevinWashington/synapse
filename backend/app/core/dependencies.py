@@ -8,6 +8,8 @@ from app.database import get_db
 from app.core.security import decode_token
 from app.models.user import User
 from app.services.mcp_host_service import MCPHostService
+from app.services.neo4j_service import Neo4jService, get_neo4j_service
+from app.services.postgres_mcp_service import PostgresMCPService, get_postgres_mcp_service
 
 
 security = HTTPBearer()
@@ -81,3 +83,15 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
 def get_mcp_host() -> MCPHostService:
     """Dependency provider for MCP host orchestrator service."""
     return MCPHostService()
+
+
+@lru_cache()
+def get_graph_mcp_service() -> Neo4jService:
+    """Dependency provider for graph MCP service."""
+    return get_neo4j_service()
+
+
+@lru_cache()
+def get_sql_mcp_service() -> PostgresMCPService:
+    """Dependency provider for SQL MCP service."""
+    return get_postgres_mcp_service()

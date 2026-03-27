@@ -205,6 +205,81 @@ class Neo4jService:
                 projectId=project_id
             )
 
+    async def mcp_query(self, cypher: str, params: dict | None = None) -> dict:
+        """MCP wrapper for graph.query operations."""
+        params = params or {}
+        try:
+            async with self.driver.session() as session:
+                result = await session.run(cypher, **params)
+                rows = [record.data() async for record in result]
+                return {
+                    "ok": True,
+                    "method": "graph.query",
+                    "rows": rows,
+                    "rowCount": len(rows),
+                }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "method": "graph.query",
+                "error": {
+                    "category": "graph",
+                    "message": str(exc),
+                    "hint": "Validate Cypher syntax and Neo4j connectivity.",
+                },
+            }
+
+    async def mcp_write(self, cypher: str, params: dict | None = None) -> dict:
+        """MCP wrapper for graph.write operations."""
+        params = params or {}
+        try:
+            async with self.driver.session() as session:
+                result = await session.run(cypher, **params)
+                summary = await result.consume()
+                counters = summary.counters
+                return {
+                    "ok": True,
+                    "method": "graph.write",
+                    "counters": {
+                        "nodesCreated": counters.nodes_created,
+                        "nodesDeleted": counters.nodes_deleted,
+                        "relationshipsCreated": counters.relationships_created,
+                        "relationshipsDeleted": counters.relationships_deleted,
+                    },
+                }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "method": "graph.write",
+                "error": {
+                    "category": "graph",
+                    "message": str(exc),
+                    "hint": "Validate write query and permissions.",
+                },
+            }
+
+    async def mcp_health(self) -> dict:
+        """MCP wrapper for graph.health operation."""
+        try:
+            async with self.driver.session() as session:
+                await session.run("RETURN 1 as ok")
+            return {
+                "connected": True,
+                "server": "neo4j",
+                "details": {
+                    "uri": settings.NEO4J_URI,
+                },
+            }
+        except Exception as exc:
+            return {
+                "connected": False,
+                "server": "neo4j",
+                "details": {
+                    "error": str(exc),
+                    "hint": "Check Neo4j URI, credentials, and container status.",
+                },
+            }
+
 
 # Singleton instance
 _neo4j_service: Neo4jService | None = None

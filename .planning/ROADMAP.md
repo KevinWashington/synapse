@@ -31,9 +31,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md - Add Neo4j MCP read/write and health contracts
-- [ ] 03-02-PLAN.md - Add PostgreSQL MCP read/write and health service
-- [ ] 03-03-PLAN.md - Wire graph/sql MCP startup and diagnostics
+- [x] 03-01-PLAN.md - Add Neo4j MCP read/write and health contracts
+- [x] 03-02-PLAN.md - Add PostgreSQL MCP read/write and health service
+- [x] 03-03-PLAN.md - Wire graph/sql MCP startup and diagnostics
 
 ### Phase 4: Cross-System Anchor and Joinability
 **Goal:** Enforce `paper_id` consistency across vector and relational stores.
@@ -54,4 +54,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 5 to break down)
 
 ## Recommended Next Command
-/gsd-execute-phase 3
+/gsd-plan-phase 4

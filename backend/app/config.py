@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     RETRIEVAL_BACKEND: str = "pgvector"
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION: str = "articles"
+
+    # PostgreSQL MCP safeguards
+    SQL_MCP_TIMEOUT_SECONDS: int = 15
+    SQL_MCP_MAX_ROWS: int = 200
+    SQL_MCP_ALLOW_WRITE_TABLES: str = "articles,projects"
     
     class Config:
         env_file = ".env"
