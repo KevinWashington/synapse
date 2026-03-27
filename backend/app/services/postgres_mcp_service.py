@@ -119,6 +119,41 @@ class PostgresMCPService:
             "details": health,
         }
 
+    async def lookup_by_paper_id(self, project_id: int, paper_id: str) -> dict:
+        """Project-scoped relational lookup for a canonical paper_id."""
+        query = """
+            SELECT id, "paperId", title, "projectId"
+            FROM articles
+            WHERE "projectId" = :project_id
+              AND "paperId" = :paper_id
+            LIMIT 1
+        """
+        return await self.mcp_query(query=query, params={"project_id": project_id, "paper_id": paper_id}, max_rows=1)
+
+    async def paper_id_counts(self, project_id: int) -> dict:
+        """Return project-scoped paper_id availability counts."""
+        query = """
+            SELECT
+                COUNT(*)::int AS total,
+                COUNT("paperId")::int AS with_anchor,
+                (COUNT(*) - COUNT("paperId"))::int AS missing_anchor
+            FROM articles
+            WHERE "projectId" = :project_id
+        """
+        result = await self.mcp_query(query=query, params={"project_id": project_id}, max_rows=1)
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "error": result.get("error"),
+            }
+        row = (result.get("rows") or [{}])[0]
+        return {
+            "ok": True,
+            "total": row.get("total", 0),
+            "with_anchor": row.get("with_anchor", 0),
+            "missing_anchor": row.get("missing_anchor", 0),
+        }
+
     def _is_blocked_statement(self, query: str) -> bool:
         lowered = query.strip().lower()
         if any(lowered.startswith(prefix) for prefix in self._BLOCKED_PREFIXES):

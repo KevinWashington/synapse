@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, LargeBinary, Table, Column
+from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, LargeBinary, Table, Column, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ARRAY
 from pgvector.sqlalchemy import Vector
@@ -18,6 +18,9 @@ articleRelationships = Table(
 
 class Article(Base):
     __tablename__ = "articles"
+    __table_args__ = (
+        Index("idx_articles_project_paperid", "projectId", "paperId"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -26,6 +29,7 @@ class Article(Base):
     journal: Mapped[str] = mapped_column(String(200), nullable=False)
     
     # Optional fields
+    paperId: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     doi: Mapped[str | None] = mapped_column(String(100), nullable=True)
     abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
     keywords: Mapped[str | None] = mapped_column(String(500), nullable=True)

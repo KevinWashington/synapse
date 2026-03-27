@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 
 class ArticleCreate(BaseModel):
+    paperId: str | None = Field(None, max_length=120)
     title: str = Field(..., min_length=1, max_length=200)
     authors: str = Field(..., min_length=1, max_length=300)
     year: int = Field(..., ge=1900, le=2100)
@@ -18,6 +19,7 @@ class ArticleCreate(BaseModel):
 
 
 class ArticleUpdate(BaseModel):
+    paperId: str | None = Field(None, max_length=120)
     title: str | None = Field(None, max_length=200)
     authors: str | None = Field(None, max_length=300)
     year: int | None = Field(None, ge=1900, le=2100)
@@ -42,6 +44,7 @@ class ArticleNotesUpdate(BaseModel):
 
 class ArticleResponse(BaseModel):
     id: int
+    paperId: str | None = None
     title: str
     authors: str
     year: int

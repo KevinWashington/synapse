@@ -37,6 +37,27 @@ async def init_db():
             "UPDATE projects SET framework = 'PICOC' WHERE framework IS NULL"
         ))
 
+        # Migration: add canonical paperId anchor to articles
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "paperId" VARCHAR(120)'
+        ))
+        await conn.execute(text(
+            """
+            UPDATE articles
+            SET "paperId" = COALESCE(
+                NULLIF(BTRIM(REGEXP_REPLACE(LOWER(COALESCE(doi, '')), '[^a-z0-9]+', '-', 'g'), '-'), ''),
+                'paper-' || SUBSTRING(MD5(COALESCE(title, '') || '-' || COALESCE(year::text, '') || '-' || id::text), 1, 16)
+            )
+            WHERE "paperId" IS NULL OR "paperId" = ''
+            """
+        ))
+        await conn.execute(text(
+            'CREATE INDEX IF NOT EXISTS idx_articles_paperid ON articles ("paperId")'
+        ))
+        await conn.execute(text(
+            'CREATE INDEX IF NOT EXISTS idx_articles_project_paperid ON articles ("projectId", "paperId")'
+        ))
+
 
 async def get_db() -> AsyncSession:
     """Dependency to get database session."""

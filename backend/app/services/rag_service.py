@@ -93,7 +93,7 @@ class RAGService:
             
             result = await db.execute(
                 text("""
-                    SELECT id, title, authors, year, journal, abstract, notas,
+                    SELECT id, "paperId", title, authors, year, journal, abstract, notas,
                            "aiMethodology", "aiDomain", "aiKeywords",
                            embedding <=> :query_embedding AS distance
                     FROM articles
@@ -116,6 +116,7 @@ class RAGService:
             if isinstance(art, dict):
                 retrieved_articles.append({
                     "id": art.get("id"),
+                    "paper_id": art.get("paper_id") or art.get("paperId"),
                     "title": art.get("title", "N/A"),
                     "authors": art.get("authors"),
                     "year": art.get("year"),
@@ -131,6 +132,7 @@ class RAGService:
                 # SQLAlchemy model object (fallback path)
                 retrieved_articles.append({
                     "id": art.id,
+                    "paper_id": art.paperId,
                     "title": art.title,
                     "authors": art.authors,
                     "year": art.year,
@@ -146,6 +148,7 @@ class RAGService:
                 # Raw row from vector search
                 retrieved_articles.append({
                     "id": art.id,
+                    "paper_id": art.paperId,
                     "title": art.title,
                     "authors": art.authors,
                     "year": art.year,

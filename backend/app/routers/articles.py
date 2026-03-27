@@ -18,6 +18,7 @@ from app.schemas.article import (
     RelationshipCreate,
 )
 from app.core.dependencies import get_current_user
+from app.services.anchor_service import get_anchor_service
 
 
 router = APIRouter()
@@ -128,6 +129,14 @@ async def create_article(
         projectId=projectId,
         ownerId=current_user.id
     )
+
+    anchor_service = get_anchor_service()
+    article.paperId = anchor_service.resolve(
+        provided=data.paperId,
+        doi=article.doi,
+        title=article.title,
+        year=article.year,
+    )
     
     # Avaliação automática por IA e extração de metadados se tiver abstract
     if article.abstract:
@@ -183,6 +192,24 @@ async def create_article(
     db.add(article)
     await db.commit()
     await db.refresh(article)
+
+    # Propagar âncora canônica para payload vetorial.
+    if article.embedding is not None and article.paperId:
+        try:
+            from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
+
+            qdrant = get_qdrant_retrieval_service()
+            payload = qdrant.build_payload(
+                paper_id=article.paperId,
+                project_id=article.projectId,
+                metadata={
+                    "article_id": article.id,
+                    "title": article.title,
+                },
+            )
+            await qdrant.upsert_payload(payload=payload, embedding=list(article.embedding))
+        except Exception as e:
+            print(f"[QDRANT] Erro ao sincronizar payload vetorial: {e}")
     
     # Sincronizar com Neo4j (criar nó e relacionamentos)
     try:
@@ -239,6 +266,16 @@ async def update_article(
     
     for field, value in update_data.items():
         setattr(article, field, value)
+
+    anchor_service = get_anchor_service()
+    anchor_fields_changed = any(k in update_data for k in ("paperId", "doi", "title", "year"))
+    if anchor_fields_changed or not article.paperId:
+        article.paperId = anchor_service.resolve(
+            provided=update_data.get("paperId") if anchor_fields_changed else article.paperId,
+            doi=article.doi,
+            title=article.title,
+            year=article.year,
+        )
     
     if re_evaluate and article.abstract:
         try:
@@ -264,6 +301,23 @@ async def update_article(
 
     await db.commit()
     await db.refresh(article)
+
+    if article.embedding is not None and article.paperId:
+        try:
+            from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
+
+            qdrant = get_qdrant_retrieval_service()
+            payload = qdrant.build_payload(
+                paper_id=article.paperId,
+                project_id=article.projectId,
+                metadata={
+                    "article_id": article.id,
+                    "title": article.title,
+                },
+            )
+            await qdrant.upsert_payload(payload=payload, embedding=list(article.embedding))
+        except Exception as e:
+            print(f"[QDRANT] Erro ao sincronizar payload vetorial: {e}")
     
     response = ArticleResponse.model_validate(article)
     response.hasPdf = article.pdfData is not None

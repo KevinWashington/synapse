@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -12,6 +12,7 @@ from app.services.mcp_host_service import MCPHostService
 from app.services.rag_service import get_rag_service
 from app.services.neo4j_service import Neo4jService
 from app.services.postgres_mcp_service import PostgresMCPService
+from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
 
 
 router = APIRouter()
@@ -175,4 +176,45 @@ async def get_mcp_service_stats(
         "host": host.diagnostics(),
         "graph": graph_health,
         "sql": sql_health,
+    }
+
+
+@router.get("/stats/anchor-consistency")
+async def get_anchor_consistency_stats(
+    projectId: int,
+    current_user: User = Depends(get_current_user),
+    sql: PostgresMCPService = Depends(get_sql_mcp_service),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return paper_id consistency metrics across relational and vector boundaries."""
+    project_result = await db.execute(
+        select(Project).where(Project.id == projectId, Project.ownerId == current_user.id)
+    )
+    project = project_result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": "Projeto não encontrado",
+                "message": "Projeto inexistente ou sem permissão",
+            },
+        )
+
+    postgres_metrics = await sql.paper_id_counts(project_id=projectId)
+    qdrant = get_qdrant_retrieval_service()
+    vector_metrics = await qdrant.inspect_anchor_consistency(project_id=projectId)
+
+    postgres_missing = 0 if not postgres_metrics.get("ok") else postgres_metrics.get("missing_anchor", 0)
+    vector_missing = vector_metrics.get("vector_missing_anchor_count", 0)
+
+    return {
+        "viewerUserId": current_user.id,
+        "projectId": projectId,
+        "postgres": postgres_metrics,
+        "vector": vector_metrics,
+        "joinable": postgres_missing == 0 and vector_missing == 0,
+        "missingAnchorIndicators": {
+            "postgres": postgres_missing,
+            "vector": vector_missing,
+        },
     }
