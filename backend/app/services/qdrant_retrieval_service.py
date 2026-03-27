@@ -40,6 +40,12 @@ class QdrantRetrievalService:
             "collection": self.collection,
             "vector_size": len(embedding),
             "payload": payload,
+            "provenance": {
+                "subsystem": "vector",
+                "backend": "qdrant",
+                "projectId": payload.get("project_id"),
+                "paperId": payload.get("paper_id"),
+            },
         }
 
     async def inspect_anchor_consistency(self, project_id: int) -> dict:
@@ -50,6 +56,11 @@ class QdrantRetrievalService:
             "expected_fields": ["paper_id", "project_id"],
             "vector_anchor_count": 0,
             "vector_missing_anchor_count": 0,
+            "provenance": {
+                "subsystem": "vector",
+                "backend": "qdrant",
+                "projectId": project_id,
+            },
             "note": "Qdrant integration placeholder: counts available after live adapter wiring.",
         }
 

@@ -218,3 +218,35 @@ async def get_anchor_consistency_stats(
             "vector": vector_missing,
         },
     }
+
+
+@router.get("/stats/provenance-audit")
+async def get_provenance_audit_stats(
+    current_user: User = Depends(get_current_user),
+    host: MCPHostService = Depends(get_mcp_host),
+):
+    """Return consolidated provenance and isolation audit signals."""
+    rag = get_rag_service()
+    rag_diagnostics = rag.diagnostics()
+    host_diagnostics = host.diagnostics()
+    sources_with_provenance = rag_diagnostics.get("sourcesWithProvenance", 0)
+    sources_without_provenance = rag_diagnostics.get("sourcesWithoutProvenance", 0)
+    provenance_coverage = (
+        sources_with_provenance / (sources_with_provenance + sources_without_provenance)
+        if (sources_with_provenance + sources_without_provenance) > 0
+        else 1.0
+    )
+    return {
+        "viewerUserId": current_user.id,
+        "provenance": {
+            "coverage": provenance_coverage,
+            "sourcesWithProvenance": sources_with_provenance,
+            "sourcesWithoutProvenance": sources_without_provenance,
+            "backend": rag_diagnostics.get("backend"),
+        },
+        "isolation": {
+            "scopeDenied": rag_diagnostics.get("scopeDenied", 0),
+            "projectScopeEnforced": rag_diagnostics.get("projectScopeEnforced", False),
+        },
+        "hostAudit": host_diagnostics.get("audit", {}),
+    }

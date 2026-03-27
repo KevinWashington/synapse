@@ -64,10 +64,10 @@ Plans:
 
 Plans:
 
-- [ ] 05-01-PLAN.md - Define provenance contracts in schema and retrieval layer
-- [ ] 05-02-PLAN.md - Expose provenance and isolation audit data in APIs
-- [ ] 05-03-PLAN.md - Add automated traceability and isolation tests
+- [x] 05-01-PLAN.md - Define provenance contracts in schema and retrieval layer
+- [x] 05-02-PLAN.md - Expose provenance and isolation audit data in APIs
+- [x] 05-03-PLAN.md - Add automated traceability and isolation tests
 
 ## Recommended Next Command
 
-/gsd-execute-phase 5
+/gsd-plan-phase 6

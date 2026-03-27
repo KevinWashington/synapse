@@ -84,6 +84,16 @@ class ArticleSource(BaseModel):
     title: str
     authors: str | None = None
     year: int | None = None
+    paperId: str | None = None
+    provenance: dict | None = None
+
+
+class ChatProvenance(BaseModel):
+    backends: list[str] = []
+    subsystems: list[str] = []
+    sourceCount: int = 0
+    projectId: int
+    traceabilityComplete: bool = False
 
 
 class ProjectChatRequest(BaseModel):
@@ -94,6 +104,7 @@ class ProjectChatRequest(BaseModel):
 class ProjectChatResponse(BaseModel):
     content: str
     sources: list[ArticleSource] = []
+    provenance: ChatProvenance | None = None
 
 
 class MCPError(BaseModel):

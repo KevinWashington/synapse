@@ -26,6 +26,8 @@ class RAGService:
             "scopeDenied": 0,
             "lastProjectId": None,
             "lastBackend": self.retrieval_backend,
+            "sourcesWithProvenance": 0,
+            "sourcesWithoutProvenance": 0,
         }
     
     async def retrieve(
@@ -114,6 +116,13 @@ class RAGService:
         retrieved_articles = []
         for art in articles:
             if isinstance(art, dict):
+                provenance = art.get("provenance") or {
+                    "subsystem": "vector",
+                    "backend": self.retrieval_backend,
+                    "projectId": project_id,
+                    "paperId": art.get("paper_id") or art.get("paperId"),
+                    "distance": art.get("distance"),
+                }
                 retrieved_articles.append({
                     "id": art.get("id"),
                     "paper_id": art.get("paper_id") or art.get("paperId"),
@@ -127,6 +136,7 @@ class RAGService:
                     "domain": art.get("domain"),
                     "keywords": art.get("keywords"),
                     "distance": art.get("distance"),
+                    "provenance": provenance,
                 })
             elif hasattr(art, 'id'):
                 # SQLAlchemy model object (fallback path)
@@ -143,6 +153,13 @@ class RAGService:
                     "domain": art.aiDomain,
                     "keywords": art.aiKeywords,
                     "distance": None,
+                    "provenance": {
+                        "subsystem": "vector",
+                        "backend": self.retrieval_backend,
+                        "projectId": project_id,
+                        "paperId": art.paperId,
+                        "distance": None,
+                    },
                 })
             else:
                 # Raw row from vector search
@@ -159,7 +176,18 @@ class RAGService:
                     "domain": art.aiDomain,
                     "keywords": art.aiKeywords,
                     "distance": round(float(art.distance), 4) if art.distance else None,
+                    "provenance": {
+                        "subsystem": "vector",
+                        "backend": self.retrieval_backend,
+                        "projectId": project_id,
+                        "paperId": art.paperId,
+                        "distance": round(float(art.distance), 4) if art.distance else None,
+                    },
                 })
+
+        with_provenance = sum(1 for art in retrieved_articles if art.get("provenance"))
+        self._diagnostics["sourcesWithProvenance"] += with_provenance
+        self._diagnostics["sourcesWithoutProvenance"] += max(0, len(retrieved_articles) - with_provenance)
         
         return {
             "project": project_context,
@@ -173,6 +201,8 @@ class RAGService:
             "scopeDenied": self._diagnostics["scopeDenied"],
             "lastProjectId": self._diagnostics["lastProjectId"],
             "projectScopeEnforced": True,
+            "sourcesWithProvenance": self._diagnostics["sourcesWithProvenance"],
+            "sourcesWithoutProvenance": self._diagnostics["sourcesWithoutProvenance"],
         }
 
 

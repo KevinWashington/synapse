@@ -124,12 +124,19 @@ class MCPHostService:
                     "lastError": server.last_error,
                 }
             )
+        healthy_servers = sum(1 for s in servers if s["healthy"])
+        unhealthy_servers = len(servers) - healthy_servers
         return {
             "protocolVersion": self.protocol_version,
             "timeoutSeconds": self.timeout_seconds,
             "maxRetries": self.max_retries,
             "registeredServerCount": len(self._servers),
             "methodServerMap": method_server_map,
+            "audit": {
+                "registeredMethodCount": len(method_server_map),
+                "healthyServerCount": healthy_servers,
+                "unhealthyServerCount": unhealthy_servers,
+            },
             "servers": servers,
         }
 

@@ -12,7 +12,8 @@
 - Phase 4 planned: `.planning/phases/04-cross-system-anchor-and-joinability/`
 - Phase 4 executed: plans 04-01, 04-02, 04-03 complete
 - Phase 5 planned: `.planning/phases/05-traceability-and-validation/`
-- Next recommended step: /gsd-execute-phase 5
+- Phase 5 executed: plans 05-01, 05-02, 05-03 complete
+- Next recommended step: /gsd-plan-phase 6
 
 ## Key Context
 - Brownfield repository with existing backend and frontend

@@ -235,12 +235,37 @@ async def project_chat(
                 id=art["id"],
                 title=art["title"],
                 authors=art.get("authors"),
-                year=art.get("year")
+                year=art.get("year"),
+                paperId=art.get("paper_id"),
+                provenance=art.get("provenance"),
             )
             for art in rag_result["articles"]
         ]
+
+        backends = sorted({
+            (art.get("provenance") or {}).get("backend")
+            for art in rag_result["articles"]
+            if (art.get("provenance") or {}).get("backend")
+        })
+        subsystems = sorted({
+            (art.get("provenance") or {}).get("subsystem")
+            for art in rag_result["articles"]
+            if (art.get("provenance") or {}).get("subsystem")
+        })
+        traceability_complete = all(
+            bool((art.get("provenance") or {}).get("paperId"))
+            for art in rag_result["articles"]
+        ) if rag_result["articles"] else True
+
+        provenance = {
+            "backends": backends,
+            "subsystems": subsystems,
+            "sourceCount": len(rag_result["articles"]),
+            "projectId": data.projectId,
+            "traceabilityComplete": traceability_complete,
+        }
         
-        return ProjectChatResponse(content=response, sources=sources)
+        return ProjectChatResponse(content=response, sources=sources, provenance=provenance)
     
     except HTTPException:
         raise
