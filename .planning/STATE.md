@@ -3,7 +3,8 @@
 ## Project Status
 - Initialized manually after codebase mapping
 - Current milestone: Milestone 1 - Hybrid GraphRAG Foundation
-- Next recommended step: /gsd-plan-phase 1
+- Phase 1 planned: `.planning/phases/01-mcp-host-and-contracts/`
+- Next recommended step: /gsd-execute-phase 1
 
 ## Key Context
 - Brownfield repository with existing backend and frontend

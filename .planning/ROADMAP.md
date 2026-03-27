@@ -6,10 +6,12 @@ Milestone 1 - Hybrid GraphRAG Foundation
 ### Phase 1: MCP Host and Contracts
 **Goal:** Establish stable local MCP host orchestration and server contracts.
 **Requirements:** R1
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 1 to break down)
+- [ ] 01-01-PLAN.md - Define JSON-RPC contracts and host config
+- [ ] 01-02-PLAN.md - Implement MCP host orchestration service
+- [ ] 01-03-PLAN.md - Add diagnostics and operations documentation
 
 ### Phase 2: Vector Retrieval with Isolation
 **Goal:** Implement Qdrant semantic retrieval with mandatory project-level isolation.
@@ -48,4 +50,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 5 to break down)
 
 ## Recommended Next Command
-/gsd-plan-phase 1
+/gsd-execute-phase 1
