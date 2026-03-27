@@ -26,15 +26,38 @@ while maintaining strict per-project data isolation.
 - Rigid, one-size-fits-all retrieval pipelines
 - Data isolation risk across concurrent projects
 
-## Scope Baseline (Milestone 1)
+
+<details>
+<summary>Milestone 1 (v1.0) — Hybrid GraphRAG Foundation (archived)</summary>
+
+<b>Scope Baseline:</b>
 - Local MCP host orchestration using JSON-RPC
 - Qdrant vector search server with Specter2 embeddings
 - Mandatory project-level filtering for vector retrieval
 - Basic Neo4j and PostgreSQL MCP servers for read/write operations
 - Universal paper anchor key (`paper_id`) consistency across stores
 
-## Success Criteria
+<b>Success Criteria:</b>
 - Retrieval and reasoning path can be traced to concrete sources and systems
 - No cross-project data leakage in retrieval results
 - Multi-tool reasoning improves answer quality over vector-only baseline
 - Foundation is stable for later advanced reactive loops
+
+</details>
+
+## Current State (after v1.0)
+
+- All core retrieval, graph, and SQL MCP services operational and integrated
+- Project-level isolation and provenance contracts enforced
+- Automated tests and diagnostics cover all requirements
+- Foundation ready for advanced agent orchestration and multi-tenant expansion
+
+## Next Milestone Goals
+
+- Add multi-tenant remote deployment support
+- Integrate advanced graph reasoning and ranking
+- Expand agent orchestration for multi-step query planning
+- Enhance diagnostics and auditability for production
+
+---
+*Last updated: 2026-03-27 after v1.0 milestone*
