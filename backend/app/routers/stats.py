@@ -7,7 +7,8 @@ from app.database import get_db
 from app.models.user import User
 from app.models.project import Project
 from app.models.article import Article
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_mcp_host
+from app.services.mcp_host_service import MCPHostService
 
 
 router = APIRouter()
@@ -129,4 +130,16 @@ async def get_stats(
         "progressPercentage": progressPercentage,
         "pendingArticles": pendingArticles,
         "dailyReviews": dailyReviews
+    }
+
+
+@router.get("/stats/mcp-host")
+async def get_mcp_host_stats(
+    current_user: User = Depends(get_current_user),
+    host: MCPHostService = Depends(get_mcp_host),
+):
+    """Return MCP host diagnostics for registered local servers."""
+    return {
+        "viewerUserId": current_user.id,
+        "diagnostics": host.diagnostics(),
     }

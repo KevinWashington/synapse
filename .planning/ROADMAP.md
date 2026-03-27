@@ -9,9 +9,9 @@ Milestone 1 - Hybrid GraphRAG Foundation
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md - Define JSON-RPC contracts and host config
-- [ ] 01-02-PLAN.md - Implement MCP host orchestration service
-- [ ] 01-03-PLAN.md - Add diagnostics and operations documentation
+- [x] 01-01-PLAN.md - Define JSON-RPC contracts and host config
+- [x] 01-02-PLAN.md - Implement MCP host orchestration service
+- [x] 01-03-PLAN.md - Add diagnostics and operations documentation
 
 ### Phase 2: Vector Retrieval with Isolation
 **Goal:** Implement Qdrant semantic retrieval with mandatory project-level isolation.
@@ -50,4 +50,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 5 to break down)
 
 ## Recommended Next Command
-/gsd-execute-phase 1
+/gsd-plan-phase 2

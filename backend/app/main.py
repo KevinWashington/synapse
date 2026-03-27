@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db, engine
 from app.routers import auth, projects, articles, ai, stats
+from app.core.dependencies import get_mcp_host
 
 
 @asynccontextmanager
@@ -12,6 +13,17 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     # Startup: create database tables
     await init_db()
+
+    # Bootstrap MCP host registry for local tools.
+    host = get_mcp_host()
+    configured_servers = [s.strip() for s in settings.MCP_REGISTERED_SERVERS.split(",") if s.strip()]
+    if "qdrant" in configured_servers:
+        host.register_server("qdrant", ["vector.search", "vector.upsert", "vector.health"])
+    if "neo4j" in configured_servers:
+        host.register_server("neo4j", ["graph.query", "graph.write", "graph.health"])
+    if "postgres" in configured_servers:
+        host.register_server("postgres", ["sql.query", "sql.write", "sql.health"])
+
     yield
     # Shutdown: close database connection
     await engine.dispose()

@@ -1,9 +1,25 @@
+"""
+Serviço de IA baseado em LangChain + Google Gemini.
+
+Responsável pela geração de questões de pesquisa, strings de busca,
+critérios de inclusão/exclusão, avaliação de artigos e chat.
+"""
+
 import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from app.config import settings
+from app.frameworks import (
+    build_research_questions_prompt,
+    build_search_string_prompt,
+    build_criteria_prompt,
+    normalize_framework_data,
+    _build_components_text,
+    FRAMEWORK_COMPONENTS,
+)
+from app.schemas.ai import MCPRequestEnvelope, MCPResponseEnvelope
 
 
 class AIService:
@@ -25,164 +41,90 @@ class AIService:
             )
         return self._llm
     
-    async def generate_research_questions(self, picoc: dict, project_context: dict | None = None) -> list[str]:
-        """Generate research questions based on PICOC framework."""
+    async def generate_research_questions(
+        self,
+        components: dict,
+        framework: str = "PICOC",
+        project_context: dict | None = None,
+    ) -> list[str]:
+        """Generate research questions based on the selected framework.
+        
+        Args:
+            components: Framework component values (standardized English keys).
+            framework: Framework type (PICO, PICOS, PECO, PICOC).
+            project_context: Optional project context (title, objetivo).
+        """
+        system_msg, user_msg = build_research_questions_prompt(
+            framework, components, project_context
+        )
+        
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """Você é um especialista em metodologia de pesquisa acadêmica.
-Sua tarefa é gerar perguntas de pesquisa específicas e bem estruturadas baseadas nos dados do framework PICOC fornecidos.
-
-Instruções:
-1. Gere 3-5 perguntas de pesquisa específicas e mensuráveis
-2. Cada pergunta deve ser clara e focada
-3. Use linguagem acadêmica apropriada
-4. As perguntas devem ser baseadas nos elementos do PICOC
-5. Formate cada pergunta em uma linha separada, numerada (1., 2., etc.)
-6. Foque em perguntas que podem ser respondidas através de revisão sistemática
-7. Responda APENAS a lista numerada. NÃO inclua introduções, conclusões ou explicações."""),
-            ("user", """
-Contexto do Projeto:
-Título: {project_title}
-Objetivo: {project_objective}
-
-Framework PICOC:
-- População/Pessoa: {pessoa}
-- Intervenção: {intervencao}
-- Comparação: {comparacao}
-- Outcome (Resultado): {outcome}
-- Contexto: {contexto}
-
-Gere as perguntas agora:""")
+            ("system", system_msg),
+            ("user", user_msg),
         ])
         
         chain = prompt | self.llm | StrOutputParser()
-        
-        project_title = "Não especificado"
-        project_objective = "Não especificado"
-        
-        if project_context:
-            project_title = project_context.get("title") or "Não especificado"
-            project_objective = project_context.get("objective") or "Não especificado"
-        
-        result = await chain.ainvoke({
-            "project_title": project_title,
-            "project_objective": project_objective,
-            "pessoa": picoc.get("pessoa") or "Não especificado",
-            "intervencao": picoc.get("intervencao") or "Não especificado",
-            "comparacao": picoc.get("comparacao") or "Não especificado",
-            "outcome": picoc.get("outcome") or "Não especificado",
-            "contexto": picoc.get("contexto") or "Não especificado",
-        })
+        result = await chain.ainvoke({})
         
         return self._parse_numbered_list(result)
     
-    async def generate_search_strings(self, research_questions: list[str], picoc: dict, project_context: dict | None = None) -> list[str]:
-        """Generate search strings based on research questions and PICOC."""
-        questions_text = "\n".join(f"{i+1}. {q}" for i, q in enumerate(research_questions))
+    async def generate_search_strings(
+        self,
+        research_questions: list[str],
+        components: dict,
+        framework: str = "PICOC",
+        target_database: str = "scopus",
+        project_context: dict | None = None,
+    ) -> list[str]:
+        """Generate search strings based on research questions and framework.
+        
+        Args:
+            research_questions: List of research questions.
+            components: Framework component values.
+            framework: Framework type.
+            target_database: Target database (scopus, web_of_science, ieee).
+            project_context: Optional project context.
+        """
+        system_msg, user_msg = build_search_string_prompt(
+            framework, components, research_questions, target_database, project_context
+        )
         
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """Você é um especialista em estratégias de busca bibliográfica para revisões sistemáticas.
-Sua tarefa é gerar strings de busca eficazes baseadas nas perguntas de pesquisa e dados do PICOC fornecidos.
-
-Instruções:
-1. Gere 3-5 strings de busca otimizadas para bases de dados acadêmicas (PubMed, Scopus, Web of Science, etc.)
-2. Cada string deve usar operadores booleanos (AND, OR, NOT) adequadamente
-3. Inclua sinônimos e variações de termos importantes
-4. Use truncamento (*) quando apropriado para capturar variações
-5. Considere termos em inglês e português quando relevante
-6. Formate cada string em uma linha separada, numerada (1., 2., etc.)
-7. Foque em termos que maximizem a recuperação de estudos relevantes
-8. Responda APENAS a lista numerada. NÃO inclua introduções, conclusões ou explicações."""),
-            ("user", """Perguntas de Pesquisa:
-{questions}
-
-Contexto do Projeto:
-Título: {project_title}
-Objetivo: {project_objective}
-
-Framework PICOC:
-- População/Pessoa: {pessoa}
-- Intervenção: {intervencao}
-- Comparação: {comparacao}
-- Outcome (Resultado): {outcome}
-- Contexto: {contexto}
-
-Gere as strings de busca agora:""")
+            ("system", system_msg),
+            ("user", user_msg),
         ])
         
         chain = prompt | self.llm | StrOutputParser()
-        
-        project_title = "Não especificado"
-        project_objective = "Não especificado"
-        
-        if project_context:
-            project_title = project_context.get("title") or "Não especificado"
-            project_objective = project_context.get("objective") or "Não especificado"
-        
-        result = await chain.ainvoke({
-            "questions": questions_text,
-            "project_title": project_title,
-            "project_objective": project_objective,
-            "pessoa": picoc.get("pessoa") or "Não especificado",
-            "intervencao": picoc.get("intervencao") or "Não especificado",
-            "comparacao": picoc.get("comparacao") or "Não especificado",
-            "outcome": picoc.get("outcome") or "Não especificado",
-            "contexto": picoc.get("contexto") or "Não especificado",
-        })
+        result = await chain.ainvoke({})
         
         return self._parse_numbered_list(result)
     
-    async def generate_criteria(self, research_questions: list[str], picoc: dict, project_context: dict | None = None) -> dict[str, list[str]]:
-        """Generate inclusion and exclusion criteria based on research questions and PICOC."""
-        questions_text = "\n".join(f"{i+1}. {q}" for i, q in enumerate(research_questions)) if research_questions else "Não especificadas"
+    async def generate_criteria(
+        self,
+        research_questions: list[str],
+        components: dict,
+        framework: str = "PICOC",
+        project_context: dict | None = None,
+    ) -> dict[str, list[str]]:
+        """Generate inclusion and exclusion criteria based on research questions and framework.
+        
+        Args:
+            research_questions: List of research questions.
+            components: Framework component values.
+            framework: Framework type.
+            project_context: Optional project context.
+        """
+        system_msg, user_msg = build_criteria_prompt(
+            framework, components, research_questions, project_context
+        )
         
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """Você é um especialista em revisões sistemáticas e mapeamento sistemático de literatura.
-Sua tarefa é gerar critérios de inclusão e exclusão claros, objetivos e robustos para a seleção de estudos.
-
-Instruções:
-1. Gere uma lista de 4-6 critérios de inclusão e uma lista de 4-6 critérios de exclusão.
-2. Os critérios devem ser baseados no framework PICOC e nas perguntas de pesquisa fornecidas.
-3. Certifique-se de que os critérios sejam específicos e fáceis de aplicar.
-4. Inclua critérios relacionados a: tipo de estudo, intervalo de tempo, idioma (se relevante), população, intervenção e resultados.
-5. Formate explicitamente com dois cabeçalhos: "### INCLUSÃO" e "### EXCLUSÃO".
-6. Liste cada critério numerado dentro de seu respectivo cabeçalho.
-7. Responda APENAS as listas. NÃO inclua introduções, conclusões ou explicações."""),
-            ("user", """Perguntas de Pesquisa:
-{questions}
-
-Contexto do Projeto:
-Título: {project_title}
-Objetivo: {project_objective}
-
-Framework PICOC:
-- População/Pessoa: {pessoa}
-- Intervenção: {intervencao}
-- Comparacao: {comparacao}
-- Outcome (Resultado): {outcome}
-- Contexto: {contexto}
-
-Gere os critérios de inclusão e exclusão agora:""")
+            ("system", system_msg),
+            ("user", user_msg),
         ])
         
         chain = prompt | self.llm | StrOutputParser()
-        
-        project_title = "Não especificado"
-        project_objective = "Não especificado"
-        
-        if project_context:
-            project_title = project_context.get("title") or "Não especificado"
-            project_objective = project_context.get("objective") or "Não especificado"
-        
-        result = await chain.ainvoke({
-            "questions": questions_text,
-            "project_title": project_title,
-            "project_objective": project_objective,
-            "pessoa": picoc.get("pessoa") or "Não especificado",
-            "intervencao": picoc.get("intervencao") or "Não especificado",
-            "comparacao": picoc.get("comparacao") or "Não especificado",
-            "outcome": picoc.get("outcome") or "Não especificado",
-            "contexto": picoc.get("contexto") or "Não especificado",
-        })
+        result = await chain.ainvoke({})
         
         # Parse the dual list
         inclusion = []
@@ -390,17 +332,15 @@ REGRAS:
             if art.get('notas'):
                 articles_block += f"Notas do pesquisador: {art['notas']}\n"
         
-        # Build PICOC block
-        picoc = project_context.get("picoc", {})
-        picoc_block = ""
-        if picoc:
-            picoc_block = f"""
-Framework PICOC:
-- População: {picoc.get('pessoa', 'N/A')}
-- Intervenção: {picoc.get('intervencao', 'N/A')}
-- Comparação: {picoc.get('comparacao', 'N/A')}
-- Outcome: {picoc.get('outcome', 'N/A')}
-- Contexto: {picoc.get('contexto', 'N/A')}"""
+        # Build framework-aware components block
+        framework = project_context.get("framework", "PICOC")
+        raw_picoc = project_context.get("picoc", {})
+        components = normalize_framework_data(raw_picoc, framework)
+        
+        fw_block = ""
+        if components and any(v for v in components.values()):
+            fw_block = f"\nFramework {framework}:\n"
+            fw_block += _build_components_text(framework, components)
 
         # Research questions
         rq = project_context.get("researchQuestions", [])
@@ -412,7 +352,7 @@ Framework PICOC:
 
 CONTEXTO DO PROJETO:
 Título: {project_context.get('title', 'N/A')}
-Objetivo: {project_context.get('objetivo', 'N/A')}{picoc_block}{rq_block}
+Objetivo: {project_context.get('objetivo', 'N/A')}{fw_block}{rq_block}
 
 ARTIGOS RECUPERADOS DA BASE DO PESQUISADOR:
 {articles_block if articles_block else "(Nenhum artigo com embedding disponível neste projeto)"}
@@ -454,6 +394,29 @@ REGRAS DE OPERAÇÃO:
                     items.append(cleaned)
         
         return items
+
+    def validate_mcp_envelope(self, payload: dict) -> MCPRequestEnvelope | None:
+        """Validate MCP JSON-RPC envelope shape before tool invocation."""
+        try:
+            envelope = MCPRequestEnvelope(**payload)
+            if envelope.jsonrpc != "2.0":
+                return None
+            return envelope
+        except Exception:
+            return None
+
+    def mcp_validation_error_response(self, request_id: str | int = "validation") -> MCPResponseEnvelope:
+        return MCPResponseEnvelope(
+            id=request_id,
+            error={
+                "code": -32600,
+                "message": "Invalid MCP envelope payload",
+                "data": {
+                    "category": "validation",
+                    "hint": "Provide a JSON-RPC 2.0 envelope with id, method, and object params.",
+                },
+            },
+        )
 
 
 def get_ai_service(api_key: str | None = None, model: str = "gemini-2.0-flash") -> AIService:

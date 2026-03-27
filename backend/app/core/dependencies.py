@@ -2,10 +2,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from functools import lru_cache
 
 from app.database import get_db
 from app.core.security import decode_token
 from app.models.user import User
+from app.services.mcp_host_service import MCPHostService
 
 
 security = HTTPBearer()
@@ -73,3 +75,9 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
             }
         )
     return current_user
+
+
+@lru_cache()
+def get_mcp_host() -> MCPHostService:
+    """Dependency provider for MCP host orchestrator service."""
+    return MCPHostService()

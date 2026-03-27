@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # Server
     PORT: int = 5000
     DEBUG: bool = False
+
+    # MCP host orchestration
+    MCP_PROTOCOL_VERSION: str = "2.0"
+    MCP_REQUEST_TIMEOUT_SECONDS: int = 15
+    MCP_MAX_RETRIES: int = 1
+    MCP_REGISTERED_SERVERS: str = "qdrant,neo4j,postgres"
     
     class Config:
         env_file = ".env"

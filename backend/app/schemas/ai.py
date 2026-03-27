@@ -1,11 +1,22 @@
 from pydantic import BaseModel
 
 
-class PICOCInput(BaseModel):
+class FrameworkComponentsInput(BaseModel):
+    """Input flexível para componentes de qualquer framework.
+    Aceita tanto chaves legadas em português quanto padronizadas em inglês.
+    """
+    # Chaves padronizadas (inglês)
+    population: str | None = None
+    intervention: str | None = None
+    comparison: str | None = None
+    outcome: str | None = None
+    context: str | None = None
+    exposure: str | None = None
+    studyDesign: str | None = None
+    # Chaves legadas (português) — mantidas por compatibilidade
     pessoa: str | None = None
     intervencao: str | None = None
     comparacao: str | None = None
-    outcome: str | None = None
     contexto: str | None = None
 
 
@@ -15,8 +26,9 @@ class ProjectContext(BaseModel):
 
 
 class ResearchQuestionsRequest(BaseModel):
-    picocData: PICOCInput
+    picocData: FrameworkComponentsInput
     projeto: ProjectContext | None = None
+    framework: str = "PICOC"
 
 
 class ResearchQuestionsResponse(BaseModel):
@@ -25,8 +37,10 @@ class ResearchQuestionsResponse(BaseModel):
 
 class SearchStringsRequest(BaseModel):
     researchQuestions: list[str]
-    picocData: PICOCInput
+    picocData: FrameworkComponentsInput
     projeto: ProjectContext | None = None
+    framework: str = "PICOC"
+    targetDatabase: str = "scopus"
 
 
 class SearchStringsResponse(BaseModel):
@@ -55,8 +69,9 @@ class ChatResponse(BaseModel):
 
 class CriteriaRequest(BaseModel):
     researchQuestions: list[str]
-    picocData: PICOCInput
+    picocData: FrameworkComponentsInput
     projeto: ProjectContext | None = None
+    framework: str = "PICOC"
 
 
 class CriteriaResponse(BaseModel):
@@ -79,3 +94,23 @@ class ProjectChatRequest(BaseModel):
 class ProjectChatResponse(BaseModel):
     content: str
     sources: list[ArticleSource] = []
+
+
+class MCPError(BaseModel):
+    code: int
+    message: str
+    data: dict | None = None
+
+
+class MCPRequestEnvelope(BaseModel):
+    jsonrpc: str = "2.0"
+    id: str | int
+    method: str
+    params: dict = {}
+
+
+class MCPResponseEnvelope(BaseModel):
+    jsonrpc: str = "2.0"
+    id: str | int
+    result: dict | None = None
+    error: MCPError | None = None

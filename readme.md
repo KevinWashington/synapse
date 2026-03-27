@@ -218,6 +218,35 @@ Para suporte e dúvidas:
 
 ## 🔄 Atualizações Futuras
 - [ ] Algoritmo de clusterização dos grafos
+
+## MCP Host Operations
+
+### JSON-RPC Contract
+
+- The backend now uses JSON-RPC 2.0 envelope models for MCP-style host/server communication.
+- Required request fields: `jsonrpc`, `id`, `method`, `params`.
+- Error responses include structured `code`, `message`, and diagnostic `data` with category and hint.
+
+### Startup Expectations
+
+- MCP host registry is initialized during API startup.
+- Default registered servers are configured through `MCP_REGISTERED_SERVERS` in backend settings.
+- Timeouts and retries are controlled by:
+	- `MCP_REQUEST_TIMEOUT_SECONDS`
+	- `MCP_MAX_RETRIES`
+
+### Diagnostics Endpoint
+
+- Endpoint: `GET /api/stats/mcp-host`
+- Requires authenticated user context.
+- Returns protocol version, timeout/retry policy, registered servers, and last known error per server.
+
+### Common Recovery Steps
+
+- Timeout errors: increase timeout or inspect MCP server responsiveness.
+- Routing errors (`method not registered`): ensure server capability mapping includes the method.
+- Validation errors: verify JSON-RPC envelope shape and params object structure.
+- Transport errors: inspect backend logs and local MCP server process state.
 - [ ] Integração com mais provedores de IA
 - [ ] Exportação de relatórios em PDF
 - [ ] Colaboração em tempo real
