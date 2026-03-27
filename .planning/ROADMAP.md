@@ -28,10 +28,12 @@ Plans:
 **Goal:** Add baseline Neo4j and PostgreSQL MCP servers with health checks.
 **Requirements:** R3
 **Depends on:** Phase 1
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 3 to break down)
+- [ ] 03-01-PLAN.md - Add Neo4j MCP read/write and health contracts
+- [ ] 03-02-PLAN.md - Add PostgreSQL MCP read/write and health service
+- [ ] 03-03-PLAN.md - Wire graph/sql MCP startup and diagnostics
 
 ### Phase 4: Cross-System Anchor and Joinability
 **Goal:** Enforce `paper_id` consistency across vector and relational stores.
@@ -52,4 +54,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 5 to break down)
 
 ## Recommended Next Command
-/gsd-plan-phase 3
+/gsd-execute-phase 3
