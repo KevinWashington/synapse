@@ -60,12 +60,14 @@ Plans:
 **Goal:** Expose provenance in outputs and verify isolation/traceability through tests.
 **Requirements:** R5, R6
 **Depends on:** Phase 2, Phase 3, Phase 4
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 5 to break down)
+- [ ] 05-01-PLAN.md - Define provenance contracts in schema and retrieval layer
+- [ ] 05-02-PLAN.md - Expose provenance and isolation audit data in APIs
+- [ ] 05-03-PLAN.md - Add automated traceability and isolation tests
 
 ## Recommended Next Command
 
-/gsd-plan-phase 5
+/gsd-execute-phase 5
