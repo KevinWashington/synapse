@@ -9,6 +9,7 @@ from app.models.project import Project
 from app.models.article import Article
 from app.core.dependencies import get_current_user, get_mcp_host
 from app.services.mcp_host_service import MCPHostService
+from app.services.rag_service import get_rag_service
 
 
 router = APIRouter()
@@ -142,4 +143,16 @@ async def get_mcp_host_stats(
     return {
         "viewerUserId": current_user.id,
         "diagnostics": host.diagnostics(),
+    }
+
+
+@router.get("/stats/retrieval")
+async def get_retrieval_stats(
+    current_user: User = Depends(get_current_user),
+):
+    """Return retrieval backend diagnostics and isolation counters."""
+    rag = get_rag_service()
+    return {
+        "viewerUserId": current_user.id,
+        "diagnostics": rag.diagnostics(),
     }

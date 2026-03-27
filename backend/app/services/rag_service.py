@@ -5,7 +5,9 @@ from sqlalchemy import select, text
 
 from app.models.article import Article
 from app.models.project import Project
+from app.config import settings
 from app.services.embedding_service import get_embedding_service
+from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
 
 
 class RAGService:
@@ -17,13 +19,22 @@ class RAGService:
     
     def __init__(self):
         self.embedding = get_embedding_service()
+        self.qdrant = get_qdrant_retrieval_service()
+        self.retrieval_backend = (settings.RETRIEVAL_BACKEND or "pgvector").lower()
+        self._diagnostics = {
+            "requests": 0,
+            "scopeDenied": 0,
+            "lastProjectId": None,
+            "lastBackend": self.retrieval_backend,
+        }
     
     async def retrieve(
         self,
         query: str,
         project_id: int,
         db: AsyncSession,
-        top_k: int = 5
+        top_k: int = 5,
+        owner_id: int | None = None,
     ) -> dict:
         """Retrieve relevant articles and project context for a query.
         
@@ -36,10 +47,17 @@ class RAGService:
         Returns:
             Dict with 'project' context and 'articles' list of retrieved articles
         """
+        self._diagnostics["requests"] += 1
+        self._diagnostics["lastProjectId"] = project_id
+
         # 1. Get the project data
         project = await db.get(Project, project_id)
         if not project:
             raise ValueError(f"Projeto {project_id} não encontrado")
+
+        if owner_id is not None and project.ownerId != owner_id:
+            self._diagnostics["scopeDenied"] += 1
+            raise PermissionError("Projeto não pertence ao usuário autenticado")
         
         project_context = {
             "title": project.title,
@@ -62,6 +80,13 @@ class RAGService:
                 ).limit(top_k)
             )
             articles = result.scalars().all()
+        elif self.retrieval_backend == "qdrant":
+            rows = await self.qdrant.search(
+                query_embedding=query_embedding,
+                project_id=project_id,
+                top_k=top_k,
+            )
+            articles = rows
         else:
             # 3. Vector search using pgvector cosine distance (<=>)
             embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
@@ -88,7 +113,21 @@ class RAGService:
         # 4. Format retrieved articles
         retrieved_articles = []
         for art in articles:
-            if hasattr(art, 'id'):
+            if isinstance(art, dict):
+                retrieved_articles.append({
+                    "id": art.get("id"),
+                    "title": art.get("title", "N/A"),
+                    "authors": art.get("authors"),
+                    "year": art.get("year"),
+                    "journal": art.get("journal"),
+                    "abstract": art.get("abstract"),
+                    "notas": art.get("notas"),
+                    "methodology": art.get("methodology"),
+                    "domain": art.get("domain"),
+                    "keywords": art.get("keywords"),
+                    "distance": art.get("distance"),
+                })
+            elif hasattr(art, 'id'):
                 # SQLAlchemy model object (fallback path)
                 retrieved_articles.append({
                     "id": art.id,
@@ -122,6 +161,15 @@ class RAGService:
         return {
             "project": project_context,
             "articles": retrieved_articles,
+        }
+
+    def diagnostics(self) -> dict:
+        return {
+            "backend": self.retrieval_backend,
+            "requests": self._diagnostics["requests"],
+            "scopeDenied": self._diagnostics["scopeDenied"],
+            "lastProjectId": self._diagnostics["lastProjectId"],
+            "projectScopeEnforced": True,
         }
 
 

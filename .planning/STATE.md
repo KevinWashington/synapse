@@ -6,7 +6,8 @@
 - Phase 1 planned: `.planning/phases/01-mcp-host-and-contracts/`
 - Phase 1 executed: plans 01-01, 01-02, 01-03 complete
 - Phase 2 planned: `.planning/phases/02-vector-retrieval-with-isolation/`
-- Next recommended step: /gsd-execute-phase 2
+- Phase 2 executed: plans 02-01, 02-02, 02-03 complete
+- Next recommended step: /gsd-plan-phase 3
 
 ## Key Context
 - Brownfield repository with existing backend and frontend

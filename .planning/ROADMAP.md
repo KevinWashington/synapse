@@ -20,9 +20,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md - Harden owner and project scope checks
-- [ ] 02-02-PLAN.md - Add Qdrant adapter with mandatory project filter
-- [ ] 02-03-PLAN.md - Add isolation diagnostics and negative-path checks
+- [x] 02-01-PLAN.md - Harden owner and project scope checks
+- [x] 02-02-PLAN.md - Add Qdrant adapter with mandatory project filter
+- [x] 02-03-PLAN.md - Add isolation diagnostics and negative-path checks
 
 ### Phase 3: Graph and SQL MCP Foundations
 **Goal:** Add baseline Neo4j and PostgreSQL MCP servers with health checks.
@@ -52,4 +52,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 5 to break down)
 
 ## Recommended Next Command
-/gsd-execute-phase 2
+/gsd-plan-phase 3

@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     MCP_REQUEST_TIMEOUT_SECONDS: int = 15
     MCP_MAX_RETRIES: int = 1
     MCP_REGISTERED_SERVERS: str = "qdrant,neo4j,postgres"
+
+    # Retrieval backend
+    RETRIEVAL_BACKEND: str = "pgvector"
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_COLLECTION: str = "articles"
     
     class Config:
         env_file = ".env"

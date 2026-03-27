@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from app.models.project import Project
 from app.schemas.ai import (
     ResearchQuestionsRequest,
     ResearchQuestionsResponse,
@@ -177,6 +178,24 @@ async def project_chat(
     try:
         ai_service = get_ai_service()
         rag_service = get_rag_service()
+
+        project = await db.get(Project, data.projectId)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "error": "Projeto não encontrado",
+                    "message": f"Projeto {data.projectId} não encontrado"
+                }
+            )
+        if project.ownerId != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "Acesso negado",
+                    "message": "Você não tem permissão para consultar este projeto"
+                }
+            )
         
         # Get last user message
         last_message = ""
@@ -199,7 +218,8 @@ async def project_chat(
             query=last_message,
             project_id=data.projectId,
             db=db,
-            top_k=5
+            top_k=5,
+            owner_id=current_user.id,
         )
         
         # Generate response with project context
@@ -229,6 +249,14 @@ async def project_chat(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "error": "Projeto não encontrado",
+                "message": str(e)
+            }
+        )
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "Acesso negado",
                 "message": str(e)
             }
         )
