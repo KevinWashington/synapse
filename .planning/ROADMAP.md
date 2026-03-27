@@ -17,10 +17,12 @@ Plans:
 **Goal:** Implement Qdrant semantic retrieval with mandatory project-level isolation.
 **Requirements:** R2, R6
 **Depends on:** Phase 1
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 2 to break down)
+- [ ] 02-01-PLAN.md - Harden owner and project scope checks
+- [ ] 02-02-PLAN.md - Add Qdrant adapter with mandatory project filter
+- [ ] 02-03-PLAN.md - Add isolation diagnostics and negative-path checks
 
 ### Phase 3: Graph and SQL MCP Foundations
 **Goal:** Add baseline Neo4j and PostgreSQL MCP servers with health checks.
@@ -50,4 +52,4 @@ Plans:
 - [ ] TBD (run /gsd-plan-phase 5 to break down)
 
 ## Recommended Next Command
-/gsd-plan-phase 2
+/gsd-execute-phase 2
