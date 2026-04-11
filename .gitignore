@@ -9,6 +9,7 @@ lerna-debug.log*
 
 .github
 .agents
+.codex
 .planning/*
 node_modules
 dist

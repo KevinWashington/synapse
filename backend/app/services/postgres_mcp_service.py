@@ -154,6 +154,60 @@ class PostgresMCPService:
             "missing_anchor": row.get("missing_anchor", 0),
         }
 
+    async def rerank_by_impact(self, ids: list[str], project_id: int, filters: dict | None = None) -> dict:
+        """
+        MCP Tool 2: Valida os paper_ids no banco relacional, aplica filtros 
+        (ex: status) e busca os metadados completos.
+        """
+        if not ids:
+            return {"papers": []}
+            
+        filters = filters or {}
+        status_filter = filters.get("status", ["pendente", "analisado"])
+        
+        # Arrays são passados via cast explícito para compatibilidade com asyncpg.
+        query = """
+            SELECT id,
+                   "paperId" as paper_id,
+                   title, 
+                   authors,
+                   abstract, 
+                   "aiMethodology" as methodology,
+                   "aiDomain" as domain,
+                   year,
+                   journal,
+                   notas,
+                   status
+            FROM articles
+            WHERE "projectId" = :project_id
+              AND "paperId" = ANY(CAST(:ids AS text[]))
+              AND status = ANY(CAST(:status_list AS text[]))
+        """
+        
+        result = await self.mcp_query(
+            query=query, 
+            params={"project_id": project_id, "ids": ids, "status_list": status_filter},
+            max_rows=len(ids) # Permite retornar todos os IDs solicitados
+        )
+        
+        if not result.get("ok"):
+            raise RuntimeError(f"Postgres SQL validation failed: {result.get('error')}")
+            
+        # Adiciona proveniência para rastreabilidade do pipeline híbrido.
+        papers = []
+        for row in result.get("rows", []):
+            paper_id = row.get("paper_id")
+            row["source_type"] = "sql_validated"
+            row["provenance"] = {
+                "subsystem": "sql",
+                "backend": "postgres",
+                "projectId": project_id,
+                "paperId": paper_id,
+            }
+            papers.append(row)
+            
+        return {"papers": papers}
+
     def _is_blocked_statement(self, query: str) -> bool:
         lowered = query.strip().lower()
         if any(lowered.startswith(prefix) for prefix in self._BLOCKED_PREFIXES):

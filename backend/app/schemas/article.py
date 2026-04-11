@@ -63,6 +63,10 @@ class ArticleResponse(BaseModel):
     aiEvaluation: str | None = None
     aiSuggestedStatus: str | None = None
     aiRelevanceScore: int | None = None
+    aiMethodology: str | None = None
+    aiDatabase: str | None = None
+    aiDomain: str | None = None
+    aiKeywords: list[str] = Field(default_factory=list)
     projectId: int
     ownerId: int
     createdAt: datetime

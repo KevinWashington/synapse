@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class FrameworkComponentsInput(BaseModel):
@@ -80,7 +80,7 @@ class CriteriaResponse(BaseModel):
 
 
 class ArticleSource(BaseModel):
-    id: int
+    id: int | None = None
     title: str
     authors: str | None = None
     year: int | None = None
@@ -89,8 +89,8 @@ class ArticleSource(BaseModel):
 
 
 class ChatProvenance(BaseModel):
-    backends: list[str] = []
-    subsystems: list[str] = []
+    backends: list[str] = Field(default_factory=list)
+    subsystems: list[str] = Field(default_factory=list)
     sourceCount: int = 0
     projectId: int
     traceabilityComplete: bool = False
@@ -103,7 +103,7 @@ class ProjectChatRequest(BaseModel):
 
 class ProjectChatResponse(BaseModel):
     content: str
-    sources: list[ArticleSource] = []
+    sources: list[ArticleSource] = Field(default_factory=list)
     provenance: ChatProvenance | None = None
 
 
@@ -117,7 +117,7 @@ class MCPRequestEnvelope(BaseModel):
     jsonrpc: str = "2.0"
     id: str | int
     method: str
-    params: dict = {}
+    params: dict = Field(default_factory=dict)
 
 
 class MCPResponseEnvelope(BaseModel):
@@ -129,29 +129,29 @@ class MCPResponseEnvelope(BaseModel):
 
 class GraphQueryPayload(BaseModel):
     cypher: str
-    params: dict = {}
+    params: dict = Field(default_factory=dict)
 
 
 class GraphWritePayload(BaseModel):
     cypher: str
-    params: dict = {}
+    params: dict = Field(default_factory=dict)
 
 
 class GraphHealthResponse(BaseModel):
     connected: bool
     server: str = "neo4j"
-    details: dict = {}
+    details: dict = Field(default_factory=dict)
 
 
 class SQLQueryPayload(BaseModel):
     query: str
-    params: dict = {}
+    params: dict = Field(default_factory=dict)
     max_rows: int | None = None
 
 
 class SQLWritePayload(BaseModel):
     query: str
-    params: dict = {}
+    params: dict = Field(default_factory=dict)
 
 
 class SQLHealthResponse(BaseModel):

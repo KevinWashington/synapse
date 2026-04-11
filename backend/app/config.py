@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     
     # Google Gemini
     GOOGLE_API_KEY: str = ""
+    HF_TOKEN: str = ""
     
     # Neo4j
     NEO4J_URI: str = "bolt://localhost:7687"
@@ -38,6 +39,20 @@ class Settings(BaseSettings):
     SQL_MCP_TIMEOUT_SECONDS: int = 15
     SQL_MCP_MAX_ROWS: int = 200
     SQL_MCP_ALLOW_WRITE_TABLES: str = "articles,projects"
+
+    def validate_runtime(self) -> None:
+        missing = []
+        if not self.GOOGLE_API_KEY:
+            missing.append("GOOGLE_API_KEY")
+        if not self.HF_TOKEN:
+            missing.append("HF_TOKEN")
+
+        if missing:
+            names = ", ".join(missing)
+            raise RuntimeError(
+                f"Missing required environment variables: {names}. "
+                "Set them in backend/.env before starting the API."
+            )
     
     class Config:
         env_file = ".env"

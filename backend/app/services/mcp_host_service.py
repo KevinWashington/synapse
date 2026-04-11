@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from app.config import settings
 from app.schemas.ai import MCPError, MCPRequestEnvelope, MCPResponseEnvelope
+from app.services.neo4j_service import get_neo4j_service
+from app.services.postgres_mcp_service import get_postgres_mcp_service
+from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
 
 
 @dataclass
@@ -96,6 +100,28 @@ class MCPHostService:
         server.last_error = last_error.model_dump() if last_error else None
         return MCPResponseEnvelope(jsonrpc=self.protocol_version, id=envelope.id, error=last_error)
 
+    async def call_tool(self, method: str, params: dict) -> dict:
+        """
+        Helper para o RAGService (Agente) invocar ferramentas MCP de forma simplificada.
+        """
+        envelope = MCPRequestEnvelope(
+            jsonrpc=self.protocol_version,
+            id=str(uuid.uuid4()),
+            method=method,
+            params=params
+        )
+        
+        response = await self.dispatch(envelope)
+        
+        if response.error:
+            error_data = response.error.data or {}
+            raise RuntimeError(
+                f"MCP Tool Error [{response.error.code}]: {response.error.message} - "
+                f"Hint: {error_data.get('hint', 'N/A')}"
+            )
+            
+        return response.result
+    
     async def _simulate_local_dispatch(
         self,
         server: MCPServerRegistration,
@@ -103,9 +129,56 @@ class MCPHostService:
     ) -> dict:
         if not isinstance(envelope.params, dict):
             raise ValueError("Invalid params payload: expected object")
+
+        method = envelope.method
+
+        if method in {"search_semantic", "vector.search"}:
+            qdrant = get_qdrant_retrieval_service()
+            return await qdrant.search(**envelope.params)
+            
+        if method == "vector.upsert":
+            qdrant = get_qdrant_retrieval_service()
+            return await qdrant.upsert_payload(**envelope.params)
+
+        if method == "vector.health":
+            qdrant = get_qdrant_retrieval_service()
+            return await qdrant.mcp_health()
+
+        if method in {"execute_expansion", "graph.expand"}:
+            neo4j = get_neo4j_service()
+            return await neo4j.execute_expansion(**envelope.params)
+
+        if method == "graph.query":
+            neo4j = get_neo4j_service()
+            return await neo4j.mcp_query(**envelope.params)
+
+        if method == "graph.write":
+            neo4j = get_neo4j_service()
+            return await neo4j.mcp_write(**envelope.params)
+
+        if method == "graph.health":
+            neo4j = get_neo4j_service()
+            return await neo4j.mcp_health()
+
+        if method in {"rerank_by_impact", "sql.rerank"}:
+            pg = get_postgres_mcp_service()
+            return await pg.rerank_by_impact(**envelope.params)
+
+        if method == "sql.query":
+            pg = get_postgres_mcp_service()
+            return await pg.mcp_query(**envelope.params)
+
+        if method == "sql.write":
+            pg = get_postgres_mcp_service()
+            return await pg.mcp_write(**envelope.params)
+
+        if method == "sql.health":
+            pg = get_postgres_mcp_service()
+            return await pg.mcp_health()
+
         return {
             "server": server.name,
-            "method": envelope.method,
+            "method": method,
             "status": "ok",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }

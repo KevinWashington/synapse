@@ -1,29 +1,26 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FileIcon, LoaderIcon, UploadIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Label } from "@/components/ui/Label";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  LoaderIcon,
-  UploadIcon,
-  FileIcon,
-  AlertTriangleIcon,
-} from "lucide-react";
-import { articleService } from "@/services/artigosService";
+} from "@/components/ui/Dialog";
+import ArticleDialogErrorAlert from "@features/articles/components/ArticleDialogErrorAlert";
+import ArticleDialogFooter from "@features/articles/components/ArticleDialogFooter";
+import { articleService } from "@features/articles/services/articleService";
 import { toast } from "@/lib/toast";
 
-function UploadPDFModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
+function UploadPDFModal({ isOpen, onClose, onSuccess, project, article }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  async function handleSubmit(event) {
+    event.preventDefault();
 
     if (!selectedFile) {
       setError("Por favor, selecione um arquivo PDF");
@@ -39,33 +36,30 @@ function UploadPDFModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
       setLoading(true);
       setError("");
 
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      await articleService.uploadPdf(projeto.id, artigo.id, selectedFile);
+      await articleService.uploadPdf(project.id, article.id, selectedFile);
 
       toast.success("PDF atualizado com sucesso!");
       onSuccess();
       handleClose();
-    } catch (err) {
-      console.error("Erro ao atualizar PDF:", err);
-      setError("Erro ao atualizar PDF: " + err.message);
+    } catch (requestError) {
+      console.error("Erro ao atualizar PDF:", requestError);
+      setError(`Erro ao atualizar PDF: ${requestError.message}`);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleClose = () => {
+  function handleClose() {
     setSelectedFile(null);
     setError("");
     onClose();
-  };
+  }
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  function handleFileChange(event) {
+    const file = event.target.files[0];
     setSelectedFile(file);
     setError("");
-  };
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -76,12 +70,11 @@ function UploadPDFModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
             Upload de PDF
           </DialogTitle>
           <DialogDescription>
-            Faça upload do PDF para o artigo "{artigo?.title}".
+            Faça upload do PDF para o artigo "{article?.title}".
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Upload de arquivo */}
           <div className="space-y-2">
             <Label htmlFor="pdf-file">Arquivo PDF</Label>
             <div className="flex items-center gap-2">
@@ -96,47 +89,35 @@ function UploadPDFModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
                 type="button"
                 variant="outline"
                 onClick={() => document.getElementById("pdf-file").click()}
-                className="flex items-center gap-2 w-full"
+                className="flex w-full items-center gap-2"
               >
                 <FileIcon className="h-4 w-4" />
                 {selectedFile ? selectedFile.name : "Selecionar PDF"}
               </Button>
             </div>
-            {selectedFile && (
+            {selectedFile ? (
               <p className="text-sm text-muted-foreground">
                 Arquivo selecionado: {selectedFile.name} (
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
               </p>
-            )}
+            ) : null}
           </div>
 
-          {/* Erro */}
-          {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 dark:bg-red-900 dark:border-red-800 dark:text-red-200">
-              <AlertTriangleIcon className="h-4 w-4" />
-              <span className="text-sm">{error}</span>
-            </div>
-          )}
+          <ArticleDialogErrorAlert error={error} />
 
-          {/* Botões */}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading || !selectedFile}>
-              {loading ? (
-                <>
-                  <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <UploadIcon className="h-4 w-4 mr-2" />
-                  Enviar PDF
-                </>
-              )}
-            </Button>
-          </div>
+          <ArticleDialogFooter
+            confirmIcon={UploadIcon}
+            confirmLabel="Enviar PDF"
+            disabled={loading || !selectedFile}
+            loading={loading}
+            loadingLabel={
+              <>
+                <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
+                Enviando...
+              </>
+            }
+            onCancel={handleClose}
+          />
         </form>
       </DialogContent>
     </Dialog>
@@ -144,3 +125,4 @@ function UploadPDFModal({ isOpen, onClose, onSuccess, projeto, artigo }) {
 }
 
 export default UploadPDFModal;
+

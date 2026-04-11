@@ -1,10 +1,10 @@
-import Menu from "../components/Menu";
-import ThemeToggle from "../components/ThemeToggle";
+﻿import { useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Menu from "@components/Menu";
+import ThemeToggle from "@components/ThemeToggle";
+import { Button } from "@/components/ui/Button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
 import { UserIcon, LogOut, Bell, ArrowLeft } from "lucide-react";
-import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,10 +12,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/components/ui/DropdownMenu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth";
-import { PageTitleProvider, usePageTitleValue } from "@/context/pageTitleContext";
+import { PageTitleProvider } from "@/context/pageTitleContext";
+import { usePageTitleValue } from "@hooks/usePageTitleValue";
 
 const Layout = () => {
   const navigate = useNavigate();
@@ -23,16 +24,15 @@ const Layout = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(true);
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: "var(--syn-sidebar-bg)" }}>
+    <div className="flex min-h-screen bg-[var(--syn-sidebar-bg)]">
       <Menu setIsMenuOpen={setIsMenuOpen} isMenuOpen={isMenuOpen} />
 
       {/* Main content area */}
       <div
         className={cn(
-          "flex-1 flex flex-col min-h-screen transition-all",
+          "flex min-h-screen flex-1 flex-col transition-[margin] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
           isMenuOpen ? "md:ml-[220px]" : "md:ml-16"
         )}
-        style={{ transition: "margin var(--syn-transition)" }}
       >
         {/* Content card wrapper */}
         <div className="flex-1 flex flex-col m-0 md:m-2 md:ml-0 rounded-none md:rounded-xl bg-[var(--syn-bg-secondary)] dark:bg-[var(--syn-bg-secondary)] overflow-hidden">
@@ -90,7 +90,7 @@ function HeaderBar({ navigate, logout, user }) {
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm font-medium text-[var(--syn-text-primary)] hidden sm:block">
-                {user?.name || "Usuário"}
+                {user?.name || "UsuÃ¡rio"}
               </span>
             </Button>
           </DropdownMenuTrigger>
@@ -114,3 +114,4 @@ function HeaderBar({ navigate, logout, user }) {
 }
 
 export default Layout;
+

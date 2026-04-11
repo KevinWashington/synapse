@@ -1,4 +1,4 @@
-import { apiService } from "@/services/api";
+import { ApiError, apiService } from "@/services/api";
 
 class ArtigosService {
   constructor() {
@@ -65,6 +65,31 @@ class ArtigosService {
       ? apiService.baseURL
       : `${apiService.baseURL}/`;
     return `${baseURL}api/projetos/${projectId}/artigos/${articleId}/download`;
+  }
+
+  async getPdfData(projectId, articleId) {
+    try {
+      if (!projectId || !articleId) {
+        throw new Error("IDs do projeto e artigo sÃ£o obrigatÃ³rios");
+      }
+
+      const response = await apiService.request(
+        `${this.getProjectEndpoint(projectId)}/${articleId}/pdf`,
+        {
+          method: "GET",
+          suppressErrorStatuses: [404],
+        }
+      );
+
+      return response.arrayBuffer();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return null;
+      }
+
+      console.error(`Erro ao obter PDF do artigo ${articleId}:`, error);
+      throw error;
+    }
   }
 
   async createArticle(projectId, formData) {
@@ -191,6 +216,29 @@ class ArtigosService {
       );
     } catch (error) {
       console.error(`Erro ao buscar grafo do projeto ${projectId}:`, error);
+      throw error;
+    }
+  }
+
+  async reprocessProjectGraph(projectId, options = {}) {
+    try {
+      if (!projectId) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      const params = new URLSearchParams();
+      if (options.onlyMissingEmbeddings !== undefined) {
+        params.set("only_missing_embeddings", String(options.onlyMissingEmbeddings));
+      }
+
+      const query = params.toString();
+      const endpoint = `${this.baseEndpoint}/${projectId}/reprocessar-grafo${
+        query ? `?${query}` : ""
+      }`;
+
+      return await apiService.post(endpoint, {});
+    } catch (error) {
+      console.error(`Erro ao reprocessar grafo do projeto ${projectId}:`, error);
       throw error;
     }
   }

@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 const PageTitleContext = createContext(null);
 
@@ -26,9 +34,15 @@ export function usePageTitle({ title, backUrl, actions, badge } = {}) {
   if (!ctx) throw new Error("usePageTitle must be used within PageTitleProvider");
 
   const { setPageTitle } = ctx;
+  const latestDecoratorsRef = useRef({ actions, badge });
 
   useEffect(() => {
-    setPageTitle({ title, backUrl, actions, badge });
+    latestDecoratorsRef.current = { actions, badge };
+  }, [actions, badge]);
+
+  useEffect(() => {
+    const { actions: currentActions, badge: currentBadge } = latestDecoratorsRef.current;
+    setPageTitle({ title, backUrl, actions: currentActions, badge: currentBadge });
     return () => setPageTitle({ title: "", backUrl: null, actions: null, badge: null });
   }, [title, backUrl, setPageTitle]);
 

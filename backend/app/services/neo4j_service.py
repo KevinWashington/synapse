@@ -172,14 +172,22 @@ class Neo4jService:
             if relationship_type == "all":
                 links_query = """
                     MATCH (a:Article {projectId: $projectId})-[r]->(b:Article {projectId: $projectId})
-                    RETURN a.id as source, b.id as target, type(r) as type,
-                           CASE WHEN r.score IS NOT NULL THEN r.score ELSE 1.0 END as score
+                    WITH
+                        CASE WHEN a.id < b.id THEN a.id ELSE b.id END as source,
+                        CASE WHEN a.id < b.id THEN b.id ELSE a.id END as target,
+                        type(r) as type,
+                        CASE WHEN r.score IS NOT NULL THEN r.score ELSE 1.0 END as score
+                    RETURN source, target, type, max(score) as score
                 """
             else:
                 links_query = f"""
                     MATCH (a:Article {{projectId: $projectId}}){rel_pattern}(b:Article {{projectId: $projectId}})
-                    RETURN a.id as source, b.id as target, type(r) as type,
-                           CASE WHEN r.score IS NOT NULL THEN r.score ELSE 1.0 END as score
+                    WITH
+                        CASE WHEN a.id < b.id THEN a.id ELSE b.id END as source,
+                        CASE WHEN a.id < b.id THEN b.id ELSE a.id END as target,
+                        type(r) as type,
+                        CASE WHEN r.score IS NOT NULL THEN r.score ELSE 1.0 END as score
+                    RETURN source, target, type, max(score) as score
                 """
             
             links_result = await session.run(links_query, projectId=project_id)
@@ -280,7 +288,63 @@ class Neo4jService:
                 },
             }
 
+    async def execute_expansion(
+        self,
+        ids: list[str],
+        project_id: int,
+        relations: list[str] | None = None,
+        max_hops: int = 1, # Mantendo 1 salto como fallback seguro. max_hops=2 requer queries mais complexas ou APOC.
+    ) -> dict:
+        """
+        MCP Tool 1: Navega o grafo a partir de artigos 'seed' para encontrar conexões.
+        """
+        if not ids:
+            return {"related_papers": []}
+            
+        relations = relations or ["SAME_METHODOLOGY", "SIMILAR_TO", "SAME_AUTHOR"]
+        
+        # Formata o Cypher para incluir as relações de forma dinâmica (protegido contra injeção pelo uso de params)
+        rel_pattern = "|".join(relations)
+        
+        cypher = f"""
+            MATCH (a:Article)
+            WHERE a.projectId = $projectId AND a.id IN $seedIds
+            MATCH (a)-[r:{rel_pattern}]-(related:Article)
+            WHERE related.projectId = $projectId AND NOT related.id IN $seedIds
+            RETURN DISTINCT related.id AS paper_id, 
+                            related.title AS title, 
+                            related.methodology AS methodology, 
+                            type(r) AS relation_type
+            LIMIT 30
+        """
+        
+        result = await self.mcp_query(cypher, params={"projectId": project_id, "seedIds": ids})
+        
+        if not result.get("ok"):
+             raise RuntimeError(f"Neo4j expansion failed: {result.get('error')}")
+             
+        # Formata a resposta adicionando o source_type para a rastreabilidade (Fase 5)
+        related_papers = []
+        for row in result.get("rows", []):
+            related_papers.append({
+                "paper_id": row["paper_id"],
+                "title": row["title"],
+                "methodology": row["methodology"],
+                "source_type": f"graph_expansion ({row['relation_type']})"
+            })
+            
+        return {"related_papers": related_papers}
 
+    async def read_schema(self) -> dict:
+        """
+        Retorna as propriedades e labels disponíveis no grafo. 
+        """
+        return {
+            "nodes": {
+                "Article": ["id", "projectId", "title", "authors", "year", "status", "methodology", "domain"]
+            },
+            "relationships": ["SIMILAR_TO", "SAME_METHODOLOGY", "SAME_AUTHOR"]
+        }
 # Singleton instance
 _neo4j_service: Neo4jService | None = None
 

@@ -1,20 +1,9 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
+import useThemePreference from "@hooks/useThemePreference";
 import { Moon, Sun } from "lucide-react";
 
-const ThemeToggle = ({ className = "" }) => {
-  const toggleTheme = () => {
-    const isDark = document.documentElement.classList.contains("dark");
-
-    if (isDark) {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    } else {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    }
-  };
-
-  const isDark = document.documentElement.classList.contains("dark");
+function ThemeToggle({ className = "" }) {
+  const { isDark, toggleTheme } = useThemePreference();
 
   return (
     <Button
@@ -27,6 +16,6 @@ const ThemeToggle = ({ className = "" }) => {
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>
   );
-};
+}
 
 export default ThemeToggle;

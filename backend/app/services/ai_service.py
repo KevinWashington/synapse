@@ -363,7 +363,8 @@ REGRAS DE OPERAÇÃO:
 3. Se a informação não estiver coberta pelos artigos, você pode usar seu conhecimento geral, mas AVISE claramente que é uma informação externa aos artigos do projeto.
 4. Seja conciso e acadêmico.
 5. Quando fizer sínteses ou comparações, organize a resposta de forma clara (listas, tabelas quando apropriado).
-6. Se não houver artigos relevantes, responda com seu conhecimento geral e sugira ao pesquisador que adicione mais artigos à base."""
+6. Se não houver artigos relevantes, responda com seu conhecimento geral e sugira ao pesquisador que adicione mais artigos à base.
+7. CRÍTICO: Sempre que você utilizar uma informação vinda de um artigo, você DEVE observar o campo 'source_type' (se fornecido na lista de artigos) para entender se a informação foi validada por metadados, busca semântica ou expansão de grafo."""
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),

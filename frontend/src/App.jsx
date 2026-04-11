@@ -1,65 +1,87 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-// Features imports
-import { LoginPage, RegisterPage, AuthProvider } from "./features/auth";
-import { AIConfigProvider } from "./features/ai";
+import { LoadingState } from "@components/layout";
+import ProtectedRoute from "@components/ProtectedRoute";
+import { Toaster } from "@components/ui/Sonner";
+import { AIConfigProvider } from "@features/ai";
+import { AuthProvider } from "@features/auth";
 
-// Pages
-import Dashboard from "./pages/Dashboard";
-import Projetos from "./pages/Projetos";
-import ProjetoDetalhes from "./pages/ProjetoDetalhes";
-import ArtigoDetalhes from "./pages/ArtigoDetalhes";
-import Layout from "./pages/Layout";
-import Configuracoes from "./pages/Configuracoes";
-import Artigos from "./pages/Artigos";
-import ChatIAPage from "./pages/ChatIA";
+const ArticleDetailsPage = lazy(() => import("@/pages/ArticleDetails"));
+const ArticlesPage = lazy(() => import("@/pages/Articles"));
+const AIChatPage = lazy(() => import("@/pages/AIChat"));
+const SettingsPage = lazy(() => import("@/pages/Settings"));
+const DashboardPage = lazy(() => import("@/pages/Dashboard"));
+const LayoutPage = lazy(() => import("@/pages/Layout"));
+const LoginPage = lazy(() => import("@/pages/Login"));
+const ProjectDetailsPage = lazy(() => import("@/pages/ProjectDetails"));
+const ProjectsPage = lazy(() => import("@/pages/Projects"));
+const RegisterPage = lazy(() => import("@/pages/Register"));
 
-// Components
-import ProtectedRoute from "./components/ProtectedRoute";
-import { Toaster } from "./components/ui/sonner";
+function RouteLoader() {
+  return <LoadingState message="Carregando página..." fullPage />;
+}
+
+function withSuspense(children) {
+  return <Suspense fallback={<RouteLoader />}>{children}</Suspense>;
+}
 
 function App() {
   return (
     <AuthProvider>
       <AIConfigProvider>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={withSuspense(<LoginPage />)} />
+          <Route path="/register" element={withSuspense(<RegisterPage />)} />
 
           <Route
             path="/"
             element={
               <ProtectedRoute>
-                <Layout />
+                {withSuspense(<LayoutPage />)}
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="projetos" element={<Projetos />} />
-            <Route path="projetos/:id" element={<ProjetoDetalhes />} />
+            <Route index element={withSuspense(<DashboardPage />)} />
+            <Route path="dashboard" element={withSuspense(<DashboardPage />)} />
+            <Route path="projetos" element={withSuspense(<ProjectsPage />)} />
             <Route
-              path="projetos/:projetoId/artigos/:artigoId"
-              element={<ArtigoDetalhes />}
+              path="projetos/:id"
+              element={withSuspense(<ProjectDetailsPage />)}
+            />
+            <Route
+              path="projetos/:projectId/artigos/:articleId"
+              element={withSuspense(<ArticleDetailsPage />)}
             />
 
-            {/* Articles */}
-            <Route path="artigos" element={<Artigos />} />
-            <Route path="artigos/importar" element={<Artigos />} />
-            <Route path="artigos/upload" element={<Artigos />} />
+            <Route path="artigos" element={withSuspense(<ArticlesPage />)} />
+            <Route
+              path="artigos/importar"
+              element={withSuspense(<ArticlesPage />)}
+            />
+            <Route
+              path="artigos/upload"
+              element={withSuspense(<ArticlesPage />)}
+            />
 
-            {/* AI */}
-            <Route path="ia/analise" element={<ChatIAPage />} />
-            <Route path="ia/recomendacoes" element={<ChatIAPage />} />
-            <Route path="ia/chat" element={<ChatIAPage />} />
+            <Route path="ia/analise" element={withSuspense(<AIChatPage />)} />
+            <Route path="ia/recomendacoes" element={withSuspense(<AIChatPage />)} />
+            <Route path="ia/chat" element={withSuspense(<AIChatPage />)} />
 
-            {/* Visualizations */}
-            <Route path="visualizacoes/relacionamentos" element={<Dashboard />} />
-            <Route path="visualizacoes/estatisticas" element={<Dashboard />} />
+            <Route
+              path="visualizacoes/relacionamentos"
+              element={withSuspense(<DashboardPage />)}
+            />
+            <Route
+              path="visualizacoes/estatisticas"
+              element={withSuspense(<DashboardPage />)}
+            />
 
-            {/* Settings */}
-            <Route path="configuracoes" element={<Configuracoes />} />
-            <Route path="configuracoes/preferencias" element={<Configuracoes />} />
+            <Route path="settings" element={withSuspense(<SettingsPage />)} />
+            <Route
+              path="settings/preferencias"
+              element={withSuspense(<SettingsPage />)}
+            />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -71,4 +93,3 @@ function App() {
 }
 
 export default App;
-

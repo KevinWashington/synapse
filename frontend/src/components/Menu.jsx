@@ -4,25 +4,23 @@ import {
   FolderKanban,
   FileText,
   Bot,
-  BarChart3,
   Settings,
   ChevronDown,
   ChevronRight,
   Menu as MenuIcon,
   PanelLeftClose,
   PanelLeftOpen,
-  UserIcon,
 } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+} from "@/components/ui/Sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth";
 
@@ -43,28 +41,16 @@ const NAV_ITEMS = [
     icon: FileText,
   },
   {
+    path: "/ia/chat",
     label: "Inteligência Artificial",
     icon: Bot,
-    children: [
-      { path: "/ia/analise", label: "Análise" },
-      { path: "/ia/recomendacoes", label: "Recomendações" },
-      { path: "/ia/chat", label: "Chat IA" },
-    ],
-  },
-  {
-    label: "Visualizações",
-    icon: BarChart3,
-    children: [
-      { path: "/visualizacoes/relacionamentos", label: "Relacionamentos" },
-      { path: "/visualizacoes/estatisticas", label: "Estatísticas" },
-    ],
   },
   {
     label: "Configurações",
     icon: Settings,
     children: [
-      { path: "/configuracoes", label: "Provedores de IA" },
-      { path: "/configuracoes/preferencias", label: "Preferências" },
+      { path: "/Settings", label: "Provedores de IA" },
+      { path: "/Settings/preferencias", label: "Preferências" },
     ],
   },
 ];
@@ -238,8 +224,7 @@ function Menu({ isMenuOpen, setIsMenuOpen }) {
           </SheetTrigger>
           <SheetContent
             side="left"
-            className="w-[240px] p-0 border-0"
-            style={{ backgroundColor: "var(--syn-sidebar-bg)" }}
+            className="w-[240px] border-0 bg-[var(--syn-sidebar-bg)] p-0"
           >
             <SheetHeader className="sr-only">
               <SheetTitle>Menu de Navegação</SheetTitle>
@@ -252,13 +237,9 @@ function Menu({ isMenuOpen, setIsMenuOpen }) {
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "hidden md:flex flex-col fixed left-0 top-0 z-40 h-full",
+          "fixed left-0 top-0 z-40 hidden h-full flex-col bg-[var(--syn-sidebar-bg)] transition-[width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] md:flex",
           isMenuOpen ? "w-[220px]" : "w-16"
         )}
-        style={{
-          backgroundColor: "var(--syn-sidebar-bg)",
-          transition: "width var(--syn-transition)",
-        }}
       >
         <SidebarContent />
       </aside>
@@ -267,3 +248,5 @@ function Menu({ isMenuOpen, setIsMenuOpen }) {
 }
 
 export default Menu;
+
+

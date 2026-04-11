@@ -24,6 +24,36 @@ from app.services.anchor_service import get_anchor_service
 router = APIRouter()
 
 
+def _graph_sync_http_error(message: str = "Falha ao sincronizar grafo no Neo4j") -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "error": "Graph sync unavailable",
+            "message": message,
+        },
+    )
+
+
+async def _sync_article_graph_or_raise(article: Article, db: AsyncSession) -> None:
+    from app.services.graph_sync_service import get_graph_sync_service
+
+    graph_sync = get_graph_sync_service()
+    try:
+        await graph_sync.sync_article_to_graph(article, db)
+    except Exception as exc:
+        raise _graph_sync_http_error() from exc
+
+
+async def _delete_article_graph_or_raise(article_id: int) -> None:
+    from app.services.graph_sync_service import get_graph_sync_service
+
+    graph_sync = get_graph_sync_service()
+    try:
+        await graph_sync.delete_article_from_graph(article_id)
+    except Exception as exc:
+        raise _graph_sync_http_error("Falha ao remover artigo do grafo no Neo4j") from exc
+
+
 async def get_project_or_404(projectId: int, ownerId: int, db: AsyncSession) -> Project:
     """Helper to get project or raise 404."""
     result = await db.execute(
@@ -142,10 +172,8 @@ async def create_article(
     if article.abstract:
         try:
             from app.services.ai_service import get_ai_service
-            from app.services.embedding_service import get_embedding_service
             
             ai_service = get_ai_service()
-            embedding_service = get_embedding_service()
             
             project_data = {
                 "criteriosInclusao": project.criteriosInclusao or [],
@@ -190,6 +218,10 @@ async def create_article(
             traceback.print_exc()
     
     db.add(article)
+    await db.flush()
+
+    await _sync_article_graph_or_raise(article, db)
+
     await db.commit()
     await db.refresh(article)
 
@@ -205,23 +237,19 @@ async def create_article(
                 metadata={
                     "article_id": article.id,
                     "title": article.title,
+                    "authors": article.authors,
+                    "year": article.year,
+                    "journal": article.journal,
+                    "abstract": article.abstract,
+                    "methodology": article.aiMethodology,
+                    "domain": article.aiDomain,
+                    "keywords": article.aiKeywords,
+                    "notas": article.notas,
                 },
             )
             await qdrant.upsert_payload(payload=payload, embedding=list(article.embedding))
         except Exception as e:
             print(f"[QDRANT] Erro ao sincronizar payload vetorial: {e}")
-    
-    # Sincronizar com Neo4j (criar nó e relacionamentos)
-    try:
-        from app.services.graph_sync_service import get_graph_sync_service
-        graph_sync = get_graph_sync_service()
-        print(f"[GRAPH] Sincronizando artigo {article.id} com Neo4j...")
-        await graph_sync.sync_article_to_graph(article, db)
-        print(f"[GRAPH] Sincronização concluída para artigo {article.id}")
-    except Exception as e:
-        import traceback
-        print(f"[GRAPH] Erro ao sincronizar artigo com grafo: {e}")
-        traceback.print_exc()
     
     response = ArticleResponse.model_validate(article)
     response.hasPdf = False
@@ -296,8 +324,24 @@ async def update_article(
             article.aiEvaluation = eval_result.get("justification")
             article.aiSuggestedStatus = eval_result.get("suggestedStatus")
             article.aiRelevanceScore = eval_result.get("relevanceScore")
+            article.aiMethodology = eval_result.get("methodology")
+            article.aiDatabase = eval_result.get("database")
+            article.aiDomain = eval_result.get("domain")
+            article.aiKeywords = eval_result.get("keywords", [])
         except Exception as e:
             print(f"Erro ao re-avaliar artigo com IA: {e}")
+
+        try:
+            from app.services.embedding_service import get_embedding_service
+
+            embedding_service = get_embedding_service()
+            embedding = embedding_service.generate_embedding(article.abstract)
+            article.embedding = embedding if embedding else None
+        except Exception as e:
+            print(f"Erro ao re-gerar embedding: {e}")
+
+    await db.flush()
+    await _sync_article_graph_or_raise(article, db)
 
     await db.commit()
     await db.refresh(article)
@@ -313,6 +357,14 @@ async def update_article(
                 metadata={
                     "article_id": article.id,
                     "title": article.title,
+                    "authors": article.authors,
+                    "year": article.year,
+                    "journal": article.journal,
+                    "abstract": article.abstract,
+                    "methodology": article.aiMethodology,
+                    "domain": article.aiDomain,
+                    "keywords": article.aiKeywords,
+                    "notas": article.notas,
                 },
             )
             await qdrant.upsert_payload(payload=payload, embedding=list(article.embedding))
@@ -341,6 +393,10 @@ async def update_article_status(
     """Atualizar status do artigo."""
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     article.status = data.status
+
+    await db.flush()
+    await _sync_article_graph_or_raise(article, db)
+
     await db.commit()
     await db.refresh(article)
     
@@ -377,14 +433,8 @@ async def delete_article(
 ):
     """Deletar artigo e remover do grafo."""
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    
-    # Remover do Neo4j
-    try:
-        from app.services.graph_sync_service import get_graph_sync_service
-        graph_sync = get_graph_sync_service()
-        await graph_sync.delete_article_from_graph(articleId)
-    except Exception as e:
-        print(f"Erro ao remover artigo do grafo: {e}")
+
+    await _delete_article_graph_or_raise(articleId)
     
     await db.delete(article)
     await db.commit()
@@ -447,6 +497,29 @@ async def get_pdf(
         BytesIO(article.pdfData),
         media_type=article.pdfContentType,
         headers={"Content-Disposition": f"inline; filename=\"{article.pdfFilename or 'artigo.pdf'}\""}
+    )
+
+
+@router.get("/{projectId}/artigos/{articleId}/download")
+async def download_pdf(
+    projectId: int,
+    articleId: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Baixar PDF do artigo com header de anexo para download direto."""
+    article = await get_article_or_404(articleId, projectId, current_user.id, db)
+
+    if not article.pdfData:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "PDF não encontrado", "message": "Este artigo não possui PDF"}
+        )
+
+    return StreamingResponse(
+        BytesIO(article.pdfData),
+        media_type=article.pdfContentType,
+        headers={"Content-Disposition": f"attachment; filename=\"{article.pdfFilename or 'artigo.pdf'}\""}
     )
 
 
@@ -523,65 +596,55 @@ async def get_project_graph(
     
     try:
         from app.services.neo4j_service import get_neo4j_service
+
         neo4j_service = get_neo4j_service()
-        
         graph_data = await neo4j_service.get_project_graph(
             project_id=projectId,
             relationship_type=relationship_type,
-            min_similarity=min_similarity
+            min_similarity=min_similarity,
         )
         return graph_data
-    except Exception as e:
-        print(f"Erro ao obter grafo do Neo4j: {e}")
-        # Fallback para o comportamento antigo usando PostgreSQL
-        result = await db.execute(
-            select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
-        )
-        articles = result.scalars().all()
-        
-        nodes = []
-        links = []
-        
-        for article in articles:
-            nodes.append({
-                "id": str(article.id),
-                "title": article.title,
-                "authors": article.authors,
-                "year": article.year,
-                "status": article.status,
-                "methodology": article.aiMethodology,
-                "domain": article.aiDomain
-            })
-            
-            for related in article.relatedArticles:
-                links.append({
-                    "source": str(article.id),
-                    "target": str(related.id),
-                    "type": "manual"
-                })
-        
-        return {"nodes": nodes, "links": links}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "Graph unavailable",
+                "message": "Neo4j indisponível para consulta de grafo",
+            },
+        ) from exc
 
 
 @router.post("/{projectId}/reprocessar-grafo")
 async def reprocess_project_graph(
     projectId: int,
+    only_missing_embeddings: bool = False,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Reprocessar todos os artigos do projeto: gerar embeddings, extrair metadados e reconstruir grafo."""
+    """Reprocessar artigos do projeto: gerar embeddings, extrair metadados e reconstruir grafo.
+
+    Args:
+        only_missing_embeddings: Se True, processa apenas artigos com embedding ausente.
+    """
     project = await get_project_or_404(projectId, current_user.id, db)
-    
-    result = await db.execute(
-        select(Article).where(
-            Article.projectId == projectId,
-            Article.ownerId == current_user.id
-        )
+
+    query = select(Article).where(
+        Article.projectId == projectId,
+        Article.ownerId == current_user.id
     )
+    if only_missing_embeddings:
+        query = query.where(Article.embedding.is_(None))
+
+    result = await db.execute(query)
     articles = result.scalars().all()
-    
+
     if not articles:
-        return {"success": True, "message": "Nenhum artigo encontrado", "processed": 0}
+        message = (
+            "Nenhum artigo com embedding ausente encontrado"
+            if only_missing_embeddings
+            else "Nenhum artigo encontrado"
+        )
+        return {"success": True, "message": message, "processed": 0}
     
     from app.services.ai_service import get_ai_service
     from app.services.embedding_service import get_embedding_service
@@ -670,5 +733,6 @@ async def reprocess_project_graph(
         "message": f"Reprocessamento concluído: {processed} artigos",
         "processed": processed,
         "total": len(articles),
+        "onlyMissingEmbeddings": only_missing_embeddings,
         "errors": errors if errors else None
     }

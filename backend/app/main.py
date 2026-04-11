@@ -6,11 +6,14 @@ from app.config import settings
 from app.database import init_db, engine
 from app.routers import auth, projects, articles, ai, stats
 from app.core.dependencies import get_mcp_host, get_graph_mcp_service, get_sql_mcp_service
+from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
+    settings.validate_runtime()
+
     # Startup: create database tables
     await init_db()
 
@@ -18,14 +21,17 @@ async def lifespan(app: FastAPI):
     host = get_mcp_host()
     configured_servers = [s.strip() for s in settings.MCP_REGISTERED_SERVERS.split(",") if s.strip()]
     if "qdrant" in configured_servers:
-        host.register_server("qdrant", ["vector.search", "vector.upsert", "vector.health"])
+        host.register_server("qdrant", ["search_semantic", "vector.search", "vector.upsert", "vector.health"])
+        qdrant = get_qdrant_retrieval_service()
+        qdrant_health = await qdrant.mcp_health()
+        host.set_server_health("qdrant", qdrant_health.get("connected", False), qdrant_health.get("details"))
     if "neo4j" in configured_servers:
-        host.register_server("neo4j", ["graph.query", "graph.write", "graph.health"])
+        host.register_server("neo4j", ["execute_expansion", "graph.query", "graph.write", "graph.health"])
         graph = get_graph_mcp_service()
         graph_health = await graph.mcp_health()
         host.set_server_health("neo4j", graph_health.get("connected", False), graph_health.get("details"))
     if "postgres" in configured_servers:
-        host.register_server("postgres", ["sql.query", "sql.write", "sql.health"])
+        host.register_server("postgres", ["rerank_by_impact", "sql.query", "sql.write", "sql.health"])
         sql = get_sql_mcp_service()
         sql_health = await sql.mcp_health()
         host.set_server_health("postgres", sql_health.get("connected", False), sql_health.get("details"))

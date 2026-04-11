@@ -11,13 +11,18 @@ class ApiService {
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+    const {
+      skipErrorLog = false,
+      suppressErrorStatuses = [],
+      ...fetchOptions
+    } = options;
 
     const config = {
       headers: {
         "Content-Type": "application/json",
-        ...options.headers,
+        ...fetchOptions.headers,
       },
-      ...options,
+      ...fetchOptions,
     };
 
     const token = this.getAuthToken();
@@ -66,7 +71,14 @@ class ApiService {
 
       return await response.json();
     } catch (error) {
-      console.error(`ApiRequest Error [${options.method || 'GET'}] ${url}:`, error);
+      const shouldSuppressLog =
+        skipErrorLog ||
+        (error instanceof ApiError &&
+          suppressErrorStatuses.includes(error.status));
+
+      if (!shouldSuppressLog) {
+        console.error(`ApiRequest Error [${config.method || "GET"}] ${url}:`, error);
+      }
 
       if (error instanceof ApiError) {
         throw error;

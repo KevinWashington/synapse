@@ -228,16 +228,38 @@ async def project_chat(
             project_context=rag_result["project"],
             retrieved_articles=rag_result["articles"]
         )
+
+        def _fallback_provenance(article: dict) -> dict:
+            source_type = article.get("source_type", "unknown")
+            if source_type == "sql_validated":
+                subsystem = "sql"
+                backend = "postgres"
+            elif source_type == "vector":
+                subsystem = "vector"
+                backend = "qdrant"
+            elif source_type.startswith("graph_expansion"):
+                subsystem = "graph"
+                backend = "neo4j"
+            else:
+                subsystem = "unknown"
+                backend = "hybrid-mcp"
+
+            return {
+                "subsystem": subsystem,
+                "backend": backend,
+                "projectId": data.projectId,
+                "paperId": article.get("paper_id"),
+            }
         
         # Build sources list from retrieved articles
         sources = [
             ArticleSource(
-                id=art["id"],
-                title=art["title"],
+                id=art.get("id"),
+                title=art.get("title", "N/A"),
                 authors=art.get("authors"),
                 year=art.get("year"),
                 paperId=art.get("paper_id"),
-                provenance=art.get("provenance"),
+                provenance=art.get("provenance") or _fallback_provenance(art),
             )
             for art in rag_result["articles"]
         ]

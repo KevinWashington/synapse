@@ -129,11 +129,11 @@ class ProjectService {
     });
   }
 
-  async generateResearchQuestions(picocData, projeto, framework = "PICOC") {
+  async generateResearchQuestions(picocData, project, framework = "PICOC") {
     try {
       return await apiService.post("/api/generate-research-questions", {
         picocData,
-        projeto,
+        projeto: project,
         framework,
       });
     } catch (error) {
@@ -142,12 +142,18 @@ class ProjectService {
     }
   }
 
-  async generateSearchStrings(researchQuestions, picocData, projeto, framework = "PICOC", targetDatabase = "scopus") {
+  async generateSearchStrings(
+    researchQuestions,
+    picocData,
+    project,
+    framework = "PICOC",
+    targetDatabase = "scopus"
+  ) {
     try {
       return await apiService.post("/api/generate-search-strings", {
         researchQuestions,
         picocData,
-        projeto,
+        projeto: project,
         framework,
         targetDatabase,
       });
@@ -157,12 +163,12 @@ class ProjectService {
     }
   }
 
-  async generateCriteria(researchQuestions, picocData, projeto, framework = "PICOC") {
+  async generateCriteria(researchQuestions, picocData, project, framework = "PICOC") {
     try {
       return await apiService.post("/api/generate-criteria", {
         researchQuestions,
         picocData,
-        projeto,
+        projeto: project,
         framework,
       });
     } catch (error) {
