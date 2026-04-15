@@ -18,6 +18,28 @@ from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
 router = APIRouter()
 
 
+def _build_anchor_joinability(postgres_metrics: dict, vector_metrics: dict) -> dict:
+    postgres_ok = bool(postgres_metrics.get("ok"))
+    postgres_with_anchor = postgres_metrics.get("with_anchor", 0) if postgres_ok else 0
+    postgres_missing = postgres_metrics.get("missing_anchor", 0) if postgres_ok else 0
+    vector_with_anchor = vector_metrics.get("vector_anchor_count", 0)
+    vector_missing = vector_metrics.get("vector_missing_anchor_count", 0)
+    count_mismatch = postgres_with_anchor != vector_with_anchor
+
+    return {
+        "joinable": postgres_ok and postgres_missing == 0 and vector_missing == 0 and not count_mismatch,
+        "missingAnchorIndicators": {
+            "postgres": postgres_missing,
+            "vector": vector_missing,
+        },
+        "countParity": {
+            "postgresAnchoredArticles": postgres_with_anchor,
+            "vectorAnchoredPoints": vector_with_anchor,
+            "countMismatch": count_mismatch,
+        },
+    }
+
+
 @router.get("/stats")
 async def get_stats(
     current_user: User = Depends(get_current_user),
@@ -204,19 +226,14 @@ async def get_anchor_consistency_stats(
     qdrant = get_qdrant_retrieval_service()
     vector_metrics = await qdrant.inspect_anchor_consistency(project_id=projectId)
 
-    postgres_missing = 0 if not postgres_metrics.get("ok") else postgres_metrics.get("missing_anchor", 0)
-    vector_missing = vector_metrics.get("vector_missing_anchor_count", 0)
+    joinability = _build_anchor_joinability(postgres_metrics, vector_metrics)
 
     return {
         "viewerUserId": current_user.id,
         "projectId": projectId,
         "postgres": postgres_metrics,
         "vector": vector_metrics,
-        "joinable": postgres_missing == 0 and vector_missing == 0,
-        "missingAnchorIndicators": {
-            "postgres": postgres_missing,
-            "vector": vector_missing,
-        },
+        **joinability,
     }
 
 

@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { chatService } from "@services/chatService";
 import { projectService } from "@features/projects/services/projectService";
-import { useAIConfig } from "@features/ai/context/AIConfigContext";
 
 const DEFAULT_WELCOME_MESSAGE = {
   id: "welcome",
@@ -24,15 +23,6 @@ function useAIChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const { aiProvider, geminiConfig, ollamaConfig } = useAIConfig();
-
-  const modelLabel = useMemo(
-    () =>
-      aiProvider === "gemini"
-        ? geminiConfig.model || "Gemini"
-        : ollamaConfig.model || "Ollama",
-    [aiProvider, geminiConfig.model, ollamaConfig.model]
-  );
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -93,6 +83,7 @@ function useAIChatPage() {
             role: "assistant",
             content: data.content,
             sources: data.sources || [],
+            provenance: data.provenance || null,
           },
         ]);
       } catch (error) {
@@ -103,7 +94,7 @@ function useAIChatPage() {
             id: (Date.now() + 1).toString(),
             role: "assistant",
             content:
-              "Desculpe, ocorreu um erro ao processar sua mensagem. Verifique a configuracao do provedor de IA.",
+              "Desculpe, ocorreu um erro ao processar sua mensagem.",
           },
         ]);
       } finally {
@@ -114,12 +105,10 @@ function useAIChatPage() {
   );
 
   return {
-    aiProvider,
     handleSend,
     input,
     isLoading,
     messages,
-    modelLabel,
     projects,
     selectedProjectId,
     setInput,

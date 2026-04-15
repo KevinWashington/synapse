@@ -148,6 +148,26 @@ class MCPHostService:
             neo4j = get_neo4j_service()
             return await neo4j.execute_expansion(**envelope.params)
 
+        if method == "graph.cluster_project":
+            neo4j = get_neo4j_service()
+            return await neo4j.cluster_project(**envelope.params)
+
+        if method == "graph.bridge_authors":
+            neo4j = get_neo4j_service()
+            return await neo4j.bridge_authors(**envelope.params)
+
+        if method == "graph.timeline_by_methodology":
+            neo4j = get_neo4j_service()
+            return await neo4j.timeline_by_methodology(**envelope.params)
+
+        if method == "graph.recommend_related_reads":
+            neo4j = get_neo4j_service()
+            return await neo4j.recommend_related_reads(**envelope.params)
+
+        if method == "graph.find_author_topic_paths":
+            neo4j = get_neo4j_service()
+            return await neo4j.find_author_topic_paths(**envelope.params)
+
         if method == "graph.query":
             neo4j = get_neo4j_service()
             return await neo4j.mcp_query(**envelope.params)

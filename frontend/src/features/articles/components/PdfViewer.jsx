@@ -17,7 +17,7 @@ function PdfViewer({ projectId, articleId, article }) {
   if (!hasPdf) {
     return (
       <div className="rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] overflow-hidden h-full">
-        <div className="w-full h-full min-h-[500px] flex flex-col">
+        <div className="w-full h-full min-h-0 flex flex-col">
           <div className="px-4 py-3 border-b border-[var(--syn-border)]">
             <div className="flex items-center gap-2">
               <FileTextIcon className="h-4 w-4 text-[var(--syn-text-secondary)]" />
@@ -56,7 +56,7 @@ function PdfViewer({ projectId, articleId, article }) {
   // Tem PDF - mostra o visualizador
   return (
     <div className="rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] overflow-hidden h-full">
-      <div className="w-full h-full min-h-[500px]">
+      <div className="w-full h-full min-h-0">
         {pdfError ? (
           <div className="flex flex-col items-center justify-center h-full p-6 text-center">
             <FileIcon className="h-16 w-16 text-[var(--syn-text-secondary)] mb-4" />

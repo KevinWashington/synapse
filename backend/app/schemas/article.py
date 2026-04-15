@@ -38,6 +38,38 @@ class ArticleStatusUpdate(BaseModel):
     status: str = Field(..., pattern="^(pendente|analisado|excluido)$")
 
 
+class ArticleDecisionUpdate(BaseModel):
+    decision: str = Field(..., pattern="^(pendente|incluido|excluido)$")
+    reason: str | None = Field(None, max_length=2000)
+    exclusionCriteria: list[str] = Field(default_factory=list)
+    answeringRQs: list[int] = Field(default_factory=list)
+    useSuggestedRQs: bool = True
+
+
+class BatchEvaluateRequest(BaseModel):
+    limit: int = Field(default=200, ge=1, le=2000)
+    onlyPending: bool = True
+    onlyUnscored: bool = True
+    forceReevaluate: bool = False
+    applySuggestedStatus: bool = False
+    dryRun: bool = False
+
+
+class BatchEvaluateSummary(BaseModel):
+    totalCandidates: int
+    evaluated: int
+    skippedNoAbstract: int
+    skippedAlreadyEvaluated: int
+    suggestedIncluded: int
+    suggestedExcluded: int
+    appliedStatusChanges: int
+
+
+class BatchEvaluateResponse(BaseModel):
+    summary: BatchEvaluateSummary
+    projectId: int
+
+
 class ArticleNotesUpdate(BaseModel):
     notas: str
 
@@ -63,6 +95,12 @@ class ArticleResponse(BaseModel):
     aiEvaluation: str | None = None
     aiSuggestedStatus: str | None = None
     aiRelevanceScore: int | None = None
+    aiSuggestedRQs: list[int] = Field(default_factory=list)
+    manualDecision: str | None = None
+    manualDecisionReason: str | None = None
+    exclusionCriteria: list[str] = Field(default_factory=list)
+    answeringRQs: list[int] = Field(default_factory=list)
+    decisionUpdatedAt: datetime | None = None
     aiMethodology: str | None = None
     aiDatabase: str | None = None
     aiDomain: str | None = None

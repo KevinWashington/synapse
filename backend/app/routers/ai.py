@@ -17,6 +17,7 @@ from app.schemas.ai import (
     ArticleSource,
 )
 from app.services.ai_service import get_ai_service
+from app.services.graph_query_agent_service import get_graph_query_agent_service
 from app.services.rag_service import get_rag_service
 from app.core.dependencies import get_current_user
 from app.database import get_db
@@ -24,6 +25,96 @@ from app.frameworks import normalize_framework_data
 
 
 router = APIRouter()
+
+
+def _fallback_provenance_for_project_chat(article: dict, project_id: int) -> dict:
+    source_type = article.get("source_type", "unknown")
+    if source_type == "sql_validated":
+        subsystem = "sql"
+        backend = "postgres"
+    elif source_type == "vector":
+        subsystem = "vector"
+        backend = "qdrant"
+    elif source_type.startswith("graph_expansion"):
+        subsystem = "graph"
+        backend = "neo4j"
+    else:
+        subsystem = "unknown"
+        backend = "hybrid-mcp"
+
+    return {
+        "subsystem": subsystem,
+        "backend": backend,
+        "projectId": project_id,
+        "paperId": article.get("paper_id"),
+    }
+
+
+def _extract_graph_sources(result: dict, project_id: int) -> list[dict]:
+    if not result:
+        return []
+
+    sources: list[dict] = []
+    seen: set[tuple[int | None, str | None]] = set()
+
+    def add_source(
+        *,
+        article_id: int | None,
+        paper_id: str | None,
+        title: str | None,
+        authors: str | None = None,
+        year: int | None = None,
+        provenance: dict | None = None,
+    ) -> None:
+        key = (article_id, paper_id)
+        if key in seen or (article_id is None and paper_id is None) or not title:
+            return
+        seen.add(key)
+        sources.append(
+            {
+                "id": article_id,
+                "title": title,
+                "authors": authors,
+                "year": year,
+                "paper_id": paper_id,
+                "provenance": provenance
+                or {
+                    "subsystem": "graph",
+                    "backend": "neo4j",
+                    "projectId": project_id,
+                    "paperId": paper_id,
+                },
+            }
+        )
+
+    for item in result.get("recommendations", []):
+        add_source(
+            article_id=item.get("article_id"),
+            paper_id=item.get("paper_id"),
+            title=item.get("title"),
+            authors=item.get("authors"),
+            year=item.get("year"),
+        )
+
+    for item in result.get("paths", []):
+        add_source(
+            article_id=item.get("article_id"),
+            paper_id=item.get("paper_id"),
+            title=item.get("title"),
+            year=item.get("year"),
+        )
+
+    for cluster in result.get("clusters", []):
+        for sample in cluster.get("sample_articles", []):
+            add_source(
+                article_id=sample.get("id"),
+                paper_id=sample.get("paper_id"),
+                title=sample.get("title"),
+                authors=sample.get("authors"),
+                year=sample.get("year"),
+            )
+
+    return sources
 
 
 @router.post("/generate-research-questions", response_model=ResearchQuestionsResponse)
@@ -178,6 +269,7 @@ async def project_chat(
     try:
         ai_service = get_ai_service()
         rag_service = get_rag_service()
+        graph_agent = get_graph_query_agent_service()
 
         project = await db.get(Project, data.projectId)
         if project is None:
@@ -213,79 +305,169 @@ async def project_chat(
                 }
             )
         
-        # Retrieve relevant articles via RAG
-        rag_result = await rag_service.retrieve(
-            query=last_message,
-            project_id=data.projectId,
-            db=db,
-            top_k=5,
-            owner_id=current_user.id,
-        )
-        
-        # Generate response with project context
-        response = await ai_service.chat_project(
-            message=last_message,
-            project_context=rag_result["project"],
-            retrieved_articles=rag_result["articles"]
-        )
+        agent_plan = graph_agent.plan(last_message)
 
-        def _fallback_provenance(article: dict) -> dict:
-            source_type = article.get("source_type", "unknown")
-            if source_type == "sql_validated":
-                subsystem = "sql"
-                backend = "postgres"
-            elif source_type == "vector":
-                subsystem = "vector"
-                backend = "qdrant"
-            elif source_type.startswith("graph_expansion"):
-                subsystem = "graph"
-                backend = "neo4j"
-            else:
-                subsystem = "unknown"
-                backend = "hybrid-mcp"
-
-            return {
-                "subsystem": subsystem,
-                "backend": backend,
-                "projectId": data.projectId,
-                "paperId": article.get("paper_id"),
+        if agent_plan.get("intent") != "fallback_hybrid_rag":
+            agent_context = {
+                "article_id": data.articleId,
+                "paper_id": data.paperId,
+                "author_query": data.authorQuery,
+                "topic_query": data.topicQuery,
+                "methodology": data.methodology,
+                "limit": data.limit,
             }
-        
-        # Build sources list from retrieved articles
-        sources = [
-            ArticleSource(
-                id=art.get("id"),
-                title=art.get("title", "N/A"),
-                authors=art.get("authors"),
-                year=art.get("year"),
-                paperId=art.get("paper_id"),
-                provenance=art.get("provenance") or _fallback_provenance(art),
+            agent_result = await graph_agent.run(
+                query=last_message,
+                project_id=data.projectId,
+                context=agent_context,
             )
-            for art in rag_result["articles"]
-        ]
 
-        backends = sorted({
-            (art.get("provenance") or {}).get("backend")
-            for art in rag_result["articles"]
-            if (art.get("provenance") or {}).get("backend")
-        })
-        subsystems = sorted({
-            (art.get("provenance") or {}).get("subsystem")
-            for art in rag_result["articles"]
-            if (art.get("provenance") or {}).get("subsystem")
-        })
-        traceability_complete = all(
-            bool((art.get("provenance") or {}).get("paperId"))
-            for art in rag_result["articles"]
-        ) if rag_result["articles"] else True
+            missing = agent_result.get("missing", [])
+            if missing:
+                response = (
+                    "Preciso de mais contexto para executar essa consulta exploratória. "
+                    f"Campos ausentes: {', '.join(missing)}."
+                )
+                graph_sources_raw = []
+            else:
+                response = await ai_service.chat_graph_agent(
+                    message=last_message,
+                    project_context={
+                        "title": project.title,
+                        "objetivo": project.objetivo,
+                        "framework": getattr(project, "framework", "PICOC") or "PICOC",
+                        "picoc": getattr(project, "picoc", {}) or {},
+                        "researchQuestions": project.researchQuestions or [],
+                    },
+                    agent_plan=agent_result["plan"],
+                    agent_trace=agent_result["trace"],
+                    agent_result=agent_result.get("result"),
+                )
+                graph_sources_raw = _extract_graph_sources(agent_result.get("result") or {}, data.projectId)
 
-        provenance = {
-            "backends": backends,
-            "subsystems": subsystems,
-            "sourceCount": len(rag_result["articles"]),
-            "projectId": data.projectId,
-            "traceabilityComplete": traceability_complete,
-        }
+            sources = [
+                ArticleSource(
+                    id=art.get("id"),
+                    title=art.get("title", "N/A"),
+                    authors=art.get("authors"),
+                    year=art.get("year"),
+                    paperId=art.get("paper_id"),
+                    provenance=art.get("provenance"),
+                )
+                for art in graph_sources_raw
+            ]
+
+            backends = sorted({
+                (art.get("provenance") or {}).get("backend")
+                for art in graph_sources_raw
+                if (art.get("provenance") or {}).get("backend")
+            })
+            subsystems = sorted({
+                (art.get("provenance") or {}).get("subsystem")
+                for art in graph_sources_raw
+                if (art.get("provenance") or {}).get("subsystem")
+            })
+            traceability_complete = all(
+                bool((art.get("provenance") or {}).get("paperId"))
+                for art in graph_sources_raw
+            ) if graph_sources_raw else True
+
+            provenance = {
+                "backends": backends,
+                "subsystems": subsystems,
+                "sourceCount": len(graph_sources_raw),
+                "projectId": data.projectId,
+                "traceabilityComplete": traceability_complete,
+                "agentIntent": agent_result["plan"].get("intent"),
+                "agentTools": agent_result["plan"].get("tools", []),
+                "agentTrace": agent_result.get("trace", []),
+            }
+        else:
+            rag_result = await rag_service.retrieve(
+                query=last_message,
+                project_id=data.projectId,
+                db=db,
+                top_k=5,
+                owner_id=current_user.id,
+            )
+
+            response = await ai_service.chat_project(
+                message=last_message,
+                project_context=rag_result["project"],
+                retrieved_articles=rag_result["articles"]
+            )
+
+            sources = [
+                ArticleSource(
+                    id=art.get("id"),
+                    title=art.get("title", "N/A"),
+                    authors=art.get("authors"),
+                    year=art.get("year"),
+                    paperId=art.get("paper_id"),
+                    provenance=art.get("provenance") or _fallback_provenance_for_project_chat(art, data.projectId),
+                )
+                for art in rag_result["articles"]
+            ]
+
+            backends = sorted({
+                (art.get("provenance") or {}).get("backend")
+                for art in rag_result["articles"]
+                if (art.get("provenance") or {}).get("backend")
+            })
+            subsystems = sorted({
+                (art.get("provenance") or {}).get("subsystem")
+                for art in rag_result["articles"]
+                if (art.get("provenance") or {}).get("subsystem")
+            })
+            traceability_complete = all(
+                bool((art.get("provenance") or {}).get("paperId"))
+                for art in rag_result["articles"]
+            ) if rag_result["articles"] else True
+
+            diagnostics = rag_result.get("diagnostics") or {}
+            tool_call_counts = (diagnostics.get("tool_calls") or {}) if isinstance(diagnostics, dict) else {}
+
+            fallback_agent_tools = []
+            if tool_call_counts.get("tool3_vector", 0) > 0:
+                fallback_agent_tools.append("search_semantic")
+            if tool_call_counts.get("tool1_graph", 0) > 0:
+                fallback_agent_tools.append("execute_expansion")
+            if tool_call_counts.get("tool2_sql", 0) > 0:
+                fallback_agent_tools.append("rerank_by_impact")
+
+            fallback_agent_trace = []
+            if tool_call_counts.get("tool3_vector", 0) > 0:
+                fallback_agent_trace.append(
+                    {
+                        "tool": "search_semantic",
+                        "observation": {"calls": tool_call_counts.get("tool3_vector", 0)},
+                    }
+                )
+            if tool_call_counts.get("tool1_graph", 0) > 0:
+                fallback_agent_trace.append(
+                    {
+                        "tool": "execute_expansion",
+                        "observation": {"calls": tool_call_counts.get("tool1_graph", 0)},
+                    }
+                )
+            if tool_call_counts.get("tool2_sql", 0) > 0:
+                fallback_agent_trace.append(
+                    {
+                        "tool": "rerank_by_impact",
+                        "observation": {"calls": tool_call_counts.get("tool2_sql", 0)},
+                    }
+                )
+
+            provenance = {
+                "backends": backends,
+                "subsystems": subsystems,
+                "sourceCount": len(rag_result["articles"]),
+                "projectId": data.projectId,
+                "traceabilityComplete": traceability_complete,
+                "agentIntent": "fallback_hybrid_rag",
+                "agentTools": fallback_agent_tools,
+                "agentTrace": fallback_agent_trace,
+            }
         
         return ProjectChatResponse(content=response, sources=sources, provenance=provenance)
     

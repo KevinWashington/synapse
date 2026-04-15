@@ -1,8 +1,10 @@
 import { useCallback, useState } from "react";
-import { GridIcon, LoaderIcon, PlusIcon, TableIcon, UploadIcon } from "lucide-react";
+import { GridIcon, LoaderIcon, PlusIcon, SparklesIcon, TableIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import ArticleListEmptyState from "@features/articles/components/ArticleListEmptyState";
 import ArticleListFilters from "@features/articles/components/ArticleListFilters";
+import ArticleDecisionDialog from "@features/articles/components/ArticleDecisionDialog";
+import RQSynthesisPanel from "@features/articles/components/RQSynthesisPanel";
 import ArticleCard from "./ArticleCard";
 import ArticlesTable from "./ArticlesTable";
 import NewArticleModal from "./NewArticleModal";
@@ -32,24 +34,38 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh }) {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showUploadPdfModal, setShowUploadPdfModal] = useState(false);
+  const [showRQSynthesis, setShowRQSynthesis] = useState(false);
   const [articleToEdit, setArticleToEdit] = useState(null);
   const [articleToUploadPdf, setArticleToUploadPdf] = useState(null);
 
   const {
     articles,
+    closeDecisionDialog,
+    decisionArticle,
+    decisionInitialValue,
     filterStatus,
+    filterSummary,
     handleDeleteArticle,
     handleEditSuccess,
     handleImportSuccess,
     handleNewArticleSuccess,
     handleUpdateArticleStatus,
     handleUploadPdfSuccess,
+    isBatchEvaluating,
+    isDecisionDialogOpen,
+    isLoadingRQSynthesis,
     isLoadingArticles,
+    isSavingDecision,
+    loadRQSynthesis,
+    openDecisionDialog,
     pagination,
+    rqSynthesisData,
+    runBatchEvaluate,
     searchTerm,
     setFilterStatus,
     setSearchTerm,
     statusList,
+    submitDecision,
   } = useProjectArticles(project);
 
   function handleAddArticle() {
@@ -85,6 +101,15 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh }) {
     [handleImportSuccess, onGraphNeedsRefresh]
   );
 
+  async function handleToggleRQSynthesis() {
+    const nextValue = !showRQSynthesis;
+    setShowRQSynthesis(nextValue);
+
+    if (nextValue && !rqSynthesisData && !isLoadingRQSynthesis) {
+      await loadRQSynthesis();
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -115,6 +140,41 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh }) {
             variant="outline"
             size="sm"
             className="gap-2 text-xs"
+            onClick={() =>
+              runBatchEvaluate({
+                onlyPending: true,
+                onlyUnscored: true,
+                forceReevaluate: false,
+              })
+            }
+            disabled={isBatchEvaluating}
+            title="Avalia apenas artigos pendentes que ainda não têm score da IA"
+          >
+            {isBatchEvaluating ? (
+              <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <SparklesIcon className="h-3.5 w-3.5" />
+            )}
+            Triagem IA (novos)
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-xs"
+            onClick={handleToggleRQSynthesis}
+            disabled={isLoadingRQSynthesis}
+          >
+            {isLoadingRQSynthesis ? (
+              <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <SparklesIcon className="h-3.5 w-3.5" />
+            )}
+            Síntese RQ
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-xs"
             onClick={handleImportBibTeX}
           >
             <UploadIcon className="h-3.5 w-3.5" />
@@ -127,12 +187,41 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh }) {
         </div>
       </div>
 
+      {filterSummary ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--syn-text-secondary)]">
+          <span className="rounded-md bg-[var(--syn-bg-secondary)] px-2 py-1">
+            Total: {filterSummary.totalArticles || 0}
+          </span>
+          <span className="rounded-md bg-[var(--syn-bg-secondary)] px-2 py-1">
+            Pendentes: {filterSummary.status?.pendente || 0}
+          </span>
+          <span className="rounded-md bg-[var(--syn-bg-secondary)] px-2 py-1">
+            Analisados: {filterSummary.status?.analisado || 0}
+          </span>
+          <span className="rounded-md bg-[var(--syn-bg-secondary)] px-2 py-1">
+            Excluídos: {filterSummary.status?.excluido || 0}
+          </span>
+        </div>
+      ) : null}
+
+      {showRQSynthesis ? (
+        <RQSynthesisPanel
+          data={rqSynthesisData}
+          isLoading={isLoadingRQSynthesis}
+          onRefresh={loadRQSynthesis}
+          onOpenArticle={(articleId) =>
+            onNavigate(`/projetos/${project.id}/artigos/${articleId}`)
+          }
+        />
+      ) : null}
+
       {viewMode === "tabela" ? (
         <ArticlesTable
           articles={articles}
           filterStatus={filterStatus}
           handleDeleteArticle={handleDeleteArticle}
           handleEditArticle={handleEditArticle}
+          handleManualDecision={openDecisionDialog}
           handleReviewArticle={handleReviewArticle}
           handleUpdateArticleStatus={handleUpdateArticleStatus}
           isLoadingArticles={isLoadingArticles}
@@ -170,6 +259,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh }) {
                   onChangeStatus={(status) =>
                     handleUpdateArticleStatus(article, status)
                   }
+                  onManualDecision={openDecisionDialog}
                   onDelete={() => handleDeleteArticle(article)}
                   onEdit={() => handleEditArticle(article)}
                   onUploadPDF={() => {
@@ -224,6 +314,16 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh }) {
         onSuccess={handleUploadPdfSuccess}
         project={project}
         article={articleToUploadPdf}
+      />
+
+      <ArticleDecisionDialog
+        article={decisionArticle}
+        researchQuestions={project?.researchQuestions || []}
+        initialDecision={decisionInitialValue}
+        isOpen={isDecisionDialogOpen}
+        isSaving={isSavingDecision}
+        onClose={closeDecisionDialog}
+        onSubmit={submitDecision}
       />
     </div>
   );

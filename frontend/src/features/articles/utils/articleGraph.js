@@ -7,15 +7,137 @@ export const LINK_COLORS = {
   "similar-to": "#8B5CF6",
   "same-methodology": "#10B981",
   "same-author": "#3B82F6",
+  "shares-keyword": "#F59E0B",
+  "same-venue": "#06B6D4",
+  authored: "#22C55E",
+  "has-keyword": "#FB7185",
+  "published-in": "#14B8A6",
   manual: "#6B7280",
 };
 
 export const RELATIONSHIP_LABELS = {
   all: "Todas as relações",
-  semantic: "Similaridade Semântica",
-  methodology: "Mesma Metodologia",
-  authors: "Mesmos Autores",
+  semantic: "Similaridade semântica",
+  methodology: "Mesma metodologia",
+  authors: "Autores em comum",
+  keywords: "Keywords em comum",
+  venue: "Mesmo venue",
+  authored: "Autoria (autor -> artigo)",
+  "has-keyword": "Artigo -> keyword",
+  "published-in": "Artigo -> venue",
 };
+
+export const RELATIONSHIP_FILTER_OPTIONS = [
+  {
+    value: "semantic",
+    label: "Similaridade semântica",
+    description: "Arestas por embedding",
+    backendType: "SIMILAR_TO",
+  },
+  {
+    value: "methodology",
+    label: "Mesma metodologia",
+    description: "Artigos com método equivalente",
+    backendType: "SAME_METHODOLOGY",
+  },
+  {
+    value: "authors",
+    label: "Autores em comum",
+    description: "Conexões por autoria compartilhada",
+    backendType: "SAME_AUTHOR",
+  },
+  {
+    value: "keywords",
+    label: "Keywords em comum",
+    description: "Conexões por termos compartilhados",
+    backendType: "SHARES_KEYWORD",
+  },
+  {
+    value: "venue",
+    label: "Mesmo venue",
+    description: "Artigos publicados no mesmo veículo",
+    backendType: "SAME_VENUE",
+  },
+  {
+    value: "authored",
+    label: "Autoria",
+    description: "Autor conectado ao artigo",
+    backendType: "AUTHORED",
+  },
+  {
+    value: "has-keyword",
+    label: "Artigo e keyword",
+    description: "Artigo conectado à keyword",
+    backendType: "HAS_KEYWORD",
+  },
+  {
+    value: "published-in",
+    label: "Artigo e venue",
+    description: "Artigo conectado ao venue",
+    backendType: "PUBLISHED_IN",
+  },
+  {
+    value: "all",
+    label: "Todas as relações",
+    description: "Visão completa do grafo",
+    backendType: "ALL",
+  },
+];
+
+export const RELATIONSHIP_LEGEND_LABELS = {
+  "similar-to": "SIMILAR_TO",
+  "same-methodology": "SAME_METHODOLOGY",
+  "same-author": "SAME_AUTHOR",
+  "shares-keyword": "SHARES_KEYWORD",
+  "same-venue": "SAME_VENUE",
+  authored: "AUTHORED",
+  "has-keyword": "HAS_KEYWORD",
+  "published-in": "PUBLISHED_IN",
+};
+
+const NODE_KIND_COLORS = {
+  article: "#3B82F6",
+  author: "#22C55E",
+  keyword: "#F59E0B",
+  venue: "#06B6D4",
+  node: "#6B7280",
+};
+
+const ARTICLE_ONLY_FILTERS = new Set([
+  "semantic",
+  "similar-to",
+  "methodology",
+  "same-methodology",
+  "authors",
+  "same-author",
+  "keywords",
+  "shares-keyword",
+  "venue",
+  "same-venue",
+]);
+
+const ENTITY_FILTER_KIND = {
+  authored: "author",
+  "has-keyword": "keyword",
+  "published-in": "venue",
+};
+
+function getVisibleNodeKindPolicy(relationshipType) {
+  const normalized = String(relationshipType || "all").trim().toLowerCase();
+
+  if (ARTICLE_ONLY_FILTERS.has(normalized)) {
+    return { keepKinds: new Set(["article"]), keepEntityOnlyIfLinked: false };
+  }
+
+  if (ENTITY_FILTER_KIND[normalized]) {
+    return {
+      keepKinds: new Set(["article", ENTITY_FILTER_KIND[normalized]]),
+      keepEntityOnlyIfLinked: true,
+    };
+  }
+
+  return { keepKinds: null, keepEntityOnlyIfLinked: false };
+}
 
 const CLUSTER_COLORS = [
   "#3B82F6",
@@ -41,6 +163,26 @@ function getEdgeLabel(type, score) {
 
   if (type === "same-author") {
     return "Autor em comum";
+  }
+
+  if (type === "shares-keyword") {
+    return "Keyword em comum";
+  }
+
+  if (type === "same-venue") {
+    return "Mesmo venue";
+  }
+
+  if (type === "authored") {
+    return "Autoria";
+  }
+
+  if (type === "has-keyword") {
+    return "Tem keyword";
+  }
+
+  if (type === "published-in") {
+    return "Publicado em";
   }
 
   if (type === "manual") {
@@ -139,7 +281,7 @@ function buildClusterMeta(nodes, edges) {
   };
 }
 
-export function toCytoscapeElements(graphData) {
+export function toCytoscapeElements(graphData, relationshipType = "all") {
   const links = Array.isArray(graphData?.links) ? graphData.links : [];
   const nodes = Array.isArray(graphData?.nodes) ? graphData.nodes : [];
   const degreeByNode = buildNodeDegrees(links);
@@ -179,31 +321,62 @@ export function toCytoscapeElements(graphData) {
   });
 
   const normalizedEdges = Array.from(dedupedEdges.values());
-  const clusterMeta = buildClusterMeta(nodes, normalizedEdges);
+  const linkedNodeIds = new Set();
+  normalizedEdges.forEach((edge) => {
+    linkedNodeIds.add(String(edge.source));
+    linkedNodeIds.add(String(edge.target));
+  });
 
-  const nodeElements = nodes.map((node) => {
+  const visibilityPolicy = getVisibleNodeKindPolicy(relationshipType);
+  const filteredNodes = nodes.filter((node) => {
+    const kind = String(node.kind || "article").toLowerCase();
+
+    if (visibilityPolicy.keepKinds && !visibilityPolicy.keepKinds.has(kind)) {
+      return false;
+    }
+
+    if (visibilityPolicy.keepEntityOnlyIfLinked && kind !== "article") {
+      return linkedNodeIds.has(String(node.id));
+    }
+
+    return true;
+  });
+
+  const filteredNodeIdSet = new Set(filteredNodes.map((node) => String(node.id)));
+  const filteredEdges = normalizedEdges.filter(
+    (edge) => filteredNodeIdSet.has(String(edge.source)) && filteredNodeIdSet.has(String(edge.target))
+  );
+
+  const clusterMeta = buildClusterMeta(filteredNodes, filteredEdges);
+
+  const nodeElements = filteredNodes.map((node) => {
     const nodeId = String(node.id);
     const clusterId = clusterMeta.clusterByNode[nodeId] ?? 0;
+    const kind = String(node.kind || "article").toLowerCase();
+    const isArticle = kind === "article";
+    const clusterColor = CLUSTER_COLORS[clusterId % CLUSTER_COLORS.length];
+    const baseColor = NODE_KIND_COLORS[kind] || NODE_KIND_COLORS.node;
 
     return {
       data: {
         id: nodeId,
         title: node.title,
         shortTitle: getShortTitle(node.title),
+        kind,
         authors: node.authors,
         year: node.year,
-        status: node.status || "pendente",
+        status: node.status || (isArticle ? "pendente" : null),
         methodology: node.methodology,
         domain: node.domain,
         degree: degreeByNode[nodeId] || 0,
         clusterId,
         clusterSize: clusterMeta.clusterSizes[clusterId] || 1,
-        clusterColor: CLUSTER_COLORS[clusterId % CLUSTER_COLORS.length],
+        clusterColor: isArticle ? clusterColor : baseColor,
       },
     };
   });
 
-  const edgeElements = normalizedEdges.map((edge) => ({
+  const edgeElements = filteredEdges.map((edge) => ({
     data: {
       id: `${edge.source}-${edge.target}-${edge.type}`,
       source: edge.source,
@@ -218,7 +391,7 @@ export function toCytoscapeElements(graphData) {
   return {
     elements: [...nodeElements, ...edgeElements],
     stats: {
-      displayedLinks: normalizedEdges.length,
+      displayedLinks: filteredEdges.length,
       totalLinks: normalizedEdges.length,
     },
   };
@@ -269,14 +442,41 @@ export const ARTICLE_GRAPH_STYLE = [
       "font-family": "Inter, system-ui, sans-serif",
       "text-wrap": "wrap",
       "text-max-width": 90,
-      width: "mapData(degree, 0, 12, 18, 42)",
-      height: "mapData(degree, 0, 12, 18, 42)",
+      width: "mapData(degree, 0, 12, 16, 42)",
+      height: "mapData(degree, 0, 12, 16, 42)",
       "background-color": "data(clusterColor)",
       "border-width": 2,
       "border-color": "#374151",
       "text-valign": "bottom",
       "text-margin-y": 8,
       "overlay-opacity": 0,
+    },
+  },
+  {
+    selector: 'node[kind = "author"]',
+    style: {
+      shape: "round-rectangle",
+      "border-color": "#16A34A",
+      width: "mapData(degree, 0, 12, 22, 50)",
+      height: "mapData(degree, 0, 12, 14, 28)",
+    },
+  },
+  {
+    selector: 'node[kind = "keyword"]',
+    style: {
+      shape: "diamond",
+      "border-color": "#D97706",
+      width: "mapData(degree, 0, 12, 18, 40)",
+      height: "mapData(degree, 0, 12, 18, 40)",
+    },
+  },
+  {
+    selector: 'node[kind = "venue"]',
+    style: {
+      shape: "ellipse",
+      "border-color": "#0891B2",
+      width: "mapData(degree, 0, 12, 20, 40)",
+      height: "mapData(degree, 0, 12, 20, 40)",
     },
   },
   {
@@ -331,6 +531,39 @@ export const ARTICLE_GRAPH_STYLE = [
     selector: 'edge[type = "same-author"]',
     style: {
       "line-color": LINK_COLORS["same-author"],
+    },
+  },
+  {
+    selector: 'edge[type = "shares-keyword"]',
+    style: {
+      "line-color": LINK_COLORS["shares-keyword"],
+    },
+  },
+  {
+    selector: 'edge[type = "same-venue"]',
+    style: {
+      "line-color": LINK_COLORS["same-venue"],
+    },
+  },
+  {
+    selector: 'edge[type = "authored"]',
+    style: {
+      "line-color": LINK_COLORS.authored,
+      "line-style": "dotted",
+    },
+  },
+  {
+    selector: 'edge[type = "has-keyword"]',
+    style: {
+      "line-color": LINK_COLORS["has-keyword"],
+      "line-style": "dashed",
+    },
+  },
+  {
+    selector: 'edge[type = "published-in"]',
+    style: {
+      "line-color": LINK_COLORS["published-in"],
+      "line-style": "dotted",
     },
   },
   {

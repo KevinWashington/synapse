@@ -101,11 +101,37 @@ function ArticleStatusMenuItems({ article, onUpdateStatus }) {
   );
 }
 
+function ArticleDecisionMenuItems({ article, onManualDecision }) {
+  return (
+    <>
+      <DropdownMenuItem>
+        <span className="mr-2">Triagem manual:</span>
+      </DropdownMenuItem>
+
+      <DropdownMenuItem onClick={() => onManualDecision(article, "incluido")}>
+        <CheckIcon className="mr-2 h-4 w-4 text-green-600" />
+        Incluir no estudo
+      </DropdownMenuItem>
+
+      <DropdownMenuItem onClick={() => onManualDecision(article, "excluido")}>
+        <XIcon className="mr-2 h-4 w-4 text-red-600" />
+        Excluir do estudo
+      </DropdownMenuItem>
+
+      <DropdownMenuItem onClick={() => onManualDecision(article, "pendente")}>
+        <ClockIcon className="mr-2 h-4 w-4 text-amber-600" />
+        Manter como pendente
+      </DropdownMenuItem>
+    </>
+  );
+}
+
 function ArticlesTable({
   articles,
   filterStatus,
   handleDeleteArticle,
   handleEditArticle,
+  handleManualDecision,
   handleReviewArticle,
   handleUpdateArticleStatus,
   isLoadingArticles,
@@ -311,20 +337,41 @@ function ArticlesTable({
                   <TableCell>
                     {article.aiRelevanceScore !== undefined &&
                     article.aiRelevanceScore !== null ? (
-                      <div
-                        className={`inline-flex cursor-help items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold transition-colors ${
-                          article.aiSuggestedStatus === "incluido"
-                            ? "border-green-200 bg-green-50 text-green-700"
-                            : "border-red-200 bg-red-50 text-red-700"
-                        }`}
-                        title={`Sugestão: ${
-                          article.aiSuggestedStatus === "incluido"
-                            ? "Incluir"
-                            : "Excluir"
-                        }\n${article.aiEvaluation}`}
-                      >
-                        <Sparkles className="h-3 w-3" />
-                        {article.aiRelevanceScore}%
+                      <div className="space-y-1">
+                        <div
+                          className={`inline-flex cursor-help items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-bold transition-colors ${
+                            article.aiSuggestedStatus === "incluido"
+                              ? "border-green-200 bg-green-50 text-green-700"
+                              : "border-red-200 bg-red-50 text-red-700"
+                          }`}
+                          title={`Sugestão: ${
+                            article.aiSuggestedStatus === "incluido"
+                              ? "Incluir"
+                              : "Excluir"
+                          }\nRQs sugeridas: ${(article.aiSuggestedRQs || []).join(", ") || "nenhuma"}\n${article.aiEvaluation}`}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {article.aiRelevanceScore}%
+                        </div>
+
+                        {(article.aiSuggestedRQs || []).length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {article.aiSuggestedRQs.map((rqNumber) => (
+                              <span
+                                key={`rq-suggested-${article.id}-${rqNumber}`}
+                                className="rounded bg-[var(--syn-bg-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--syn-text-secondary)]"
+                              >
+                                {`RQ ${rqNumber}`}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {article.manualDecision ? (
+                          <div className="text-[11px] text-[var(--syn-text-secondary)]">
+                            Manual: {article.manualDecision}
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <span className="text-xs italic text-[var(--syn-text-secondary)]">
@@ -353,6 +400,11 @@ function ArticlesTable({
                         <ArticleStatusMenuItems
                           article={article}
                           onUpdateStatus={handleUpdateArticleStatus}
+                        />
+
+                        <ArticleDecisionMenuItems
+                          article={article}
+                          onManualDecision={handleManualDecision}
                         />
 
                         <DropdownMenuItem

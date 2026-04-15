@@ -22,6 +22,7 @@ function ArticleCard({
   article,
   onClick,
   onChangeStatus,
+  onManualDecision,
   onDelete,
   onEdit,
   onUploadPDF,
@@ -188,6 +189,40 @@ function ArticleCard({
                 </DropdownMenuItem>
               ) : null}
 
+              <DropdownMenuItem>
+                <span className="mr-2">Triagem manual:</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.preventDefault();
+                  onManualDecision?.(article, "incluido");
+                }}
+              >
+                <CheckIcon className="mr-2 h-4 w-4 text-green-600" />
+                Incluir no estudo
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.preventDefault();
+                  onManualDecision?.(article, "excluido");
+                }}
+              >
+                <XIcon className="mr-2 h-4 w-4 text-red-600" />
+                Excluir do estudo
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={(event) => {
+                  event.preventDefault();
+                  onManualDecision?.(article, "pendente");
+                }}
+              >
+                <ClockIcon className="mr-2 h-4 w-4 text-amber-600" />
+                Manter como pendente
+              </DropdownMenuItem>
+
               <DropdownMenuItem
                 onClick={(event) => {
                   event.preventDefault();
@@ -210,6 +245,18 @@ function ArticleCard({
         <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
           {article.authors || article.autores}
         </p>
+        {(article.aiSuggestedRQs || []).length ? (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {article.aiSuggestedRQs.map((rqNumber) => (
+              <span
+                key={`card-ai-rq-${article.id}-${rqNumber}`}
+                className="rounded bg-[var(--syn-bg-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--syn-text-secondary)]"
+              >
+                {`RQ ${rqNumber}`}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div className="mt-auto flex items-center justify-between pt-3 text-xs">
           <span>{article.year || article.ano}</span>
           <span className="line-clamp-1 text-muted-foreground">

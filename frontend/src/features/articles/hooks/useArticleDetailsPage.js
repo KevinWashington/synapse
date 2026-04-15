@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
+import { projectService } from "@features/projects/services/projectService";
 import { toast } from "@/lib/toast";
 
 function useArticleDetailsPage() {
@@ -11,6 +12,7 @@ function useArticleDetailsPage() {
   const [error, setError] = useState(null);
   const [pdfData, setPdfData] = useState(null);
   const [rightTab, setRightTab] = useState("notas");
+  const [project, setProject] = useState(null);
 
   const fetchArticle = useCallback(async () => {
     try {
@@ -49,6 +51,33 @@ function useArticleDetailsPage() {
   }, [fetchArticle]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function fetchProjectContext() {
+      if (!projectId) {
+        return;
+      }
+
+      try {
+        const projectData = await projectService.getProjectById(projectId);
+        if (!cancelled) {
+          setProject(projectData);
+        }
+      } catch (currentError) {
+        if (!cancelled) {
+          console.error("Erro ao carregar contexto do projeto:", currentError);
+        }
+      }
+    }
+
+    fetchProjectContext();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
     if (article) {
       fetchPdfData();
     }
@@ -62,6 +91,36 @@ function useArticleDetailsPage() {
         toast.success(`Status atualizado para ${nextStatus}`);
       } catch (currentError) {
         toast.error("Erro ao atualizar status: " + currentError.message);
+      }
+    },
+    [articleId, projectId]
+  );
+
+  const handleApplyDecision = useCallback(
+    async ({
+      decision,
+      reason = null,
+      exclusionCriteria = [],
+      answeringRQs = [],
+    }) => {
+      try {
+        const updatedArticle = await articleService.updateArticleDecision(
+          projectId,
+          articleId,
+          {
+            decision,
+            reason,
+            exclusionCriteria,
+            answeringRQs,
+          }
+        );
+
+        setArticle(updatedArticle);
+        toast.success("Decisão de triagem registrada com sucesso!");
+        return updatedArticle;
+      } catch (currentError) {
+        toast.error("Erro ao registrar decisão: " + currentError.message);
+        throw currentError;
       }
     },
     [articleId, projectId]
@@ -110,12 +169,14 @@ function useArticleDetailsPage() {
     articleId,
     error,
     handleAddNote,
+    handleApplyDecision,
     handleChangeStatus,
     handleDeleteArticle,
     handleSaveNotes,
     loading,
     navigate,
     pdfData,
+    project,
     projectId,
     rightTab,
     setRightTab,

@@ -26,7 +26,20 @@ async def lifespan(app: FastAPI):
         qdrant_health = await qdrant.mcp_health()
         host.set_server_health("qdrant", qdrant_health.get("connected", False), qdrant_health.get("details"))
     if "neo4j" in configured_servers:
-        host.register_server("neo4j", ["execute_expansion", "graph.query", "graph.write", "graph.health"])
+        host.register_server(
+            "neo4j",
+            [
+                "execute_expansion",
+                "graph.query",
+                "graph.write",
+                "graph.health",
+                "graph.cluster_project",
+                "graph.bridge_authors",
+                "graph.timeline_by_methodology",
+                "graph.recommend_related_reads",
+                "graph.find_author_topic_paths",
+            ],
+        )
         graph = get_graph_mcp_service()
         graph_health = await graph.mcp_health()
         host.set_server_health("neo4j", graph_health.get("connected", False), graph_health.get("details"))

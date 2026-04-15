@@ -114,6 +114,46 @@ class ArtigosService {
     }
   }
 
+  async createArticleJson(projectId, articleData) {
+    try {
+      if (!projectId) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      if (!articleData?.title || !articleData?.authors) {
+        throw new Error("Título e autores são obrigatórios");
+      }
+
+      return await apiService.post(this.getProjectEndpoint(projectId), articleData);
+    } catch (error) {
+      console.error(`Erro ao criar artigo JSON no projeto ${projectId}:`, error);
+      throw error;
+    }
+  }
+
+  async uploadPdf(projectId, articleId, file) {
+    try {
+      if (!projectId || !articleId) {
+        throw new Error("IDs do projeto e artigo são obrigatórios");
+      }
+
+      if (!file) {
+        throw new Error("Arquivo PDF é obrigatório");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      return await apiService.postFormData(
+        `${this.getProjectEndpoint(projectId)}/${articleId}/pdf`,
+        formData
+      );
+    } catch (error) {
+      console.error(`Erro ao enviar PDF do artigo ${articleId}:`, error);
+      throw error;
+    }
+  }
+
   async updateArticle(projectId, articleId, updateData) {
     try {
       if (!projectId || !articleId) {
@@ -178,6 +218,82 @@ class ArtigosService {
     }
   }
 
+  async updateArticleDecision(projectId, articleId, decisionData) {
+    try {
+      if (!projectId || !articleId) {
+        throw new Error("IDs do projeto e artigo são obrigatórios");
+      }
+
+      const decision = decisionData?.decision;
+      if (!decision || !["pendente", "incluido", "excluido"].includes(decision)) {
+        throw new Error("Decisão inválida");
+      }
+
+      return await apiService.put(
+        `${this.getProjectEndpoint(projectId)}/${articleId}/decision`,
+        {
+          decision,
+          reason: decisionData?.reason || null,
+          exclusionCriteria: decisionData?.exclusionCriteria || [],
+          answeringRQs: decisionData?.answeringRQs || [],
+          useSuggestedRQs: decisionData?.useSuggestedRQs ?? true,
+        }
+      );
+    } catch (error) {
+      console.error(`Erro ao atualizar decisão do artigo ${articleId}:`, error);
+      throw error;
+    }
+  }
+
+  async batchEvaluateArticles(projectId, options = {}) {
+    try {
+      if (!projectId) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      return await apiService.post(
+        `${this.getProjectEndpoint(projectId)}/batch-evaluate`,
+        {
+          limit: options.limit ?? 200,
+          onlyPending: options.onlyPending ?? true,
+          onlyUnscored: options.onlyUnscored ?? true,
+          forceReevaluate: options.forceReevaluate ?? false,
+          applySuggestedStatus: options.applySuggestedStatus ?? false,
+          dryRun: options.dryRun ?? false,
+        }
+      );
+    } catch (error) {
+      console.error(`Erro ao avaliar artigos em lote no projeto ${projectId}:`, error);
+      throw error;
+    }
+  }
+
+  async getProjectFilterSummary(projectId) {
+    try {
+      if (!projectId) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      return await apiService.get(`${this.getProjectEndpoint(projectId)}/filter-summary`);
+    } catch (error) {
+      console.error(`Erro ao buscar resumo de triagem do projeto ${projectId}:`, error);
+      throw error;
+    }
+  }
+
+  async getProjectRQSynthesis(projectId) {
+    try {
+      if (!projectId) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      return await apiService.get(`${this.getProjectEndpoint(projectId)}/rq-synthesis`);
+    } catch (error) {
+      console.error(`Erro ao buscar síntese por RQ do projeto ${projectId}:`, error);
+      throw error;
+    }
+  }
+
   async deleteArticle(projectId, articleId) {
     try {
       if (!projectId || !articleId) {
@@ -197,7 +313,7 @@ class ArtigosService {
    * Busca dados do grafo de relacionamentos do projeto
    * @param {number} projectId - ID do projeto
    * @param {Object} options - Opções de filtro
-   * @param {string} options.relationshipType - Tipo: 'all', 'semantic', 'methodology', 'database', 'authors'
+  * @param {string} options.relationshipType - Tipo: 'all', 'semantic', 'methodology', 'authors', 'keywords', 'venue', 'authored', 'has-keyword', 'published-in'
    * @param {number} options.minSimilarity - Threshold mínimo para similaridade semântica (0.0 a 1.0)
    */
   async getProjectGraph(projectId, options = {}) {

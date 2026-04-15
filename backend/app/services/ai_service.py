@@ -5,6 +5,7 @@ Responsável pela geração de questões de pesquisa, strings de busca,
 critérios de inclusão/exclusão, avaliação de artigos e chat.
 """
 
+import json
 import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -160,6 +161,7 @@ class AIService:
         """Evaluate an article's relevance and extract metadata for graph relationships."""
         abstract = article_data.get("abstract", "")
         title = article_data.get("title", "")
+        research_questions = project_data.get("researchQuestions", []) or []
         
         if not abstract:
             return {
@@ -168,11 +170,13 @@ class AIService:
                 "justification": "Artigo sem resumo disponível para análise automática.",
                 "methodology": None,
                 "domain": None,
-                "keywords": []
+                "keywords": [],
+                "suggestedRQs": [],
             }
 
         inclusion = "\n".join([f"- {c}" for c in project_data.get("criteriosInclusao", [])])
         exclusion = "\n".join([f"- {c}" for c in project_data.get("criteriosExclusao", [])])
+        rq_block = "\n".join([f"{idx + 1}. {rq}" for idx, rq in enumerate(research_questions)])
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Você é um especialista em triagem de literatura científica.
@@ -187,6 +191,7 @@ Instruções:
 6. Extraia a metodologia do estudo. Analise cuidadosamente o abstract para identificar a metodologia REAL usada. Se o artigo descreve experimentos, é "experimental". Se faz revisão da literatura, é "literature-review" ou "systematic-review". Se propõe um framework/arquitetura, é "design-science". Se faz survey/questionário, é "survey". NÃO use "other" a menos que realmente nenhuma das opções se aplique.
 7. Identifique o domínio/área do estudo.
 8. Extraia 5 palavras-chave principais.
+9. Se houver perguntas de pesquisa (RQs), indique quais números de RQ este artigo ajuda a responder. Retorne no máximo 3 números.
 
 Responda APENAS no formato JSON:
 {{
@@ -195,7 +200,8 @@ Responda APENAS no formato JSON:
   "justification": "string",
   "methodology": "experimental" | "survey" | "case-study" | "literature-review" | "systematic-review" | "meta-analysis" | "design-science" | "simulation" | "theoretical" | "comparative-analysis" | "qualitative" | "mixed-methods" | "rct" | "cohort" | "cross-sectional" | "other" | null,
   "domain": "string (área do estudo, ex: NLP, machine learning, educação)",
-  "keywords": ["palavra1", "palavra2", "palavra3", "palavra4", "palavra5"]
+    "keywords": ["palavra1", "palavra2", "palavra3", "palavra4", "palavra5"],
+    "suggestedRQs": [1, 2]
 }}"""),
             ("user", f"""
 Dados do Projeto:
@@ -204,6 +210,9 @@ Critérios de Inclusão:
 
 Critérios de Exclusão:
 {exclusion}
+
+Perguntas de Pesquisa (RQs):
+{rq_block if rq_block else "Projeto sem RQs definidas"}
 
 Dados do Artigo:
 Título: {title}
@@ -221,6 +230,24 @@ Avalie o artigo e extraia os metadados agora:""")
             if json_match:
                 import json
                 eval_data = json.loads(json_match.group(0))
+
+                raw_suggested_rqs = eval_data.get("suggestedRQs", []) or []
+                valid_suggested_rqs = []
+                for value in raw_suggested_rqs:
+                    if isinstance(value, bool):
+                        continue
+                    try:
+                        rq_number = int(value)
+                    except (TypeError, ValueError):
+                        continue
+
+                    if rq_number < 1:
+                        continue
+                    if research_questions and rq_number > len(research_questions):
+                        continue
+                    if rq_number not in valid_suggested_rqs:
+                        valid_suggested_rqs.append(rq_number)
+
                 # Ensure all expected fields are present
                 return {
                     "suggestedStatus": eval_data.get("suggestedStatus", "pendente"),
@@ -228,7 +255,8 @@ Avalie o artigo e extraia os metadados agora:""")
                     "justification": eval_data.get("justification", ""),
                     "methodology": eval_data.get("methodology"),
                     "domain": eval_data.get("domain"),
-                    "keywords": eval_data.get("keywords", [])
+                    "keywords": eval_data.get("keywords", []),
+                    "suggestedRQs": valid_suggested_rqs[:3],
                 }
             return {
                 "suggestedStatus": "pendente",
@@ -236,7 +264,8 @@ Avalie o artigo e extraia os metadados agora:""")
                 "justification": "Falha ao processar avaliação da IA.",
                 "methodology": None,
                 "domain": None,
-                "keywords": []
+                "keywords": [],
+                "suggestedRQs": [],
             }
         except Exception as e:
             print(f"Erro na avaliação da IA: {e}")
@@ -246,7 +275,8 @@ Avalie o artigo e extraia os metadados agora:""")
                 "justification": f"Erro na análise: {str(e)}",
                 "methodology": None,
                 "domain": None,
-                "keywords": []
+                "keywords": [],
+                "suggestedRQs": [],
             }
 
     async def chat(self, message: str, article_context: dict | None = None) -> str:
@@ -373,6 +403,65 @@ REGRAS DE OPERAÇÃO:
         
         chain = prompt | self.llm | StrOutputParser()
         
+        return await chain.ainvoke({"message": message})
+
+    async def chat_graph_agent(
+        self,
+        *,
+        message: str,
+        project_context: dict,
+        agent_plan: dict,
+        agent_trace: list[dict],
+        agent_result: dict | None,
+    ) -> str:
+        """Synthesize answers from graph-agent tool outputs."""
+        framework = project_context.get("framework", "PICOC")
+        raw_picoc = project_context.get("picoc", {})
+        components = normalize_framework_data(raw_picoc, framework)
+
+        fw_block = ""
+        if components and any(v for v in components.values()):
+            fw_block = f"\nFramework {framework}:\n"
+            fw_block += _build_components_text(framework, components)
+
+        rq = project_context.get("researchQuestions", [])
+        rq_block = ""
+        if rq:
+            rq_block = "\nPerguntas de pesquisa:\n" + "\n".join(f"  {i+1}. {q}" for i, q in enumerate(rq))
+
+        plan_block = json.dumps(agent_plan, ensure_ascii=False, indent=2).replace("{", "{{").replace("}", "}}")
+        trace_block = json.dumps(agent_trace, ensure_ascii=False, indent=2).replace("{", "{{").replace("}", "}}")
+        result_block = json.dumps(agent_result or {}, ensure_ascii=False, indent=2).replace("{", "{{").replace("}", "}}")
+
+        system_prompt = f"""PERSONA: Você é um assistente especializado em revisão de literatura orientada a grafos.
+
+CONTEXTO DO PROJETO:
+Título: {project_context.get('title', 'N/A')}
+Objetivo: {project_context.get('objetivo', 'N/A')}{fw_block}{rq_block}
+
+PLANO DO AGENTE:
+{plan_block}
+
+TRILHA DE EXECUÇÃO:
+{trace_block}
+
+RESULTADO DAS TOOLS:
+{result_block}
+
+REGRAS:
+1. Responda com base prioritariamente no resultado das tools do grafo.
+2. Não invente informações ausentes no resultado.
+3. Quando houver artigos no resultado, cite no formato [Autor, Ano] quando possível.
+4. Quando o resultado for estrutural, explique padrões, clusters, pontes e tendências com linguagem clara.
+5. Se o resultado estiver vazio ou incompleto, diga isso explicitamente.
+6. Seja conciso, analítico e orientado à decisão do pesquisador."""
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("user", "{message}")
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
         return await chain.ainvoke({"message": message})
 
     def _parse_numbered_list(self, text: str) -> list[str]:

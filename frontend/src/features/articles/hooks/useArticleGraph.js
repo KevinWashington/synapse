@@ -9,7 +9,9 @@ import {
 
 function useArticleGraph({ graphRefreshToken = 0, projectId }) {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
-  const [relationshipType, setRelationshipType] = useState("all");
+  const [relationshipType, setRelationshipType] = useState("semantic");
+  const [nodeSearch, setNodeSearch] = useState("");
+  const [nodeSearchStatus, setNodeSearchStatus] = useState("");
   const [minSimilarity, setMinSimilarity] = useState(0.7);
   const [debouncedSimilarity, setDebouncedSimilarity] = useState(0.7);
   const [loading, setLoading] = useState(true);
@@ -77,17 +79,51 @@ function useArticleGraph({ graphRefreshToken = 0, projectId }) {
     }
   }, [graphData.nodes, selectedNodeId]);
 
-  const graphModel = useMemo(() => toCytoscapeElements(graphData), [graphData]);
+  const graphModel = useMemo(
+    () => toCytoscapeElements(graphData, relationshipType),
+    [graphData, relationshipType]
+  );
+
+  const visibleNodeElements = useMemo(
+    () => graphModel.elements.filter((element) => !element.data.source),
+    [graphModel]
+  );
+
+  const nodeSearchSuggestions = useMemo(() => {
+    const seen = new Set();
+    const suggestions = [];
+
+    visibleNodeElements.forEach((element) => {
+      const title = String(element.data.title || "").trim();
+      if (!title) {
+        return;
+      }
+
+      const normalized = title.toLowerCase();
+      if (seen.has(normalized)) {
+        return;
+      }
+
+      seen.add(normalized);
+      suggestions.push(title);
+    });
+
+    return suggestions.slice(0, 80);
+  }, [visibleNodeElements]);
 
   const graphStats = useMemo(() => {
     const nodeElements = graphModel.elements.filter(
       (element) => !element.data.source
+    );
+    const articleNodes = nodeElements.filter(
+      (node) => String(node.data.kind || "article") === "article"
     );
     const clusterIds = new Set(
       nodeElements.map((node) => String(node.data.clusterId ?? 0))
     );
 
     return {
+      articleNodes: articleNodes.length,
       clusters: clusterIds.size,
       linksDisplayed: graphModel.stats.displayedLinks,
       linksTotal: graphModel.stats.totalLinks,
@@ -238,6 +274,100 @@ function useArticleGraph({ graphRefreshToken = 0, projectId }) {
     cy.fit(cy.elements(), 140);
   }, []);
 
+  const handleSearchNode = useCallback(
+    (queryValue) => {
+      const searchTerm = String(queryValue ?? nodeSearch)
+        .trim()
+        .toLowerCase();
+
+      if (!searchTerm) {
+        setNodeSearchStatus("Digite um termo para buscar.");
+        return false;
+      }
+
+      const rankedMatches = visibleNodeElements
+        .map((element) => {
+          const title = String(element.data.title || "");
+          const kind = String(element.data.kind || "");
+          const metadata = [
+            title,
+            String(element.data.authors || ""),
+            String(element.data.methodology || ""),
+            String(element.data.domain || ""),
+            String(element.data.year || ""),
+            String(element.data.id || ""),
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          if (!metadata.includes(searchTerm)) {
+            return null;
+          }
+
+          const titleLower = title.toLowerCase();
+          const exactTitle = titleLower === searchTerm ? 0 : 1;
+          const startsWithTitle = titleLower.startsWith(searchTerm) ? 0 : 1;
+          const kindPriority = kind === "article" ? 0 : 1;
+          const index = metadata.indexOf(searchTerm);
+
+          return {
+            element,
+            score: [exactTitle, startsWithTitle, kindPriority, index],
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+          for (let i = 0; i < a.score.length; i += 1) {
+            if (a.score[i] !== b.score[i]) {
+              return a.score[i] - b.score[i];
+            }
+          }
+          return 0;
+        });
+
+      if (rankedMatches.length === 0) {
+        setNodeSearchStatus("Nenhum nó encontrado no filtro atual.");
+        return false;
+      }
+
+      const bestMatch = rankedMatches[0].element;
+      const matchId = String(bestMatch.data.id);
+      setSelectedNodeId(matchId);
+      setNodeSearchStatus(`Nó encontrado: ${bestMatch.data.title}`);
+
+      const cy = graphRef.current;
+      if (cy) {
+        const selected = cy.getElementById(matchId);
+        if (selected && !selected.empty()) {
+          cy.animate(
+            {
+              fit: {
+                eles: selected.closedNeighborhood(),
+                padding: 140,
+              },
+            },
+            { duration: 320 }
+          );
+        }
+      }
+
+      return true;
+    },
+    [nodeSearch, visibleNodeElements]
+  );
+
+  useEffect(() => {
+    if (!nodeSearchStatus) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setNodeSearchStatus("");
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [nodeSearchStatus]);
+
   return {
     error,
     graphData,
@@ -251,8 +381,13 @@ function useArticleGraph({ graphRefreshToken = 0, projectId }) {
     layoutConfig: ARTICLE_GRAPH_LAYOUT,
     loading,
     minSimilarity,
+    nodeSearch,
+    nodeSearchStatus,
+    nodeSearchSuggestions,
     relationshipType,
     selectedNode,
+    handleSearchNode,
+    setNodeSearch,
     setMinSimilarity,
     setRelationshipType,
   };

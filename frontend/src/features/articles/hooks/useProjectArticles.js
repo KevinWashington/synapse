@@ -4,10 +4,34 @@ import { toast } from "@/lib/toast";
 
 export const useProjectArticles = (project) => {
   const [isLoadingArticles, setIsLoadingArticles] = useState(false);
+  const [isLoadingFilterSummary, setIsLoadingFilterSummary] = useState(false);
+  const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
+  const [isLoadingRQSynthesis, setIsLoadingRQSynthesis] = useState(false);
+  const [isSavingDecision, setIsSavingDecision] = useState(false);
+  const [isDecisionDialogOpen, setIsDecisionDialogOpen] = useState(false);
+  const [decisionArticle, setDecisionArticle] = useState(null);
+  const [decisionInitialValue, setDecisionInitialValue] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
   const [articles, setArticles] = useState([]);
   const [pagination, setPagination] = useState({});
+  const [filterSummary, setFilterSummary] = useState(null);
+  const [rqSynthesisData, setRqSynthesisData] = useState(null);
+
+  const loadFilterSummary = useCallback(async () => {
+    if (!project?.id) return;
+
+    try {
+      setIsLoadingFilterSummary(true);
+      const response = await articleService.getProjectFilterSummary(project.id);
+      setFilterSummary(response || null);
+    } catch (error) {
+      console.error("Erro ao carregar resumo de triagem:", error);
+      setFilterSummary(null);
+    } finally {
+      setIsLoadingFilterSummary(false);
+    }
+  }, [project?.id]);
 
   const fetchArticles = useCallback(
     async (filters = {}) => {
@@ -56,10 +80,68 @@ export const useProjectArticles = (project) => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, filterStatus, project?.id, fetchArticles]);
 
+  useEffect(() => {
+    if (!project?.id) return;
+    loadFilterSummary();
+  }, [project?.id, loadFilterSummary]);
+
+  const runBatchEvaluate = async (options = {}) => {
+    if (!project?.id) return;
+
+    try {
+      setIsBatchEvaluating(true);
+      const response = await articleService.batchEvaluateArticles(project.id, options);
+      const summary = response?.summary || {};
+      const evaluated = summary.evaluated || 0;
+      const skippedAlreadyEvaluated = summary.skippedAlreadyEvaluated || 0;
+      if (evaluated === 0 && skippedAlreadyEvaluated > 0) {
+        toast.success(
+          "Nenhum artigo novo para triagem: os pendentes já tinham score da IA."
+        );
+      } else {
+        toast.success(
+          `Triagem concluída: ${evaluated} avaliados, ${summary.suggestedIncluded || 0} sugeridos para inclusão e ${summary.suggestedExcluded || 0} para exclusão.`
+        );
+      }
+      await fetchArticles();
+      await loadFilterSummary();
+      if (rqSynthesisData) {
+        await loadRQSynthesis();
+      }
+    } catch (error) {
+      console.error("Erro na triagem em lote:", error);
+      toast.error("Erro ao executar triagem em lote: " + error.message);
+    } finally {
+      setIsBatchEvaluating(false);
+    }
+  };
+
+  const loadRQSynthesis = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+
+    try {
+      setIsLoadingRQSynthesis(true);
+      const response = await articleService.getProjectRQSynthesis(project.id);
+      setRqSynthesisData(response || null);
+    } catch (error) {
+      console.error("Erro ao carregar síntese por RQ:", error);
+      setRqSynthesisData(null);
+      toast.error("Erro ao carregar síntese por RQ: " + error.message);
+    } finally {
+      setIsLoadingRQSynthesis(false);
+    }
+  }, [project?.id]);
+
   const handleUpdateArticleStatus = async (article, newStatus) => {
     try {
       await articleService.updateArticleStatus(project.id, article.id, newStatus);
-      fetchArticles();
+      await fetchArticles();
+      await loadFilterSummary();
+      if (rqSynthesisData) {
+        await loadRQSynthesis();
+      }
       toast.success(`Status do artigo atualizado para ${newStatus}`);
     } catch (error) {
       console.error("Erro ao atualizar status do artigo:", error);
@@ -75,27 +157,98 @@ export const useProjectArticles = (project) => {
     try {
       await articleService.deleteArticle(project.id, article.id);
       toast.success("Artigo deletado com sucesso!");
-      fetchArticles();
+      await fetchArticles();
+      await loadFilterSummary();
+      if (rqSynthesisData) {
+        await loadRQSynthesis();
+      }
     } catch (error) {
       console.error("Erro ao deletar artigo:", error);
       toast.error("Erro ao deletar artigo: " + error.message);
     }
   };
 
+  const openDecisionDialog = useCallback((article, initialDecision = null) => {
+    setDecisionArticle(article);
+    setDecisionInitialValue(initialDecision);
+    setIsDecisionDialogOpen(true);
+  }, []);
+
+  const closeDecisionDialog = useCallback(() => {
+    setIsDecisionDialogOpen(false);
+    setDecisionArticle(null);
+    setDecisionInitialValue(null);
+  }, []);
+
+  const submitDecision = useCallback(
+    async (decisionPayload) => {
+      if (!project?.id || !decisionArticle?.id) {
+        throw new Error("Artigo inválido para decisão manual.");
+      }
+
+      try {
+        setIsSavingDecision(true);
+        await articleService.updateArticleDecision(
+          project.id,
+          decisionArticle.id,
+          decisionPayload
+        );
+
+        await fetchArticles();
+        await loadFilterSummary();
+        if (rqSynthesisData) {
+          await loadRQSynthesis();
+        }
+
+        toast.success("Decisão de triagem registrada com sucesso!");
+        closeDecisionDialog();
+      } catch (error) {
+        console.error("Erro ao registrar decisão manual:", error);
+        throw error;
+      } finally {
+        setIsSavingDecision(false);
+      }
+    },
+    [
+      closeDecisionDialog,
+      decisionArticle?.id,
+      fetchArticles,
+      loadFilterSummary,
+      loadRQSynthesis,
+      project?.id,
+      rqSynthesisData,
+    ]
+  );
+
   const handleNewArticleSuccess = () => {
     fetchArticles();
+    loadFilterSummary();
+    if (rqSynthesisData) {
+      loadRQSynthesis();
+    }
   };
 
   const handleImportSuccess = () => {
     fetchArticles();
+    loadFilterSummary();
+    if (rqSynthesisData) {
+      loadRQSynthesis();
+    }
   };
 
   const handleEditSuccess = () => {
     fetchArticles();
+    loadFilterSummary();
+    if (rqSynthesisData) {
+      loadRQSynthesis();
+    }
   };
 
   const handleUploadPdfSuccess = () => {
     fetchArticles();
+    if (rqSynthesisData) {
+      loadRQSynthesis();
+    }
   };
 
   const statusList = [
@@ -107,13 +260,27 @@ export const useProjectArticles = (project) => {
 
   return {
     isLoadingArticles,
+    isLoadingFilterSummary,
+    isBatchEvaluating,
+    isLoadingRQSynthesis,
+    isSavingDecision,
+    isDecisionDialogOpen,
+    decisionArticle,
+    decisionInitialValue,
     searchTerm,
     setSearchTerm,
     filterStatus,
     setFilterStatus,
     articles,
     pagination,
+    filterSummary,
+    rqSynthesisData,
     fetchArticles,
+    runBatchEvaluate,
+    loadRQSynthesis,
+    openDecisionDialog,
+    closeDecisionDialog,
+    submitDecision,
     handleUpdateArticleStatus,
     handleDeleteArticle,
     handleNewArticleSuccess,

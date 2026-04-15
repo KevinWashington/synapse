@@ -7,12 +7,10 @@ import { usePageTitle } from "@hooks/usePageTitle";
 
 function AIChatPage() {
   const {
-    aiProvider,
     handleSend,
     input,
     isLoading,
     messages,
-    modelLabel,
     projects,
     selectedProjectId,
     setInput,
@@ -29,14 +27,11 @@ function AIChatPage() {
           input={input}
           isLoading={isLoading}
           messages={messages}
-          modelLabel={modelLabel}
           selectedProjectId={selectedProjectId}
           setInput={setInput}
         />
 
         <ChatContextSidebar
-          aiProvider={aiProvider}
-          modelLabel={modelLabel}
           projects={projects}
           selectedProjectId={selectedProjectId}
           setSelectedProjectId={setSelectedProjectId}

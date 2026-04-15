@@ -1,4 +1,4 @@
-import { BoltIcon, TrashIcon } from "lucide-react";
+import { BoltIcon, ClipboardCheckIcon, TrashIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 
-function ArticleStatusActions({ onChangeStatus, onDeleteArticle }) {
+function ArticleStatusActions({ onChangeStatus, onDeleteArticle, onOpenDecisionDialog }) {
   return (
     <div className="mb-4 flex items-center justify-end gap-2">
       <DropdownMenu>
@@ -34,6 +34,27 @@ function ArticleStatusActions({ onChangeStatus, onDeleteArticle }) {
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+
+          {onOpenDecisionDialog ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <ClipboardCheckIcon className="mr-2 h-4 w-4" />
+                Decisão de triagem
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={() => onOpenDecisionDialog("incluido")}>
+                  Incluir no estudo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onOpenDecisionDialog("excluido")}>
+                  Excluir do estudo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onOpenDecisionDialog("pendente")}>
+                  Manter pendente
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
+
           <DropdownMenuItem
             className="gap-2 text-red-500 focus:bg-red-50 focus:text-red-600"
             onClick={onDeleteArticle}

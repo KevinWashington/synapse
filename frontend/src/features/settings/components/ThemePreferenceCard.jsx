@@ -6,29 +6,40 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 
-function ThemePreferenceCard({ isDark, onToggleTheme }) {
+function ThemePreferenceCard({ onThemeColorChange, themeColor, themeColorOptions }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Preferências Gerais</CardTitle>
-        <CardDescription>Personalize o tema da interface.</CardDescription>
+        <CardDescription>Escolha a cor principal da interface.</CardDescription>
       </CardHeader>
 
-      <CardContent>
-        <div className="flex items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-sm font-medium text-foreground">Tema Escuro</h3>
-            <p className="text-sm text-muted-foreground">
-              Alternar para modo escuro
-            </p>
-          </div>
-
-          <input
-            type="checkbox"
-            className="h-4 w-4 text-primary"
-            checked={isDark}
-            onChange={onToggleTheme}
-          />
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          A cor escolhida é aplicada em destaques, gráficos e elementos de navegação.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {themeColorOptions.map((option) => {
+            const isActive = themeColor === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onThemeColorChange(option.value)}
+                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  isActive
+                    ? "border-[var(--syn-sidebar-accent)] bg-[var(--syn-bg-secondary)] text-[var(--syn-text-primary)]"
+                    : "border-[var(--syn-border)] text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
+                }`}
+              >
+                <span
+                  className="h-3 w-3 rounded-full"
+                  style={{ backgroundColor: option.accent }}
+                />
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

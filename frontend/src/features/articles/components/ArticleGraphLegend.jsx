@@ -1,16 +1,19 @@
-import { LINK_COLORS } from "@features/articles/utils/articleGraph";
+import {
+  LINK_COLORS,
+  RELATIONSHIP_LEGEND_LABELS,
+} from "@features/articles/utils/articleGraph";
 
 function ArticleGraphLegend() {
   return (
     <div className="flex flex-wrap items-center gap-4 text-xs">
-      {Object.entries(LINK_COLORS).map(([type, color]) => (
+      {Object.entries(RELATIONSHIP_LEGEND_LABELS).map(([type, label]) => (
         <div key={type} className="flex items-center gap-1.5">
           <div
             className="h-0.5 w-4 rounded-full"
-            style={{ backgroundColor: color }}
+            style={{ backgroundColor: LINK_COLORS[type] }}
           />
-          <span className="capitalize text-[var(--syn-text-secondary)]">
-            {type.replace(/-/g, " ").replace("same ", "mesmo ")}
+          <span className="text-[var(--syn-text-secondary)]">
+            {label}
           </span>
         </div>
       ))}

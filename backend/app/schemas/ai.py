@@ -94,11 +94,20 @@ class ChatProvenance(BaseModel):
     sourceCount: int = 0
     projectId: int
     traceabilityComplete: bool = False
+    agentIntent: str | None = None
+    agentTools: list[str] = Field(default_factory=list)
+    agentTrace: list[dict] = Field(default_factory=list)
 
 
 class ProjectChatRequest(BaseModel):
     messages: list[dict]
     projectId: int
+    articleId: int | None = None
+    paperId: str | None = None
+    authorQuery: str | None = None
+    topicQuery: str | None = None
+    methodology: str | None = None
+    limit: int | None = None
 
 
 class ProjectChatResponse(BaseModel):

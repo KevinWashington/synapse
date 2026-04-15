@@ -46,12 +46,9 @@ const NAV_ITEMS = [
     icon: Bot,
   },
   {
+    path: "/settings",
     label: "Configurações",
     icon: Settings,
-    children: [
-      { path: "/Settings", label: "Provedores de IA" },
-      { path: "/Settings/preferencias", label: "Preferências" },
-    ],
   },
 ];
 

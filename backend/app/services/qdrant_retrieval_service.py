@@ -152,6 +152,52 @@ class QdrantRetrievalService:
             },
         }
 
+    async def delete_article(self, article_id: int | str) -> dict:
+        await self._ensure_collection()
+
+        await self.client.delete(
+            collection_name=self.collection,
+            points_selector=models.PointIdsList(points=[article_id]),
+        )
+
+        return {
+            "ok": True,
+            "collection": self.collection,
+            "point_id": article_id,
+            "provenance": {
+                "subsystem": "vector",
+                "backend": "qdrant",
+            },
+        }
+
+    async def delete_project_points(self, project_id: int) -> dict:
+        await self._ensure_collection()
+
+        project_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="project_id",
+                    match=models.MatchValue(value=project_id),
+                )
+            ]
+        )
+
+        await self.client.delete(
+            collection_name=self.collection,
+            points_selector=models.FilterSelector(filter=project_filter),
+        )
+
+        return {
+            "ok": True,
+            "collection": self.collection,
+            "project_id": project_id,
+            "provenance": {
+                "subsystem": "vector",
+                "backend": "qdrant",
+                "projectId": project_id,
+            },
+        }
+
     async def inspect_anchor_consistency(self, project_id: int) -> dict:
         if project_id is None:
             raise ValueError("project_id is required for anchor inspection")

@@ -20,8 +20,13 @@ export function ArticleGraph({ projectId, graphRefreshToken = 0 }) {
     layoutConfig,
     loading,
     minSimilarity,
+    nodeSearch,
+    nodeSearchStatus,
+    nodeSearchSuggestions,
     relationshipType,
     selectedNode,
+    handleSearchNode,
+    setNodeSearch,
     setMinSimilarity,
     setRelationshipType,
   } = useArticleGraph({
@@ -69,7 +74,12 @@ export function ArticleGraph({ projectId, graphRefreshToken = 0 }) {
       <ArticleGraphToolbar
         graphStats={graphStats}
         minSimilarity={minSimilarity}
+        nodeSearch={nodeSearch}
+        nodeSearchStatus={nodeSearchStatus}
+        nodeSearchSuggestions={nodeSearchSuggestions}
+        onSearchNode={handleSearchNode}
         relationshipType={relationshipType}
+        setNodeSearch={setNodeSearch}
         setMinSimilarity={setMinSimilarity}
         setRelationshipType={setRelationshipType}
       />

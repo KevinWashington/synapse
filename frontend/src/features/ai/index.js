@@ -4,7 +4,6 @@ export { default as ChatConversationPanel } from "./components/ChatConversationP
 export { default as ChatContextSidebar } from "./components/ChatContextSidebar";
 export { default as ChatSourcesPanel } from "./components/ChatSourcesPanel";
 
-// AI Feature - Context & Hook
-export { AIConfigProvider, useAIConfig, AIConfigContext } from "./context/AIConfigContext";
+// AI Feature - Hooks
 export { default as useAIChatPage } from "./hooks/useAIChatPage";
 

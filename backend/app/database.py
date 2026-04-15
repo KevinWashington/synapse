@@ -58,6 +58,26 @@ async def init_db():
             'CREATE INDEX IF NOT EXISTS idx_articles_project_paperid ON articles ("projectId", "paperId")'
         ))
 
+        # Migration: add screening and traceability columns to articles
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "manualDecision" VARCHAR(20)'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "manualDecisionReason" TEXT'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "exclusionCriteria" TEXT[] DEFAULT ARRAY[]::TEXT[]'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "answeringRQs" INTEGER[] DEFAULT ARRAY[]::INTEGER[]'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "aiSuggestedRQs" INTEGER[] DEFAULT ARRAY[]::INTEGER[]'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "decisionUpdatedAt" TIMESTAMP WITH TIME ZONE'
+        ))
+
 
 async def get_db() -> AsyncSession:
     """Dependency to get database session."""

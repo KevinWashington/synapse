@@ -4,7 +4,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { LoadingState } from "@components/layout";
 import ProtectedRoute from "@components/ProtectedRoute";
 import { Toaster } from "@components/ui/Sonner";
-import { AIConfigProvider } from "@features/ai";
 import { AuthProvider } from "@features/auth";
 
 const ArticleDetailsPage = lazy(() => import("@/pages/ArticleDetails"));
@@ -29,65 +28,63 @@ function withSuspense(children) {
 function App() {
   return (
     <AuthProvider>
-      <AIConfigProvider>
-        <Routes>
-          <Route path="/login" element={withSuspense(<LoginPage />)} />
-          <Route path="/register" element={withSuspense(<RegisterPage />)} />
+      <Routes>
+        <Route path="/login" element={withSuspense(<LoginPage />)} />
+        <Route path="/register" element={withSuspense(<RegisterPage />)} />
+
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              {withSuspense(<LayoutPage />)}
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={withSuspense(<DashboardPage />)} />
+          <Route path="dashboard" element={withSuspense(<DashboardPage />)} />
+          <Route path="projetos" element={withSuspense(<ProjectsPage />)} />
+          <Route
+            path="projetos/:id"
+            element={withSuspense(<ProjectDetailsPage />)}
+          />
+          <Route
+            path="projetos/:projectId/artigos/:articleId"
+            element={withSuspense(<ArticleDetailsPage />)}
+          />
+
+          <Route path="artigos" element={withSuspense(<ArticlesPage />)} />
+          <Route
+            path="artigos/importar"
+            element={withSuspense(<ArticlesPage />)}
+          />
+          <Route
+            path="artigos/upload"
+            element={withSuspense(<ArticlesPage />)}
+          />
+
+          <Route path="ia/analise" element={withSuspense(<AIChatPage />)} />
+          <Route path="ia/recomendacoes" element={withSuspense(<AIChatPage />)} />
+          <Route path="ia/chat" element={withSuspense(<AIChatPage />)} />
 
           <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                {withSuspense(<LayoutPage />)}
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={withSuspense(<DashboardPage />)} />
-            <Route path="dashboard" element={withSuspense(<DashboardPage />)} />
-            <Route path="projetos" element={withSuspense(<ProjectsPage />)} />
-            <Route
-              path="projetos/:id"
-              element={withSuspense(<ProjectDetailsPage />)}
-            />
-            <Route
-              path="projetos/:projectId/artigos/:articleId"
-              element={withSuspense(<ArticleDetailsPage />)}
-            />
+            path="visualizacoes/relacionamentos"
+            element={withSuspense(<DashboardPage />)}
+          />
+          <Route
+            path="visualizacoes/estatisticas"
+            element={withSuspense(<DashboardPage />)}
+          />
 
-            <Route path="artigos" element={withSuspense(<ArticlesPage />)} />
-            <Route
-              path="artigos/importar"
-              element={withSuspense(<ArticlesPage />)}
-            />
-            <Route
-              path="artigos/upload"
-              element={withSuspense(<ArticlesPage />)}
-            />
+          <Route path="settings" element={withSuspense(<SettingsPage />)} />
+          <Route
+            path="settings/preferencias"
+            element={withSuspense(<SettingsPage />)}
+          />
+        </Route>
 
-            <Route path="ia/analise" element={withSuspense(<AIChatPage />)} />
-            <Route path="ia/recomendacoes" element={withSuspense(<AIChatPage />)} />
-            <Route path="ia/chat" element={withSuspense(<AIChatPage />)} />
-
-            <Route
-              path="visualizacoes/relacionamentos"
-              element={withSuspense(<DashboardPage />)}
-            />
-            <Route
-              path="visualizacoes/estatisticas"
-              element={withSuspense(<DashboardPage />)}
-            />
-
-            <Route path="settings" element={withSuspense(<SettingsPage />)} />
-            <Route
-              path="settings/preferencias"
-              element={withSuspense(<SettingsPage />)}
-            />
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <Toaster />
-      </AIConfigProvider>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster />
     </AuthProvider>
   );
 }

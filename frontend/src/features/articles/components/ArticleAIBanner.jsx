@@ -26,6 +26,18 @@ function ArticleAIBanner({ article, onAccept, onExclude }) {
       >
         {article.aiEvaluation}
       </p>
+      {(article.aiSuggestedRQs || []).length ? (
+        <div className="hidden shrink-0 items-center gap-1 md:flex">
+          {article.aiSuggestedRQs.map((rqNumber) => (
+            <span
+              key={`ai-rq-${article.id || "article"}-${rqNumber}`}
+              className="rounded bg-[var(--syn-bg-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--syn-text-secondary)]"
+            >
+              {`RQ ${rqNumber}`}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {article.status === "pendente" && (
         <div className="flex shrink-0 gap-2">
           <Button

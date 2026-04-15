@@ -51,6 +51,14 @@ class Article(Base):
     aiEvaluation: Mapped[str | None] = mapped_column(Text, nullable=True)
     aiSuggestedStatus: Mapped[str | None] = mapped_column(String(20), nullable=True)
     aiRelevanceScore: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    aiSuggestedRQs: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), default=list)
+
+    # Screening decisions and traceability
+    manualDecision: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    manualDecisionReason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    exclusionCriteria: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
+    answeringRQs: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), default=list)
+    decisionUpdatedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     
     # AI Extracted Metadata (for graph relationships)
     aiMethodology: Mapped[str | None] = mapped_column(String(100), nullable=True)

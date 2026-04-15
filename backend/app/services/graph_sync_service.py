@@ -1,5 +1,7 @@
 """Graph synchronization service for maintaining article relationships in Neo4j."""
 
+import re
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -25,15 +27,27 @@ class GraphSyncService:
         # Create/update node in Neo4j
         await self.neo4j.create_article_node(
             article_id=article.id,
+            paper_id=article.paperId,
             project_id=article.projectId,
             title=article.title,
             authors=article.authors,
             year=article.year,
             status=article.status,
             methodology=article.aiMethodology,
-            domain=article.aiDomain
+            domain=article.aiDomain,
+            venue=article.journal,
+            keywords=self._extract_keywords(article.keywords, article.aiKeywords),
+            abstract=article.abstract,
         )
         print(f"[GRAPH] Node created for article {article.id}")
+
+        await self.neo4j.sync_article_entities(
+            article_id=article.id,
+            project_id=article.projectId,
+            authors=self._split_authors(article.authors),
+            keywords=self._extract_keywords(article.keywords, article.aiKeywords),
+            venue=article.journal,
+        )
         
         # Get all other articles in the same project
         result = await db.execute(
@@ -88,6 +102,22 @@ class GraphSyncService:
                     article.id, other.id, shared_authors
                 )
                 print(f"[GRAPH] Created SAME_AUTHOR: {article.id} -> {other.id} ({shared_authors})")
+
+            shared_keywords = self._find_shared_keywords(
+                self._extract_keywords(article.keywords, article.aiKeywords),
+                self._extract_keywords(other.keywords, other.aiKeywords),
+            )
+            if shared_keywords:
+                await self.neo4j.create_shared_keyword_relationship(
+                    article.id, other.id, shared_keywords
+                )
+                print(f"[GRAPH] Created SHARES_KEYWORD: {article.id} -> {other.id} ({shared_keywords})")
+
+            if article.journal and other.journal and article.journal.strip().lower() == other.journal.strip().lower():
+                await self.neo4j.create_same_venue_relationship(
+                    article.id, other.id, article.journal.strip()
+                )
+                print(f"[GRAPH] Created SAME_VENUE: {article.id} -> {other.id} ({article.journal.strip()})")
     
     def _find_shared_authors(
         self,
@@ -114,6 +144,52 @@ class GraphSyncService:
         
         shared = set1 & set2
         return list(shared) if shared else []
+
+    def _split_authors(self, authors: str | None) -> list[str]:
+        if not authors:
+            return []
+
+        normalized = authors.replace(" and ", ";")
+        parts = [part.strip() for part in normalized.split(";") if part.strip()]
+        deduped = []
+        seen = set()
+        for part in parts:
+            lowered = part.lower()
+            if lowered not in seen:
+                seen.add(lowered)
+                deduped.append(part)
+        return deduped
+
+    def _extract_keywords(
+        self,
+        raw_keywords: str | None,
+        ai_keywords: list[str] | None,
+    ) -> list[str]:
+        candidates: list[str] = []
+        if raw_keywords:
+            candidates.extend(re.split(r";|,|\|", raw_keywords))
+        if ai_keywords:
+            candidates.extend(ai_keywords)
+
+        deduped = []
+        seen = set()
+        for candidate in candidates:
+            cleaned = candidate.strip().lower()
+            if not cleaned or cleaned in seen:
+                continue
+            seen.add(cleaned)
+            deduped.append(cleaned)
+        return deduped[:20]
+
+    def _find_shared_keywords(
+        self,
+        keywords1: list[str],
+        keywords2: list[str],
+    ) -> list[str]:
+        if not keywords1 or not keywords2:
+            return []
+        shared = sorted(set(keywords1) & set(keywords2))
+        return shared[:10]
     
     async def delete_article_from_graph(self, article_id: int) -> None:
         """Remove an article and its relationships from Neo4j."""
