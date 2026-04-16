@@ -2,10 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class FrameworkComponentsInput(BaseModel):
-    """Input flexível para componentes de qualquer framework.
-    Aceita tanto chaves legadas em português quanto padronizadas em inglês.
-    """
-    # Chaves padronizadas (inglês)
+    """Input de componentes de framework com chaves canônicas em inglês."""
     population: str | None = None
     intervention: str | None = None
     comparison: str | None = None
@@ -13,11 +10,6 @@ class FrameworkComponentsInput(BaseModel):
     context: str | None = None
     exposure: str | None = None
     studyDesign: str | None = None
-    # Chaves legadas (português) — mantidas por compatibilidade
-    pessoa: str | None = None
-    intervencao: str | None = None
-    comparacao: str | None = None
-    contexto: str | None = None
 
 
 class ProjectContext(BaseModel):

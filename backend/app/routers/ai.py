@@ -21,7 +21,6 @@ from app.services.graph_query_agent_service import get_graph_query_agent_service
 from app.services.rag_service import get_rag_service
 from app.core.dependencies import get_current_user
 from app.database import get_db
-from app.frameworks import normalize_framework_data
 
 
 router = APIRouter()
@@ -127,8 +126,7 @@ async def generate_research_questions(
         ai_service = get_ai_service()
         
         framework = data.framework or "PICOC"
-        raw_components = data.picocData.model_dump()
-        components = normalize_framework_data(raw_components, framework)
+        components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
         
         questions = await ai_service.generate_research_questions(
@@ -157,8 +155,7 @@ async def generate_search_strings(
         ai_service = get_ai_service()
         
         framework = data.framework or "PICOC"
-        raw_components = data.picocData.model_dump()
-        components = normalize_framework_data(raw_components, framework)
+        components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
         
         searchStrings = await ai_service.generate_search_strings(
@@ -233,8 +230,7 @@ async def generate_criteria(
         ai_service = get_ai_service()
         
         framework = data.framework or "PICOC"
-        raw_components = data.picocData.model_dump()
-        components = normalize_framework_data(raw_components, framework)
+        components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
         
         result = await ai_service.generate_criteria(

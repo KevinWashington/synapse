@@ -1,8 +1,6 @@
-import { DragDropContext } from "@hello-pangea/dnd";
 import { FolderIcon, PlusIcon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { KanbanBoard, KanbanColumn } from "@/components/ui/KanbanColumn";
 import { EmptyState, LoadingState } from "@/components/layout";
 import {
   EditProjectPanel,
@@ -15,21 +13,18 @@ import { usePageTitle } from "@hooks/usePageTitle";
 
 function Projects() {
   const {
-    columnItems,
     detailOpen,
     editData,
     editLoading,
     editOpen,
     error,
     handleDeleteProject,
-    handleDragEnd,
     handleEditProject,
     handleExpandProject,
     handleProjectClick,
     handleSaveEdit,
     loadProjects,
     loading,
-    projectColumns,
     projects,
     searchTerm,
     selectedProject,
@@ -81,27 +76,17 @@ function Projects() {
       )}
 
       {projects.length > 0 ? (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <KanbanBoard>
-            {projectColumns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                columnId={column.id}
-                label={column.label}
-                count={columnItems[column.id].length}
-                items={columnItems[column.id]}
-                renderItem={(project) => (
-                  <ProjectCard
-                    project={project}
-                    onEdit={handleEditProject}
-                    onDelete={handleDeleteProject}
-                    onClick={handleProjectClick}
-                  />
-                )}
-              />
-            ))}
-          </KanbanBoard>
-        </DragDropContext>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {projects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onEdit={handleEditProject}
+              onDelete={handleDeleteProject}
+              onClick={handleProjectClick}
+            />
+          ))}
+        </div>
       ) : (
         !loading && (
           <EmptyState

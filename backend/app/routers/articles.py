@@ -1,5 +1,8 @@
 from datetime import datetime
+import hashlib
+import logging
 from io import BytesIO
+import re
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,10 +26,10 @@ from app.schemas.article import (
     RelationshipCreate,
 )
 from app.core.dependencies import get_current_user
-from app.services.anchor_service import get_anchor_service
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _graph_sync_http_error(message: str = "Falha ao sincronizar grafo no Neo4j") -> HTTPException:
@@ -180,6 +183,63 @@ def _build_evidence_excerpt(article: Article) -> str | None:
     if len(candidate) <= 280:
         return candidate
     return candidate[:277] + "..."
+
+
+_INVALID_ANCHOR_CHARS = re.compile(r"[^a-z0-9]+")
+
+
+def _normalize_paper_id(paper_id: str | None) -> str | None:
+    if not paper_id:
+        return None
+    normalized = _INVALID_ANCHOR_CHARS.sub("-", paper_id.strip().lower()).strip("-")
+    return normalized or None
+
+
+def _generate_paper_id(doi: str | None, title: str | None, year: int | None) -> str:
+    doi_normalized = _normalize_paper_id(doi)
+    if doi_normalized:
+        return doi_normalized
+
+    title_base = _normalize_paper_id(title or "paper") or "paper"
+    year_base = str(year) if year is not None else "unknown"
+    digest = hashlib.sha1(f"{title_base}|{year_base}".encode("utf-8")).hexdigest()[:10]
+    return f"{title_base}-{year_base}-{digest}"
+
+
+def _resolve_paper_id(
+    *,
+    provided: str | None,
+    doi: str | None,
+    title: str | None,
+    year: int | None,
+) -> str:
+    normalized = _normalize_paper_id(provided)
+    if normalized:
+        return normalized
+    return _generate_paper_id(doi=doi, title=title, year=year)
+
+
+def _build_project_ai_context(project: Project) -> dict[str, list[str]]:
+    return {
+        "criteriosInclusao": project.criteriosInclusao or [],
+        "criteriosExclusao": project.criteriosExclusao or [],
+        "researchQuestions": project.researchQuestions or [],
+    }
+
+
+def _apply_ai_evaluation(article: Article, eval_result: dict) -> None:
+    article.aiEvaluation = eval_result.get("justification")
+    article.aiSuggestedStatus = eval_result.get("suggestedStatus")
+    article.aiRelevanceScore = eval_result.get("relevanceScore")
+    article.aiSuggestedRQs = eval_result.get("suggestedRQs", [])
+    article.aiMethodology = eval_result.get("methodology")
+    article.aiDatabase = eval_result.get("database")
+    article.aiDomain = eval_result.get("domain")
+    article.aiKeywords = eval_result.get("keywords", [])
+
+
+def _log_vector_sync_warning(message: str, exc: Exception) -> None:
+    logger.warning("%s: %s", message, exc)
 
 
 @router.get("/{projectId}/artigos", response_model=ArticleListResponse)
@@ -419,8 +479,7 @@ async def create_article(
         ownerId=current_user.id
     )
 
-    anchor_service = get_anchor_service()
-    article.paperId = anchor_service.resolve(
+    article.paperId = _resolve_paper_id(
         provided=data.paperId,
         doi=article.doi,
         title=article.title,
@@ -433,50 +492,36 @@ async def create_article(
             from app.services.ai_service import get_ai_service
             
             ai_service = get_ai_service()
-            
-            project_data = {
-                "criteriosInclusao": project.criteriosInclusao or [],
-                "criteriosExclusao": project.criteriosExclusao or [],
-                "researchQuestions": project.researchQuestions or [],
-            }
+            project_data = _build_project_ai_context(project)
             
             # Avaliação + extração de metadados (single LLM call)
             eval_result = await ai_service.evaluate_article(
                 {"title": article.title, "abstract": article.abstract},
                 project_data
             )
-            
-            article.aiEvaluation = eval_result.get("justification")
-            article.aiSuggestedStatus = eval_result.get("suggestedStatus")
-            article.aiRelevanceScore = eval_result.get("relevanceScore")
-            article.aiSuggestedRQs = eval_result.get("suggestedRQs", [])
-            article.aiMethodology = eval_result.get("methodology")
-            article.aiDatabase = eval_result.get("database")
-            article.aiDomain = eval_result.get("domain")
-            article.aiKeywords = eval_result.get("keywords", [])
-            print(f"[GRAPH] AI metadata extracted: methodology={article.aiMethodology}, database={article.aiDatabase}")
-            
+            _apply_ai_evaluation(article, eval_result)
+            logger.info(
+                "[GRAPH] AI metadata extracted: methodology=%s, database=%s",
+                article.aiMethodology,
+                article.aiDatabase,
+            )
         except Exception as e:
-            import traceback
-            print(f"[GRAPH] Erro ao avaliar artigo com IA: {e}")
-            traceback.print_exc()
+            logger.exception("[GRAPH] Erro ao avaliar artigo com IA")
         
         # Gerar embedding separadamente para isolar erros
         try:
             from app.services.embedding_service import get_embedding_service
             embedding_service = get_embedding_service()
             
-            print(f"[GRAPH] Gerando embedding para: {article.title[:60]}...")
+            logger.info("[GRAPH] Gerando embedding para: %s...", article.title[:60])
             embedding = embedding_service.generate_embedding(article.abstract)
             if embedding:
                 article.embedding = embedding
-                print(f"[GRAPH] Embedding gerado com sucesso: {len(embedding)} dimensões")
+                logger.info("[GRAPH] Embedding gerado com sucesso: %s dimensões", len(embedding))
             else:
-                print(f"[GRAPH] Embedding retornou vazio!")
+                logger.warning("[GRAPH] Embedding retornou vazio!")
         except Exception as e:
-            import traceback
-            print(f"[GRAPH] Erro ao gerar embedding: {e}")
-            traceback.print_exc()
+            logger.exception("[GRAPH] Erro ao gerar embedding")
     
     db.add(article)
     await db.flush()
@@ -490,7 +535,7 @@ async def create_article(
     try:
         await _sync_article_vector_payload(article)
     except Exception as e:
-        print(f"[QDRANT] Erro ao sincronizar payload vetorial: {e}")
+        _log_vector_sync_warning("[QDRANT] Erro ao sincronizar payload vetorial", e)
     
     response = ArticleResponse.model_validate(article)
     response.hasPdf = False
@@ -537,10 +582,9 @@ async def update_article(
     for field, value in update_data.items():
         setattr(article, field, value)
 
-    anchor_service = get_anchor_service()
     anchor_fields_changed = any(k in update_data for k in ("paperId", "doi", "title", "year"))
     if anchor_fields_changed or not article.paperId:
-        article.paperId = anchor_service.resolve(
+        article.paperId = _resolve_paper_id(
             provided=update_data.get("paperId") if anchor_fields_changed else article.paperId,
             doi=article.doi,
             title=article.title,
@@ -553,27 +597,15 @@ async def update_article(
             ai_service = get_ai_service()
             
             project = await get_project_or_404(projectId, current_user.id, db)
-            project_data = {
-                "criteriosInclusao": project.criteriosInclusao or [],
-                "criteriosExclusao": project.criteriosExclusao or [],
-                "researchQuestions": project.researchQuestions or [],
-            }
+            project_data = _build_project_ai_context(project)
             
             eval_result = await ai_service.evaluate_article(
                 {"title": article.title, "abstract": article.abstract},
                 project_data
             )
-            
-            article.aiEvaluation = eval_result.get("justification")
-            article.aiSuggestedStatus = eval_result.get("suggestedStatus")
-            article.aiRelevanceScore = eval_result.get("relevanceScore")
-            article.aiSuggestedRQs = eval_result.get("suggestedRQs", [])
-            article.aiMethodology = eval_result.get("methodology")
-            article.aiDatabase = eval_result.get("database")
-            article.aiDomain = eval_result.get("domain")
-            article.aiKeywords = eval_result.get("keywords", [])
+            _apply_ai_evaluation(article, eval_result)
         except Exception as e:
-            print(f"Erro ao re-avaliar artigo com IA: {e}")
+            logger.exception("Erro ao re-avaliar artigo com IA")
 
         try:
             from app.services.embedding_service import get_embedding_service
@@ -582,7 +614,7 @@ async def update_article(
             embedding = embedding_service.generate_embedding(article.abstract)
             article.embedding = embedding if embedding else None
         except Exception as e:
-            print(f"Erro ao re-gerar embedding: {e}")
+            logger.exception("Erro ao re-gerar embedding")
 
     await db.flush()
     await _sync_article_graph_or_raise(article, db)
@@ -593,7 +625,7 @@ async def update_article(
     try:
         await _sync_article_vector_payload(article)
     except Exception as e:
-        print(f"[QDRANT] Erro ao sincronizar payload vetorial: {e}")
+        _log_vector_sync_warning("[QDRANT] Erro ao sincronizar payload vetorial", e)
     
     response = ArticleResponse.model_validate(article)
     response.hasPdf = article.pdfData is not None
@@ -662,7 +694,7 @@ async def update_article_decision(
     try:
         await _sync_article_vector_payload(article)
     except Exception as e:
-        print(f"[QDRANT] Erro ao sincronizar decisão no payload vetorial: {e}")
+        _log_vector_sync_warning("[QDRANT] Erro ao sincronizar decisão no payload vetorial", e)
 
     response = ArticleResponse.model_validate(article)
     response.hasPdf = article.pdfData is not None
@@ -719,11 +751,7 @@ async def batch_evaluate_articles(
     from app.services.ai_service import get_ai_service
 
     ai_service = get_ai_service()
-    project_data = {
-        "criteriosInclusao": project.criteriosInclusao or [],
-        "criteriosExclusao": project.criteriosExclusao or [],
-        "researchQuestions": project.researchQuestions or [],
-    }
+    project_data = _build_project_ai_context(project)
 
     changed_articles: list[Article] = []
 
@@ -758,14 +786,7 @@ async def batch_evaluate_articles(
         if data.dryRun:
             continue
 
-        article.aiEvaluation = eval_result.get("justification")
-        article.aiSuggestedStatus = suggested
-        article.aiRelevanceScore = eval_result.get("relevanceScore")
-        article.aiSuggestedRQs = eval_result.get("suggestedRQs", [])
-        article.aiMethodology = eval_result.get("methodology")
-        article.aiDatabase = eval_result.get("database")
-        article.aiDomain = eval_result.get("domain")
-        article.aiKeywords = eval_result.get("keywords", [])
+        _apply_ai_evaluation(article, eval_result)
 
         if data.applySuggestedStatus and suggested in ("incluido", "excluido"):
             mapped_status = _decision_to_status(suggested)
@@ -786,7 +807,10 @@ async def batch_evaluate_articles(
             try:
                 await _sync_article_vector_payload(article)
             except Exception as e:
-                print(f"[QDRANT] Erro ao sincronizar batch do artigo {article.id}: {e}")
+                _log_vector_sync_warning(
+                    f"[QDRANT] Erro ao sincronizar batch do artigo {article.id}",
+                    e,
+                )
 
     return BatchEvaluateResponse(
         projectId=projectId,
@@ -811,7 +835,7 @@ async def update_article_notes(
     try:
         await _sync_article_vector_payload(article)
     except Exception as e:
-        print(f"[QDRANT] Erro ao sincronizar notas no payload vetorial: {e}")
+        _log_vector_sync_warning("[QDRANT] Erro ao sincronizar notas no payload vetorial", e)
     
     response = ArticleResponse.model_validate(article)
     response.hasPdf = article.pdfData is not None
@@ -832,7 +856,10 @@ async def delete_article(
     try:
         await _delete_article_vector_payload(articleId)
     except Exception as e:
-        print(f"[QDRANT] Erro ao remover payload vetorial do artigo {articleId}: {e}")
+        _log_vector_sync_warning(
+            f"[QDRANT] Erro ao remover payload vetorial do artigo {articleId}",
+            e,
+        )
     
     await db.delete(article)
     await db.commit()
@@ -1062,37 +1089,32 @@ async def reprocess_project_graph(
     graph_sync = get_graph_sync_service()
     neo4j_service = get_neo4j_service()
     qdrant = get_qdrant_retrieval_service()
-    anchor_service = get_anchor_service()
     
     # Limpar grafo Neo4j do projeto
     try:
         await neo4j_service.delete_project_graph(projectId)
-        print(f"[REPROCESS] Grafo Neo4j limpo para projeto {projectId}")
+        logger.info("[REPROCESS] Grafo Neo4j limpo para projeto %s", projectId)
     except Exception as e:
-        print(f"[REPROCESS] Erro ao limpar grafo: {e}")
+        logger.warning("[REPROCESS] Erro ao limpar grafo: %s", e)
 
     try:
         await qdrant.delete_project_points(projectId)
-        print(f"[REPROCESS] Vetores Qdrant limpos para projeto {projectId}")
+        logger.info("[REPROCESS] Vetores Qdrant limpos para projeto %s", projectId)
     except Exception as e:
-        print(f"[REPROCESS] Erro ao limpar vetores do projeto: {e}")
+        logger.warning("[REPROCESS] Erro ao limpar vetores do projeto: %s", e)
     
-    project_data = {
-        "criteriosInclusao": project.criteriosInclusao or [],
-        "criteriosExclusao": project.criteriosExclusao or [],
-        "researchQuestions": project.researchQuestions or [],
-    }
+    project_data = _build_project_ai_context(project)
     
     processed = 0
     errors = []
     
     for article in articles:
         if not article.abstract:
-            print(f"[REPROCESS] Artigo {article.id} sem abstract, pulando")
+            logger.info("[REPROCESS] Artigo %s sem abstract, pulando", article.id)
             continue
         
         try:
-            article.paperId = anchor_service.resolve(
+            article.paperId = _resolve_paper_id(
                 provided=article.paperId,
                 doi=article.doi,
                 title=article.title,
@@ -1103,17 +1125,14 @@ async def reprocess_project_graph(
                 {"title": article.title, "abstract": article.abstract},
                 project_data
             )
-            article.aiEvaluation = eval_result.get("justification")
-            article.aiSuggestedStatus = eval_result.get("suggestedStatus")
-            article.aiRelevanceScore = eval_result.get("relevanceScore")
-            article.aiSuggestedRQs = eval_result.get("suggestedRQs", [])
-            article.aiMethodology = eval_result.get("methodology")
-            article.aiDatabase = eval_result.get("database")
-            article.aiDomain = eval_result.get("domain")
-            article.aiKeywords = eval_result.get("keywords", [])
-            print(f"[REPROCESS] AI metadata for article {article.id}: methodology={article.aiMethodology}")
+            _apply_ai_evaluation(article, eval_result)
+            logger.info(
+                "[REPROCESS] AI metadata for article %s: methodology=%s",
+                article.id,
+                article.aiMethodology,
+            )
         except Exception as e:
-            print(f"[REPROCESS] Erro AI para artigo {article.id}: {e}")
+            logger.warning("[REPROCESS] Erro AI para artigo %s: %s", article.id, e)
             errors.append(f"AI error for {article.id}: {str(e)}")
         
         try:
@@ -1121,18 +1140,22 @@ async def reprocess_project_graph(
             embedding = embedding_service.generate_embedding(article.abstract)
             if embedding:
                 article.embedding = embedding
-                print(f"[REPROCESS] Embedding gerado para artigo {article.id}: {len(embedding)} dims")
+                logger.info(
+                    "[REPROCESS] Embedding gerado para artigo %s: %s dims",
+                    article.id,
+                    len(embedding),
+                )
             else:
-                print(f"[REPROCESS] Embedding vazio para artigo {article.id}")
+                logger.warning("[REPROCESS] Embedding vazio para artigo %s", article.id)
         except Exception as e:
-            print(f"[REPROCESS] Erro embedding para artigo {article.id}: {e}")
+            logger.warning("[REPROCESS] Erro embedding para artigo %s: %s", article.id, e)
             errors.append(f"Embedding error for {article.id}: {str(e)}")
         
         processed += 1
     
     # Commit all embedding and metadata updates
     await db.commit()
-    print(f"[REPROCESS] Commits salvos para {processed} artigos")
+    logger.info("[REPROCESS] Commits salvos para %s artigos", processed)
     
     # Refresh articles to get updated data
     for article in all_articles:
@@ -1149,7 +1172,7 @@ async def reprocess_project_graph(
             await graph_sync.sync_article_to_graph(article, db)
             graph_synced += 1
         except Exception as e:
-            print(f"[REPROCESS] Erro sync artigo {article.id}: {e}")
+            logger.warning("[REPROCESS] Erro sync artigo %s: %s", article.id, e)
             errors.append(f"Sync error for {article.id}: {str(e)}")
 
     # Refresh Qdrant from the complete relational state to avoid stale vector indexes.
@@ -1160,10 +1183,10 @@ async def reprocess_project_graph(
             await _sync_article_vector_payload(article)
             vector_synced += 1
         except Exception as e:
-            print(f"[REPROCESS] Erro Qdrant artigo {article.id}: {e}")
+            logger.warning("[REPROCESS] Erro Qdrant artigo %s: %s", article.id, e)
             errors.append(f"Qdrant error for {article.id}: {str(e)}")
     
-    print(f"[REPROCESS] Concluído: {processed} artigos processados, {len(errors)} erros")
+    logger.info("[REPROCESS] Concluído: %s artigos processados, %s erros", processed, len(errors))
     
     return {
         "success": True,

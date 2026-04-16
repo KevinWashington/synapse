@@ -45,14 +45,23 @@ async def get_all_projects(
         .order_by(Project.createdAt.desc())
     )
     projects = result.scalars().all()
+
+    if not projects:
+        return ProjectListResponse(projects=[], total=0)
+
+    project_ids = [project.id for project in projects]
+    count_result = await db.execute(
+        select(Article.projectId, func.count(Article.id))
+        .where(Article.projectId.in_(project_ids))
+        .group_by(Article.projectId)
+    )
+    article_count_by_project = {
+        project_id: count for project_id, count in count_result.all()
+    }
     
-    # Get article count for each project
     projectsWithCount = []
     for project in projects:
-        count_result = await db.execute(
-            select(func.count(Article.id)).where(Article.projectId == project.id)
-        )
-        articleCount = count_result.scalar()
+        articleCount = article_count_by_project.get(project.id, 0)
         projectResponse = ProjectResponse.model_validate(project).model_dump()
         projectResponse["articleCount"] = articleCount
         projectsWithCount.append(ProjectResponse(**projectResponse))

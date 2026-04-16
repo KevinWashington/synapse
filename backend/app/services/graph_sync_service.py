@@ -1,5 +1,6 @@
 """Graph synchronization service for maintaining article relationships in Neo4j."""
 
+import logging
 import re
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,9 @@ from sqlalchemy import select
 from app.models.article import Article
 from app.services.neo4j_service import get_neo4j_service
 from app.services.embedding_service import get_embedding_service
+
+
+logger = logging.getLogger(__name__)
 
 
 class GraphSyncService:
@@ -39,7 +43,7 @@ class GraphSyncService:
             keywords=self._extract_keywords(article.keywords, article.aiKeywords),
             abstract=article.abstract,
         )
-        print(f"[GRAPH] Node created for article {article.id}")
+        logger.info("[GRAPH] Node created for article %s", article.id)
 
         await self.neo4j.sync_article_entities(
             article_id=article.id,
@@ -59,10 +63,10 @@ class GraphSyncService:
         other_articles = result.scalars().all()
         
         if not other_articles:
-            print(f"[GRAPH] No other articles in project to create relationships")
+            logger.debug("[GRAPH] No other articles in project to create relationships")
             return
         
-        print(f"[GRAPH] Comparing with {len(other_articles)} other articles...")
+        logger.debug("[GRAPH] Comparing with %s other articles...", len(other_articles))
         
         # Create relationships based on various criteria
         for other in other_articles:
@@ -72,16 +76,31 @@ class GraphSyncService:
                     list(article.embedding),
                     list(other.embedding)
                 )
-                print(f"[GRAPH] Similarity({article.id} <-> {other.id}): {similarity:.4f}")
+                logger.debug(
+                    "[GRAPH] Similarity(%s <-> %s): %.4f",
+                    article.id,
+                    other.id,
+                    similarity,
+                )
                 if similarity >= 0.92:  # High threshold - papers in same domain score 0.85+
                     await self.neo4j.create_semantic_relationship(
                         article.id, other.id, round(similarity, 4)
                     )
-                    print(f"[GRAPH] Created SIMILAR_TO relationship: {article.id} -> {other.id} (score={similarity:.4f})")
+                    logger.info(
+                        "[GRAPH] Created SIMILAR_TO relationship: %s -> %s (score=%.4f)",
+                        article.id,
+                        other.id,
+                        similarity,
+                    )
             else:
                 has_emb = article.embedding is not None
                 other_has_emb = other.embedding is not None
-                print(f"[GRAPH] Skipping similarity: article.embedding={has_emb}, other({other.id}).embedding={other_has_emb}")
+                logger.debug(
+                    "[GRAPH] Skipping similarity: article.embedding=%s, other(%s).embedding=%s",
+                    has_emb,
+                    other.id,
+                    other_has_emb,
+                )
             
             # Same methodology (exclude 'other' since it's meaningless)
             if (article.aiMethodology and other.aiMethodology and 
@@ -90,7 +109,12 @@ class GraphSyncService:
                 await self.neo4j.create_same_methodology_relationship(
                     article.id, other.id
                 )
-                print(f"[GRAPH] Created SAME_METHODOLOGY: {article.id} -> {other.id} ({article.aiMethodology})")
+                logger.info(
+                    "[GRAPH] Created SAME_METHODOLOGY: %s -> %s (%s)",
+                    article.id,
+                    other.id,
+                    article.aiMethodology,
+                )
             
             
             # Same authors (check for overlap)
@@ -101,7 +125,12 @@ class GraphSyncService:
                 await self.neo4j.create_same_author_relationship(
                     article.id, other.id, shared_authors
                 )
-                print(f"[GRAPH] Created SAME_AUTHOR: {article.id} -> {other.id} ({shared_authors})")
+                logger.info(
+                    "[GRAPH] Created SAME_AUTHOR: %s -> %s (%s)",
+                    article.id,
+                    other.id,
+                    shared_authors,
+                )
 
             shared_keywords = self._find_shared_keywords(
                 self._extract_keywords(article.keywords, article.aiKeywords),
@@ -111,13 +140,23 @@ class GraphSyncService:
                 await self.neo4j.create_shared_keyword_relationship(
                     article.id, other.id, shared_keywords
                 )
-                print(f"[GRAPH] Created SHARES_KEYWORD: {article.id} -> {other.id} ({shared_keywords})")
+                logger.info(
+                    "[GRAPH] Created SHARES_KEYWORD: %s -> %s (%s)",
+                    article.id,
+                    other.id,
+                    shared_keywords,
+                )
 
             if article.journal and other.journal and article.journal.strip().lower() == other.journal.strip().lower():
                 await self.neo4j.create_same_venue_relationship(
                     article.id, other.id, article.journal.strip()
                 )
-                print(f"[GRAPH] Created SAME_VENUE: {article.id} -> {other.id} ({article.journal.strip()})")
+                logger.info(
+                    "[GRAPH] Created SAME_VENUE: %s -> %s (%s)",
+                    article.id,
+                    other.id,
+                    article.journal.strip(),
+                )
     
     def _find_shared_authors(
         self,

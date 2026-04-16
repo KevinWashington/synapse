@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  denormalizeFrameworkData,
   getComponentsForFramework,
   getFrameworkInfo,
   getRequiredKeys,
-  normalizeFrameworkData,
 } from "@/lib/frameworkConfig";
 import { toast } from "@/lib/toast";
 import { projectService } from "@features/projects/services/projectService";
@@ -28,11 +26,11 @@ const INITIAL_DATA = {
 };
 
 function buildFrameworkData(rawPicoc, framework) {
-  const normalized = normalizeFrameworkData(rawPicoc || {});
+  const source = rawPicoc || {};
   const components = getComponentsForFramework(framework);
 
   return components.reduce((result, component) => {
-    result[component.key] = normalized[component.key] || "";
+    result[component.key] = source[component.key] || "";
     return result;
   }, {});
 }
@@ -183,7 +181,7 @@ export default function useProjectPlanning(project = {}) {
 
       await projectService.updateProject(project.id, {
         ...data,
-        picoc: denormalizeFrameworkData(data.picoc),
+        picoc: data.picoc,
       });
 
       toast.success("Projeto salvo com sucesso!");

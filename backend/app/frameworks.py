@@ -217,66 +217,6 @@ FRAMEWORK_COMPONENTS: dict[str, list[dict]] = {
     ],
 }
 
-
-# ---------------------------------------------------------------------------
-# Mapeamento de chaves legadas (português) → chaves padronizadas (inglês)
-# Usado para ler dados de projetos PICOC criados antes desta atualização
-# ---------------------------------------------------------------------------
-LEGACY_KEY_MAP: dict[str, str] = {
-    "pessoa": "population",
-    "intervencao": "intervention",
-    "comparacao": "comparison",
-    "outcome": "outcome",
-    "contexto": "context",
-}
-
-REVERSE_LEGACY_KEY_MAP: dict[str, str] = {v: k for k, v in LEGACY_KEY_MAP.items()}
-
-
-def normalize_framework_data(raw: dict | None, framework: str = "PICOC") -> dict:
-    """Normaliza dados do framework, convertendo chaves legadas em português
-    para chaves padronizadas em inglês.
-    
-    Args:
-        raw: Dados brutos do banco (pode conter chaves pt ou en).
-        framework: Tipo de framework do projeto.
-    
-    Returns:
-        Dicionário com chaves padronizadas em inglês.
-    """
-    if not raw:
-        return {}
-
-    normalized: dict[str, str] = {}
-    for key, value in raw.items():
-        # Se a chave é em português, converter para inglês
-        std_key = LEGACY_KEY_MAP.get(key, key)
-        normalized[std_key] = value or ""
-
-    return normalized
-
-
-def denormalize_framework_data(data: dict | None) -> dict:
-    """Converte dados com chaves em inglês de volta para chaves em português
-    (para compatibilidade com projetos existentes no banco).
-    
-    Args:
-        data: Dados com chaves padronizadas em inglês.
-    
-    Returns:
-        Dicionário com chaves em português (formato legado).
-    """
-    if not data:
-        return {}
-
-    legacy: dict[str, str] = {}
-    for key, value in data.items():
-        pt_key = REVERSE_LEGACY_KEY_MAP.get(key, key)
-        legacy[pt_key] = value or ""
-
-    return legacy
-
-
 # ---------------------------------------------------------------------------
 # Funções para construção de componentes do framework em texto para prompts
 # ---------------------------------------------------------------------------
@@ -392,19 +332,22 @@ DATABASE_INSTRUCTIONS: dict[str, str] = {
         "Gere strings otimizadas para a base **Scopus**. "
         "Use a sintaxe Scopus: TITLE-ABS-KEY() para buscas em título, abstract e keywords. "
         "Use operadores AND, OR, AND NOT. Aspas duplas para termos compostos. "
-        "Use * para truncamento. Exemplo: TITLE-ABS-KEY(\"machine learning\" OR \"deep learning\") AND TITLE-ABS-KEY(education)."
+        "Use * apenas quando necessário e evite blocos com sinônimos excessivos. "
+        "Priorize precisão e legibilidade."
     ),
     "web_of_science": (
         "Gere strings otimizadas para a base **Web of Science**. "
         "Use Topic (TS=) para buscas em título, abstract e keywords. "
         "Use operadores AND, OR, NOT. Aspas duplas para termos compostos. "
-        "Use * e ? para truncamento. Exemplo: TS=(\"machine learning\" OR \"deep learning\") AND TS=(education)."
+        "Use * e ? somente quando útil e não repita variações triviais. "
+        "Priorize consultas objetivas e fáceis de revisar."
     ),
     "ieee": (
         "Gere strings otimizadas para a base **IEEE Xplore**. "
         "Use buscas no formato de command search. "
         "Use operadores AND, OR, NOT. Aspas duplas para termos compostos. "
-        "Campos: (\"All Metadata\":termo). Exemplo: (\"All Metadata\":\"machine learning\") AND (\"All Metadata\":education)."
+        "Campos: (\"All Metadata\":termo). "
+        "Evite cadeias muito longas com muitos sinônimos no mesmo bloco."
     ),
 }
 
@@ -447,14 +390,15 @@ Sua tarefa é gerar strings de busca eficazes baseadas nas perguntas de pesquisa
 {db_instruction}
 
 Instruções:
-1. Gere 3-5 strings de busca otimizadas para a base de dados especificada
-2. Cada string deve usar operadores booleanos (AND, OR, NOT) adequadamente
-3. Agrupe termos por componente do framework {framework}: cada componente vira um bloco conectado por AND
-4. Dentro de cada bloco, use OR para sinônimos e variações terminológicas
-5. Use truncamento quando apropriado para capturar variações
-6. Considere termos em inglês (prioridade) e português quando relevante
-7. Formate cada string em uma linha separada, numerada (1., 2., etc.)
-8. Responda APENAS a lista numerada. NÃO inclua introduções, conclusões ou explicações."""
+1. Gere EXATAMENTE 3 strings de busca otimizadas para a base de dados especificada.
+2. Cada string deve usar operadores booleanos (AND, OR, NOT) com sintaxe correta da base.
+3. Estruture cada string em blocos por componente do framework {framework}, conectando os blocos com AND.
+4. Dentro de cada bloco, use no máximo 3 termos/sinônimos realmente relevantes; evite expansões redundantes.
+5. Priorize termos em inglês; inclua português apenas quando agregar cobertura sem inflar a consulta.
+6. Evite repetição de termos quase idênticos e não gere explicações ou comentários.
+7. Formate cada string em uma linha separada, numerada (1., 2., 3.).
+8. Mantenha cada string objetiva, clara e aplicável diretamente na base escolhida.
+9. Responda APENAS a lista numerada. NÃO inclua introduções, conclusões ou explicações."""
 
     user_prompt = f"""Perguntas de Pesquisa:
 {questions_text}

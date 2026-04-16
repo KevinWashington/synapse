@@ -3,14 +3,8 @@ from pydantic import BaseModel, Field
 
 
 class PICOCSchema(BaseModel):
-    """Schema legado mantido por compatibilidade. Aceita chaves em português e inglês."""
-    # Chaves legadas (português)
-    pessoa: str | None = Field(None, max_length=500)
-    intervencao: str | None = Field(None, max_length=500)
-    comparacao: str | None = Field(None, max_length=500)
+    """Schema de componentes de framework com chaves canônicas em inglês."""
     outcome: str | None = Field(None, max_length=500)
-    contexto: str | None = Field(None, max_length=500)
-    # Chaves padronizadas (inglês) — usadas por novos projetos
     population: str | None = Field(None, max_length=500)
     intervention: str | None = Field(None, max_length=500)
     comparison: str | None = Field(None, max_length=500)

@@ -49,10 +49,7 @@ export const useProjectArticles = (project) => {
         if (searchTerm) params.search = searchTerm;
         if (filterStatus !== "todos") params.status = filterStatus;
 
-        const response = await articleService.getArticlesByProject(
-          project.id,
-          params
-        );
+        const response = await articleService.getArticlesByProject(project.id, params);
 
         setArticles(response.articles || []);
         setPagination({
@@ -85,37 +82,6 @@ export const useProjectArticles = (project) => {
     loadFilterSummary();
   }, [project?.id, loadFilterSummary]);
 
-  const runBatchEvaluate = async (options = {}) => {
-    if (!project?.id) return;
-
-    try {
-      setIsBatchEvaluating(true);
-      const response = await articleService.batchEvaluateArticles(project.id, options);
-      const summary = response?.summary || {};
-      const evaluated = summary.evaluated || 0;
-      const skippedAlreadyEvaluated = summary.skippedAlreadyEvaluated || 0;
-      if (evaluated === 0 && skippedAlreadyEvaluated > 0) {
-        toast.success(
-          "Nenhum artigo novo para triagem: os pendentes já tinham score da IA."
-        );
-      } else {
-        toast.success(
-          `Triagem concluída: ${evaluated} avaliados, ${summary.suggestedIncluded || 0} sugeridos para inclusão e ${summary.suggestedExcluded || 0} para exclusão.`
-        );
-      }
-      await fetchArticles();
-      await loadFilterSummary();
-      if (rqSynthesisData) {
-        await loadRQSynthesis();
-      }
-    } catch (error) {
-      console.error("Erro na triagem em lote:", error);
-      toast.error("Erro ao executar triagem em lote: " + error.message);
-    } finally {
-      setIsBatchEvaluating(false);
-    }
-  };
-
   const loadRQSynthesis = useCallback(async () => {
     if (!project?.id) {
       return;
@@ -134,14 +100,50 @@ export const useProjectArticles = (project) => {
     }
   }, [project?.id]);
 
+  const refreshProjectData = useCallback(
+    async ({ refreshFilter = true, refreshSynthesis = Boolean(rqSynthesisData) } = {}) => {
+      await fetchArticles();
+      if (refreshFilter) {
+        await loadFilterSummary();
+      }
+      if (refreshSynthesis && rqSynthesisData) {
+        await loadRQSynthesis();
+      }
+    },
+    [fetchArticles, loadFilterSummary, loadRQSynthesis, rqSynthesisData]
+  );
+
+  const runBatchEvaluate = async (options = {}) => {
+    if (!project?.id) return;
+
+    try {
+      setIsBatchEvaluating(true);
+      const response = await articleService.batchEvaluateArticles(project.id, options);
+      const summary = response?.summary || {};
+      const evaluated = summary.evaluated || 0;
+      const skippedAlreadyEvaluated = summary.skippedAlreadyEvaluated || 0;
+      if (evaluated === 0 && skippedAlreadyEvaluated > 0) {
+        toast.success(
+          "Nenhum artigo novo para triagem: os pendentes já tinham score da IA."
+        );
+      } else {
+        toast.success(
+          `Triagem concluída: ${evaluated} avaliados, ${summary.suggestedIncluded || 0} sugeridos para inclusão e ${summary.suggestedExcluded || 0} para exclusão.`
+        );
+      }
+      await refreshProjectData();
+    } catch (error) {
+      console.error("Erro na triagem em lote:", error);
+      toast.error("Erro ao executar triagem em lote: " + error.message);
+    } finally {
+      setIsBatchEvaluating(false);
+    }
+  };
+
   const handleUpdateArticleStatus = async (article, newStatus) => {
     try {
       await articleService.updateArticleStatus(project.id, article.id, newStatus);
-      await fetchArticles();
-      await loadFilterSummary();
-      if (rqSynthesisData) {
-        await loadRQSynthesis();
-      }
+      await refreshProjectData();
       toast.success(`Status do artigo atualizado para ${newStatus}`);
     } catch (error) {
       console.error("Erro ao atualizar status do artigo:", error);
@@ -157,11 +159,7 @@ export const useProjectArticles = (project) => {
     try {
       await articleService.deleteArticle(project.id, article.id);
       toast.success("Artigo deletado com sucesso!");
-      await fetchArticles();
-      await loadFilterSummary();
-      if (rqSynthesisData) {
-        await loadRQSynthesis();
-      }
+      await refreshProjectData();
     } catch (error) {
       console.error("Erro ao deletar artigo:", error);
       toast.error("Erro ao deletar artigo: " + error.message);
@@ -194,11 +192,7 @@ export const useProjectArticles = (project) => {
           decisionPayload
         );
 
-        await fetchArticles();
-        await loadFilterSummary();
-        if (rqSynthesisData) {
-          await loadRQSynthesis();
-        }
+        await refreshProjectData();
 
         toast.success("Decisão de triagem registrada com sucesso!");
         closeDecisionDialog();
@@ -209,47 +203,24 @@ export const useProjectArticles = (project) => {
         setIsSavingDecision(false);
       }
     },
-    [
-      closeDecisionDialog,
-      decisionArticle?.id,
-      fetchArticles,
-      loadFilterSummary,
-      loadRQSynthesis,
-      project?.id,
-      rqSynthesisData,
-    ]
+    [closeDecisionDialog, decisionArticle?.id, project?.id, refreshProjectData]
   );
 
-  const handleNewArticleSuccess = () => {
-    fetchArticles();
-    loadFilterSummary();
-    if (rqSynthesisData) {
-      loadRQSynthesis();
-    }
-  };
+  const handleNewArticleSuccess = useCallback(() => {
+    void refreshProjectData();
+  }, [refreshProjectData]);
 
-  const handleImportSuccess = () => {
-    fetchArticles();
-    loadFilterSummary();
-    if (rqSynthesisData) {
-      loadRQSynthesis();
-    }
-  };
+  const handleImportSuccess = useCallback(() => {
+    void refreshProjectData();
+  }, [refreshProjectData]);
 
-  const handleEditSuccess = () => {
-    fetchArticles();
-    loadFilterSummary();
-    if (rqSynthesisData) {
-      loadRQSynthesis();
-    }
-  };
+  const handleEditSuccess = useCallback(() => {
+    void refreshProjectData();
+  }, [refreshProjectData]);
 
-  const handleUploadPdfSuccess = () => {
-    fetchArticles();
-    if (rqSynthesisData) {
-      loadRQSynthesis();
-    }
-  };
+  const handleUploadPdfSuccess = useCallback(() => {
+    void refreshProjectData({ refreshFilter: false });
+  }, [refreshProjectData]);
 
   const statusList = [
     { value: "todos", label: "Todos" },

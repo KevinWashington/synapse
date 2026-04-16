@@ -60,10 +60,6 @@ export default defineConfig({
             return "forms-vendor";
           }
 
-          if (id.includes("@hello-pangea/dnd")) {
-            return "dnd-vendor";
-          }
-
           return "vendor";
         },
       },

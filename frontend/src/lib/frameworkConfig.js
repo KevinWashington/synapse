@@ -211,50 +211,6 @@ export const FRAMEWORK_COMPONENTS = {
 };
 
 /**
- * Legacy key mapping: old Portuguese keys → standardized English keys.
- * Used to read data from PICOC projects created before multi-framework support.
- */
-const LEGACY_KEY_MAP = {
-  pessoa: "population",
-  intervencao: "intervention",
-  comparacao: "comparison",
-  outcome: "outcome",
-  contexto: "context",
-};
-
-const REVERSE_LEGACY_KEY_MAP = Object.fromEntries(
-  Object.entries(LEGACY_KEY_MAP).map(([k, v]) => [v, k])
-);
-
-/**
- * Normalize framework data from the database (may have Portuguese keys)
- * to standardized English keys.
- */
-export function normalizeFrameworkData(raw) {
-  if (!raw) return {};
-  const normalized = {};
-  for (const [key, value] of Object.entries(raw)) {
-    const stdKey = LEGACY_KEY_MAP[key] || key;
-    normalized[stdKey] = value || "";
-  }
-  return normalized;
-}
-
-/**
- * Denormalize framework data from English keys back to Portuguese keys
- * (for backward compatibility with existing API).
- */
-export function denormalizeFrameworkData(data) {
-  if (!data) return {};
-  const legacy = {};
-  for (const [key, value] of Object.entries(data)) {
-    const ptKey = REVERSE_LEGACY_KEY_MAP[key] || key;
-    legacy[ptKey] = value || "";
-  }
-  return legacy;
-}
-
-/**
  * Get the components config for a specific framework.
  */
 export function getComponentsForFramework(framework) {

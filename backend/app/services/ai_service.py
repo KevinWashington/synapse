@@ -6,6 +6,7 @@ critérios de inclusão/exclusão, avaliação de artigos e chat.
 """
 
 import json
+import logging
 import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -16,11 +17,12 @@ from app.frameworks import (
     build_research_questions_prompt,
     build_search_string_prompt,
     build_criteria_prompt,
-    normalize_framework_data,
     _build_components_text,
-    FRAMEWORK_COMPONENTS,
 )
 from app.schemas.ai import MCPRequestEnvelope, MCPResponseEnvelope
+
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -268,7 +270,7 @@ Avalie o artigo e extraia os metadados agora:""")
                 "suggestedRQs": [],
             }
         except Exception as e:
-            print(f"Erro na avaliação da IA: {e}")
+            logger.exception("Erro na avaliação da IA")
             return {
                 "suggestedStatus": "pendente",
                 "relevanceScore": 0,
@@ -365,7 +367,7 @@ REGRAS:
         # Build framework-aware components block
         framework = project_context.get("framework", "PICOC")
         raw_picoc = project_context.get("picoc", {})
-        components = normalize_framework_data(raw_picoc, framework)
+        components = raw_picoc or {}
         
         fw_block = ""
         if components and any(v for v in components.values()):
@@ -417,7 +419,7 @@ REGRAS DE OPERAÇÃO:
         """Synthesize answers from graph-agent tool outputs."""
         framework = project_context.get("framework", "PICOC")
         raw_picoc = project_context.get("picoc", {})
-        components = normalize_framework_data(raw_picoc, framework)
+        components = raw_picoc or {}
 
         fw_block = ""
         if components and any(v for v in components.values()):
@@ -465,24 +467,37 @@ REGRAS:
         return await chain.ainvoke({"message": message})
 
     def _parse_numbered_list(self, text: str) -> list[str]:
-        """Parse a numbered list from LLM output, ignoring non-numbered lines."""
+        """Parse numbered or bullet lists from LLM output, keeping multiline items."""
         lines = text.strip().split("\n")
-        items = []
-        
-        for line in lines:
-            line = line.strip()
+        items: list[str] = []
+        current_item = ""
+
+        for raw_line in lines:
+            line = raw_line.strip()
             if not line:
                 continue
-            
-            # Apenas aceita linhas que comecem explicitamente com um número seguido de . ou )
-            match = re.match(r'^(\d+)[.)]\s*(.*)$', line)
-            if match:
-                cleaned = match.group(2).strip()
-                # Remove aspas se o modelo as incluir
-                cleaned = cleaned.strip('"').strip("'")
-                if cleaned and len(cleaned) > 5:
-                    items.append(cleaned)
-        
+
+            numbered_match = re.match(r'^(\d+)[.)]\s*(.*)$', line)
+            bullet_match = re.match(r'^[-*]\s+(.*)$', line)
+
+            if numbered_match:
+                if current_item.strip() and len(current_item.strip()) > 5:
+                    items.append(current_item.strip().strip('"').strip("'"))
+                current_item = numbered_match.group(2).strip()
+                continue
+
+            if bullet_match and not current_item:
+                candidate = bullet_match.group(1).strip().strip('"').strip("'")
+                if candidate and len(candidate) > 5:
+                    items.append(candidate)
+                continue
+
+            if current_item:
+                current_item = f"{current_item} {line}".strip()
+
+        if current_item.strip() and len(current_item.strip()) > 5:
+            items.append(current_item.strip().strip('"').strip("'"))
+
         return items
 
     def validate_mcp_envelope(self, payload: dict) -> MCPRequestEnvelope | None:

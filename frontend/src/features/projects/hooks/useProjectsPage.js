@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { projectService } from "@features/projects/services/projectService";
 import { toast } from "@/lib/toast";
@@ -8,27 +8,6 @@ const INITIAL_EDIT_DATA = {
   objetivo: "",
   status: "",
 };
-
-const PROJECT_COLUMNS = [
-  {
-    id: "todo",
-    label: "Todo",
-    statuses: ["ideia", "pausado"],
-    defaultStatus: "ideia",
-  },
-  {
-    id: "in-progress",
-    label: "In Progress",
-    statuses: ["em-progresso"],
-    defaultStatus: "em-progresso",
-  },
-  {
-    id: "completed",
-    label: "Completed",
-    statuses: ["concluido"],
-    defaultStatus: "concluido",
-  },
-];
 
 function useProjectsPage() {
   const navigate = useNavigate();
@@ -131,79 +110,19 @@ function useProjectsPage() {
     }
   }, [editData, editProject, loadProjects]);
 
-  const handleDragEnd = useCallback(
-    async (result) => {
-      const { destination, source, draggableId } = result;
-
-      if (!destination) {
-        return;
-      }
-
-      if (
-        destination.droppableId === source.droppableId &&
-        destination.index === source.index
-      ) {
-        return;
-      }
-
-      const targetColumn = PROJECT_COLUMNS.find(
-        (column) => column.id === destination.droppableId
-      );
-
-      if (!targetColumn) {
-        return;
-      }
-
-      const projectId = Number(draggableId);
-      const newStatus = targetColumn.defaultStatus;
-
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === projectId ? { ...project, status: newStatus } : project
-        )
-      );
-
-      try {
-        await projectService.updateProject(projectId, { status: newStatus });
-      } catch (currentError) {
-        toast.error("Erro ao mover projeto: " + currentError.message);
-        loadProjects();
-      }
-    },
-    [loadProjects]
-  );
-
-  const columnItems = useMemo(
-    () => ({
-      todo: projects.filter((project) =>
-        PROJECT_COLUMNS[0].statuses.includes(project.status)
-      ),
-      "in-progress": projects.filter((project) =>
-        PROJECT_COLUMNS[1].statuses.includes(project.status)
-      ),
-      completed: projects.filter((project) =>
-        PROJECT_COLUMNS[2].statuses.includes(project.status)
-      ),
-    }),
-    [projects]
-  );
-
   return {
-    columnItems,
     detailOpen,
     editData,
     editLoading,
     editOpen,
     error,
     handleDeleteProject,
-    handleDragEnd,
     handleEditProject,
     handleExpandProject,
     handleProjectClick,
     handleSaveEdit,
     loadProjects,
     loading,
-    projectColumns: PROJECT_COLUMNS,
     projects,
     searchTerm,
     selectedProject,

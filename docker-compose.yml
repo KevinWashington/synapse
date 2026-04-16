@@ -96,7 +96,7 @@
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: synapse-frontend
     ports:
       - "3000:3000"
