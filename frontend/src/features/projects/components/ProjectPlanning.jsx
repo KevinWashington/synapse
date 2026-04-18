@@ -38,16 +38,16 @@ function ProjectPlanning({ project = {} }) {
 
   return (
     <div className="space-y-6">
-      <PlanningSection title="Informações Básicas">
+      <PlanningSection title="Informacoes Basicas">
         <div className="space-y-2">
           <Label htmlFor="title" className="text-[var(--syn-text-primary)]">
-            Título *
+            Titulo *
           </Label>
           <Input
             id="title"
             value={data.title}
             onChange={(event) => updateField("title", event.target.value)}
-            placeholder="Ex: Revisão Sistemática - IA na Educação"
+            placeholder="Ex: Revisao Sistematica - IA na Educacao"
           />
         </div>
         <div className="space-y-2">
@@ -142,7 +142,7 @@ function ProjectPlanning({ project = {} }) {
       </PlanningSection>
 
       <PlanningSection
-        title="Critérios de Inclusão e Exclusão"
+        title="Criterios de Inclusao e Exclusao"
         actions={
           <PlanningActionButton
             onClick={generateCriteria}
@@ -151,22 +151,22 @@ function ProjectPlanning({ project = {} }) {
           />
         }
       >
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid gap-6 md:grid-cols-2">
           <PlanningArrayField
-            label="Critérios de Inclusão"
+            label="Criterios de Inclusao"
             fieldKey="criteriosInclusao"
             items={data.criteriosInclusao}
-            placeholder="Digite um critério de inclusão..."
+            placeholder="Digite um criterio de inclusao..."
             isLongText={true}
             onAddItem={addArrayItem}
             onRemoveItem={removeArrayItem}
             onUpdateItem={updateArrayItem}
           />
           <PlanningArrayField
-            label="Critérios de Exclusão"
+            label="Criterios de Exclusao"
             fieldKey="criteriosExclusao"
             items={data.criteriosExclusao}
-            placeholder="Digite um critério de exclusão..."
+            placeholder="Digite um criterio de exclusao..."
             isLongText={true}
             onAddItem={addArrayItem}
             onRemoveItem={removeArrayItem}
@@ -175,15 +175,48 @@ function ProjectPlanning({ project = {} }) {
         </div>
       </PlanningSection>
 
+      <PlanningSection title="Elegibilidade e Relatorio">
+        <PlanningArrayField
+          label="Checklist de elegibilidade"
+          fieldKey="eligibilityChecklist"
+          items={data.eligibilityChecklist}
+          placeholder="Digite um item do checklist..."
+          isLongText={true}
+          onAddItem={addArrayItem}
+          onRemoveItem={removeArrayItem}
+          onUpdateItem={updateArrayItem}
+        />
+
+        <div className="space-y-2">
+          <Label className="text-[var(--syn-text-primary)]">Guia para screening</Label>
+          <Textarea
+            value={data.screeningGuidance}
+            onChange={(event) => updateField("screeningGuidance", event.target.value)}
+            placeholder="Orientacoes para a triagem rapida por titulo e resumo..."
+            rows={3}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-[var(--syn-text-primary)]">Notas do relatorio de selecao</Label>
+          <Textarea
+            value={data.selectionReportNotes}
+            onChange={(event) => updateField("selectionReportNotes", event.target.value)}
+            placeholder="Observacoes metodologicas para o relatorio final..."
+            rows={3}
+          />
+        </div>
+      </PlanningSection>
+
       <div className="flex justify-end">
         <Button onClick={handleSave} disabled={loadingMap.save} className="gap-2">
           {loadingMap.save ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" /> Salvando...
+              <Loader2 className="h-4 w-4 animate-spin" /> Salvando...
             </>
           ) : (
             <>
-              <Save className="w-4 h-4" /> Salvar
+              <Save className="h-4 w-4" /> Salvar
             </>
           )}
         </Button>
@@ -193,5 +226,3 @@ function ProjectPlanning({ project = {} }) {
 }
 
 export default ProjectPlanning;
-
-

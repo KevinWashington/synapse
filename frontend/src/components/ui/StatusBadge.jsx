@@ -9,17 +9,23 @@ const variants = {
 };
 
 const STATUS_MAP = {
-  // Project statuses
   ideia: { variant: "neutral", label: "Todo" },
   "em-progresso": { variant: "blue", label: "In Progress" },
   concluido: { variant: "low", label: "Completed" },
   pausado: { variant: "medium", label: "On Hold" },
-  // Article statuses
-  pendente: { variant: "medium", label: "Não lido" },
+  pendente: { variant: "medium", label: "Nao lido" },
   analisado: { variant: "low", label: "Lido" },
-  excluido: { variant: "high", label: "Excluído" },
-  incluido: { variant: "blue", label: "Incluído" },
+  excluido: { variant: "high", label: "Excluido" },
+  incluido: { variant: "blue", label: "Incluido" },
   lendo: { variant: "neutral", label: "Lendo" },
+  identification: { variant: "neutral", label: "Identification" },
+  screening: { variant: "medium", label: "Screening" },
+  eligibility: { variant: "blue", label: "Eligibility" },
+  active: { variant: "neutral", label: "Ativo" },
+  duplicate_removed: { variant: "high", label: "Duplicado" },
+  excluded_screening: { variant: "high", label: "Excluido no Screening" },
+  full_text_unavailable: { variant: "medium", label: "Texto Completo Indisponivel" },
+  excluded_eligibility: { variant: "high", label: "Excluido na Elegibilidade" },
 };
 
 const PRIORITY_MAP = {
@@ -29,8 +35,8 @@ const PRIORITY_MAP = {
 };
 
 const TYPE_MAP = {
-  "revisao-sistematica": { variant: "high", label: "Revisão Sistemática" },
-  "meta-analise": { variant: "blue", label: "Meta-análise" },
+  "revisao-sistematica": { variant: "high", label: "Revisao Sistematica" },
+  "meta-analise": { variant: "blue", label: "Meta-analise" },
   "scoping-review": { variant: "low", label: "Scoping Review" },
 };
 
@@ -64,7 +70,7 @@ export function StatusBadge({
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick}
-      onKeyDown={onClick ? (e) => e.key === "Enter" && onClick(e) : undefined}
+      onKeyDown={onClick ? (event) => event.key === "Enter" && onClick(event) : undefined}
       className={cn(
         "inline-flex items-center whitespace-nowrap rounded-[var(--syn-radius-badge)] px-2.5 py-0.5 text-xs font-semibold",
         "transition-all duration-200",

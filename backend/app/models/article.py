@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, LargeBinary, Table, Column, Index
+from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, LargeBinary, Table, Column, Index, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ARRAY
 from pgvector.sqlalchemy import Vector
@@ -38,8 +38,33 @@ class Article(Base):
     number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     issn: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notas: Mapped[str | None] = mapped_column(Text, nullable=True)
-    
-    # Status
+
+    # Selection workflow
+    entryMethod: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
+    sourceCategory: Mapped[str] = mapped_column(String(30), default="manual_other", nullable=False)
+    sourceName: Mapped[str] = mapped_column(String(120), nullable=False, default="Manual")
+    importBatchLabel: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    currentPhase: Mapped[str] = mapped_column(String(30), default="identification", nullable=False)
+    reviewOutcome: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
+
+    duplicateGroupKey: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    duplicateOfArticleId: Mapped[int | None] = mapped_column(ForeignKey("articles.id"), nullable=True)
+    duplicateReasonCode: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    duplicateReasonText: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    screeningDecision: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    screeningReasonText: Mapped[str | None] = mapped_column(Text, nullable=True)
+    screeningReviewedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    fullTextStatus: Mapped[str] = mapped_column(String(30), default="not_requested", nullable=False)
+    eligibilityDecision: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    eligibilityReasonText: Mapped[str | None] = mapped_column(Text, nullable=True)
+    eligibilityReviewedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    eligibilityChecklistAnswers: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
+    includedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Compatibility status for legacy views/services.
     status: Mapped[str] = mapped_column(String(20), default="pendente")
     
     # PDF storage (binary in DB - can be moved to filesystem later)
@@ -91,6 +116,11 @@ class Article(Base):
         primaryjoin=id == articleRelationships.c.articleId,
         secondaryjoin=id == articleRelationships.c.relatedArticleId,
         backref="relatedBy"
+    )
+    duplicateOf: Mapped["Article"] = relationship(
+        remote_side=[id],
+        foreign_keys=[duplicateOfArticleId],
+        backref="duplicateChildren",
     )
 
     def __repr__(self):

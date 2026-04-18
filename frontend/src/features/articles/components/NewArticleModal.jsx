@@ -1,19 +1,19 @@
 import { useState } from "react";
-import { AlertCircleIcon, FileIcon, LoaderIcon, PlusIcon, UploadIcon } from "lucide-react";
+import { LoaderIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { SlidePanel } from "@/components/ui/SlidePanel";
 import ArticleCommonFields from "@features/articles/components/ArticleCommonFields";
-import ArticleStatusSelector from "@features/articles/components/ArticleStatusSelector";
 import { articleService } from "@features/articles/services/articleService";
+import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS } from "@features/articles/utils/selectionFlow";
 import { toast } from "@/lib/toast";
 
 function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
-  const [loading, setLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [errors, setErrors] = useState({});
   const currentYear = new Date().getFullYear();
-
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
     title: "",
     authors: "",
@@ -22,187 +22,55 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
     doi: "",
     abstract: "",
     notas: "",
-    status: "pendente",
+    sourceCategory: "database",
+    sourceNamePreset: "Scopus",
+    sourceNameCustom: "",
   });
 
   function handleInputChange(field, value) {
-    setFormData((currentValues) => ({
-      ...currentValues,
-      [field]: value,
-    }));
-
-    if (errors[field]) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        [field]: "",
-      }));
-    }
-  }
-
-  function handleFileChange(event) {
-    const file = event.target.files[0];
-
-    if (!file) {
-      return;
-    }
-
-    if (file.type !== "application/pdf") {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        pdf: "O arquivo deve ser um PDF",
-      }));
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        pdf: "O arquivo não pode ser maior que 10MB",
-      }));
-      return;
-    }
-
-    setSelectedFile(file);
-
-    if (errors.pdf) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        pdf: "",
-      }));
-    }
+    setFormData((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: "" }));
   }
 
   function validateForm() {
     const nextErrors = {};
-
-    if (!formData.title.trim()) {
-      nextErrors.title = "Título é obrigatório";
-    } else if (formData.title.length > 200) {
-      nextErrors.title = "Título não pode ter mais que 200 caracteres";
-    }
-
-    if (!formData.authors.trim()) {
-      nextErrors.authors = "Autores são obrigatórios";
-    } else if (formData.authors.length > 300) {
-      nextErrors.authors = "Autores não podem ter mais que 300 caracteres";
-    }
-
-    if (!formData.year) {
-      nextErrors.year = "Ano é obrigatório";
-    } else {
-      const yearNumber = Number.parseInt(formData.year, 10);
-
-      if (
-        Number.isNaN(yearNumber) ||
-        yearNumber < 1900 ||
-        yearNumber > currentYear + 1
-      ) {
-        nextErrors.year = `Ano deve estar entre 1900 e ${currentYear + 1}`;
-      }
-    }
-
-    if (!formData.journal.trim()) {
-      nextErrors.journal = "Periódico/Conferência é obrigatório";
-    } else if (formData.journal.length > 200) {
-      nextErrors.journal = "Periódico não pode ter mais que 200 caracteres";
-    }
-
-    if (formData.doi && formData.doi.length > 50) {
-      nextErrors.doi = "DOI não pode ter mais que 50 caracteres";
-    }
-
-    if (formData.abstract && formData.abstract.length > 3000) {
-      nextErrors.abstract = "Resumo não pode ter mais que 3000 caracteres";
-    }
-
+    if (!formData.title.trim()) nextErrors.title = "Titulo e obrigatorio";
+    if (!formData.authors.trim()) nextErrors.authors = "Autores sao obrigatorios";
+    if (!formData.journal.trim()) nextErrors.journal = "Veiculo e obrigatorio";
+    const resolvedSourceName =
+      formData.sourceNamePreset === "outra" ? formData.sourceNameCustom : formData.sourceNamePreset;
+    if (!resolvedSourceName?.trim()) nextErrors.sourceName = "Origem e obrigatoria";
+    if (!formData.sourceCategory) nextErrors.sourceCategory = "Categoria de origem e obrigatoria";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-
     if (!validateForm()) {
       return;
     }
 
     try {
       setLoading(true);
-
-      const articleData = {
+      const response = await articleService.createArticleJson(projectId, {
         title: formData.title,
         authors: formData.authors,
         year: Number.parseInt(formData.year, 10),
         journal: formData.journal,
-      };
-
-      if (formData.doi) {
-        articleData.doi = formData.doi;
-      }
-
-      if (formData.abstract) {
-        articleData.abstract = formData.abstract;
-      }
-
-      if (formData.notas) {
-        articleData.notas = formData.notas;
-      }
-
-      const response = await articleService.createArticleJson(projectId, articleData);
-
-      if (selectedFile && response?.id) {
-        try {
-          await articleService.uploadPdf(projectId, response.id, selectedFile);
-        } catch (pdfError) {
-          console.error("Erro ao enviar PDF:", pdfError);
-          toast.error("Artigo criado, mas houve erro ao enviar o PDF.");
-        }
-      }
-
-      if (onSuccess) {
-        onSuccess(response);
-      }
-
+        doi: formData.doi || null,
+        abstract: formData.abstract || null,
+        notas: formData.notas || null,
+        sourceCategory: formData.sourceCategory,
+        sourceName:
+          formData.sourceNamePreset === "outra" ? formData.sourceNameCustom : formData.sourceNamePreset,
+        entryMethod: "manual",
+      });
+      onSuccess?.(response);
+      toast.success("Registro adicionado com sucesso!");
       handleClose();
-      toast.success("Artigo adicionado com sucesso!");
     } catch (error) {
-      console.error("Erro ao adicionar artigo:", error);
-
-      if (error.status === 400 && error.data?.details) {
-        const serverErrors = {};
-
-        if (Array.isArray(error.data.details)) {
-          error.data.details.forEach((detail) => {
-            const normalizedDetail = detail.toLowerCase();
-
-            if (normalizedDetail.includes("título")) {
-              serverErrors.title = detail;
-            } else if (normalizedDetail.includes("autores")) {
-              serverErrors.authors = detail;
-            } else if (normalizedDetail.includes("ano")) {
-              serverErrors.year = detail;
-            } else if (normalizedDetail.includes("periódico")) {
-              serverErrors.journal = detail;
-            } else if (normalizedDetail.includes("doi")) {
-              serverErrors.doi = detail;
-            } else if (normalizedDetail.includes("resumo")) {
-              serverErrors.abstract = detail;
-            } else if (
-              normalizedDetail.includes("pdf") ||
-              normalizedDetail.includes("arquivo")
-            ) {
-              serverErrors.pdf = detail;
-            }
-          });
-        }
-
-        setErrors((currentErrors) => ({
-          ...currentErrors,
-          ...serverErrors,
-        }));
-      } else {
-        toast.error(`Erro ao adicionar artigo: ${error.message}`);
-      }
+      toast.error(`Erro ao adicionar registro: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -216,10 +84,11 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
       journal: "",
       doi: "",
       abstract: "",
-      notas: "",
-      status: "pendente",
-    });
-    setSelectedFile(null);
+        notas: "",
+        sourceCategory: "database",
+        sourceNamePreset: "Scopus",
+        sourceNameCustom: "",
+      });
     setErrors({});
     onClose();
   }
@@ -228,28 +97,23 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
     <SlidePanel
       isOpen={isOpen}
       onClose={handleClose}
-      title="Novo Artigo"
-      breadcrumb="Artigos"
+      title="Novo Registro"
+      breadcrumb="Identification"
       footer={
         <div className="flex items-center justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={loading}
-          >
+          <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={loading} className="gap-2">
             {loading ? (
               <>
                 <LoaderIcon className="h-4 w-4 animate-spin" />
-                Adicionando...
+                Salvando...
               </>
             ) : (
               <>
                 <PlusIcon className="h-4 w-4" />
-                Adicionar Artigo
+                Adicionar
               </>
             )}
           </Button>
@@ -257,10 +121,47 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-6 p-6">
-        <div className="space-y-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--syn-text-secondary)]">
-            Informações do Artigo
-          </h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Categoria da origem</Label>
+            <Select value={formData.sourceCategory} onValueChange={(value) => handleInputChange("sourceCategory", value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_CATEGORY_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.sourceCategory ? <p className="text-sm text-red-500">{errors.sourceCategory}</p> : null}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Origem</Label>
+            <Select value={formData.sourceNamePreset} onValueChange={(value) => handleInputChange("sourceNamePreset", value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SOURCE_NAME_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {formData.sourceNamePreset === "outra" ? (
+              <Input
+                value={formData.sourceNameCustom}
+                onChange={(event) => handleInputChange("sourceNameCustom", event.target.value)}
+                placeholder="Descreva a origem"
+              />
+            ) : null}
+            {errors.sourceName ? <p className="text-sm text-red-500">{errors.sourceName}</p> : null}
+          </div>
         </div>
 
         <ArticleCommonFields
@@ -268,7 +169,7 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
           errors={errors}
           fieldPrefix="create-article"
           formData={formData}
-          journalLabel="Periódico/Conferência"
+          journalLabel="Periodico/Conferencia"
           onFieldChange={handleInputChange}
           placeholders={{
             title: "Ex: Artificial Intelligence in Higher Education",
@@ -283,78 +184,19 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
         />
 
         <div className="space-y-2">
-          <Label htmlFor="pdf">
-            Arquivo PDF{" "}
-            <span className="text-xs text-[var(--syn-text-secondary)]">
-              (opcional)
-            </span>
-          </Label>
-
-          <div
-            className={`rounded-[var(--syn-radius-card)] border-2 border-dashed p-6 text-center ${
-              errors.pdf
-                ? "border-red-300 bg-red-50 dark:bg-red-950"
-                : "border-[var(--syn-border)] hover:bg-[var(--syn-bg-secondary)]"
-            }`}
-          >
-            <input
-              type="file"
-              id="pdf"
-              accept="application/pdf"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-
-            {selectedFile ? (
-              <div className="flex flex-col items-center">
-                <FileIcon className="mb-2 h-8 w-8 text-[var(--syn-badge-blue-text)]" />
-                <p className="text-sm font-medium text-[var(--syn-text-primary)]">
-                  {selectedFile.name}
-                </p>
-                <p className="text-xs text-[var(--syn-text-secondary)]">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedFile(null)}
-                  className="mt-2"
-                >
-                  Remover
-                </Button>
-              </div>
-            ) : (
-              <label htmlFor="pdf" className="flex cursor-pointer flex-col items-center">
-                <UploadIcon className="mb-2 h-8 w-8 text-[var(--syn-text-secondary)]" />
-                <p className="text-sm font-medium text-[var(--syn-text-primary)]">
-                  Clique para selecionar um PDF
-                </p>
-                <p className="mt-1 text-xs text-[var(--syn-text-secondary)]">
-                  Máximo: 10MB
-                </p>
-              </label>
-            )}
-          </div>
-
-          {errors.pdf ? (
-            <div className="flex items-center gap-1 text-red-500">
-              <AlertCircleIcon className="h-4 w-4" />
-              <p className="text-sm">{errors.pdf}</p>
-            </div>
-          ) : null}
+          <Label htmlFor="new-article-notes">Notas iniciais</Label>
+          <textarea
+            id="new-article-notes"
+            value={formData.notas}
+            onChange={(event) => handleInputChange("notas", event.target.value)}
+            rows={3}
+            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-1 focus-visible:outline-none"
+            placeholder="Observacoes opcionais do registro..."
+          />
         </div>
-
-        <ArticleStatusSelector
-          label="Status Inicial"
-          onChange={(status) => handleInputChange("status", status)}
-          options={["pendente", "analisado"]}
-          selectedStatus={formData.status}
-        />
       </form>
     </SlidePanel>
   );
 }
 
 export default NewArticleModal;
-

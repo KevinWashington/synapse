@@ -27,7 +27,10 @@ class GraphSyncService:
         db: AsyncSession
     ) -> None:
         """Sync a single article to Neo4j and create relationships with existing articles."""
-        
+        if getattr(article, "reviewOutcome", None) != "included":
+            await self.delete_article_from_graph(article.id)
+            return
+
         # Create/update node in Neo4j
         await self.neo4j.create_article_node(
             article_id=article.id,
@@ -36,7 +39,9 @@ class GraphSyncService:
             title=article.title,
             authors=article.authors,
             year=article.year,
-            status=article.status,
+            status=getattr(article, "reviewOutcome", article.status),
+            current_phase=getattr(article, "currentPhase", None),
+            review_outcome=getattr(article, "reviewOutcome", None),
             methodology=article.aiMethodology,
             domain=article.aiDomain,
             venue=article.journal,
@@ -57,7 +62,8 @@ class GraphSyncService:
         result = await db.execute(
             select(Article).where(
                 Article.projectId == article.projectId,
-                Article.id != article.id
+                Article.id != article.id,
+                Article.reviewOutcome == "included",
             )
         )
         other_articles = result.scalars().all()

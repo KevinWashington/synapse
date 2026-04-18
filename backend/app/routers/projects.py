@@ -87,6 +87,9 @@ async def create_project(
         searchStrings=data.searchStrings or [],
         criteriosInclusao=data.criteriosInclusao or [],
         criteriosExclusao=data.criteriosExclusao or [],
+        eligibilityChecklist=data.eligibilityChecklist or [],
+        screeningGuidance=data.screeningGuidance,
+        selectionReportNotes=data.selectionReportNotes,
         ownerId=current_user.id
     )
     

@@ -34,6 +34,8 @@ class Neo4jService:
         authors: str,
         year: int,
         status: str = "pendente",
+        current_phase: str | None = None,
+        review_outcome: str | None = None,
         methodology: str | None = None,
         domain: str | None = None,
         venue: str | None = None,
@@ -51,6 +53,8 @@ class Neo4jService:
                     a.authors = $authors,
                     a.year = $year,
                     a.status = $status,
+                    a.currentPhase = $currentPhase,
+                    a.reviewOutcome = $reviewOutcome,
                     a.methodology = $methodology,
                     a.domain = $domain,
                     a.venue = $venue,
@@ -64,6 +68,8 @@ class Neo4jService:
                 authors=authors,
                 year=year,
                 status=status,
+                currentPhase=current_phase,
+                reviewOutcome=review_outcome,
                 methodology=methodology,
                 domain=domain,
                 venue=venue,
@@ -358,7 +364,7 @@ class Neo4jService:
                     END as title,
                     n.authors as authors,
                     n.year as year,
-                    n.status as status,
+                    coalesce(n.reviewOutcome, n.status) as status,
                     n.methodology as methodology,
                     n.domain as domain
                 """,
@@ -715,7 +721,7 @@ class Neo4jService:
         """
         return {
             "nodes": {
-                "Article": ["id", "paperId", "projectId", "title", "authors", "year", "status", "methodology", "domain", "venue", "keywords", "abstract"],
+                "Article": ["id", "paperId", "projectId", "title", "authors", "year", "status", "currentPhase", "reviewOutcome", "methodology", "domain", "venue", "keywords", "abstract"],
                 "Author": ["projectId", "name"],
                 "Keyword": ["projectId", "term"],
                 "Venue": ["projectId", "name"],

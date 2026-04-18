@@ -8,11 +8,11 @@ function useArticleDetailsPage() {
   const { projectId, articleId } = useParams();
   const navigate = useNavigate();
   const [article, setArticle] = useState(null);
+  const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pdfData, setPdfData] = useState(null);
   const [rightTab, setRightTab] = useState("notas");
-  const [project, setProject] = useState(null);
 
   const fetchArticle = useCallback(async () => {
     try {
@@ -21,105 +21,71 @@ function useArticleDetailsPage() {
       const articleData = await articleService.getArticleById(projectId, articleId);
       setArticle(articleData);
     } catch (currentError) {
-      setError(currentError.message || "Erro ao carregar dados");
+      setError(currentError.message || "Erro ao carregar artigo");
     } finally {
       setLoading(false);
     }
   }, [articleId, projectId]);
 
+  const fetchProject = useCallback(async () => {
+    try {
+      const projectData = await projectService.getProjectById(projectId);
+      setProject(projectData);
+    } catch (currentError) {
+      console.error("Erro ao carregar contexto do projeto:", currentError);
+    }
+  }, [projectId]);
+
   const fetchPdfData = useCallback(async () => {
-    if (!article || article.hasPdf === false || pdfData) {
+    if (!article || article.hasPdf === false) {
       return;
     }
-
     try {
-      const pdfBuffer = await articleService.getPdfData(projectId, articleId);
-      if (!pdfBuffer) {
-        setArticle((current) =>
-          current ? { ...current, hasPdf: false } : current
-        );
-        return;
-      }
-      setPdfData(pdfBuffer);
+      const buffer = await articleService.getPdfData(projectId, articleId);
+      setPdfData(buffer);
     } catch (currentError) {
-      console.error("Erro inesperado ao obter PDF:", currentError);
+      console.error("Erro ao obter PDF:", currentError);
     }
-  }, [article, articleId, pdfData, projectId]);
+  }, [article, articleId, projectId]);
 
   useEffect(() => {
     fetchArticle();
-  }, [fetchArticle]);
+    fetchProject();
+  }, [fetchArticle, fetchProject]);
 
   useEffect(() => {
-    let cancelled = false;
+    fetchPdfData();
+  }, [fetchPdfData]);
 
-    async function fetchProjectContext() {
-      if (!projectId) {
-        return;
-      }
+  const refreshArticle = useCallback(async () => {
+    await fetchArticle();
+    await fetchPdfData();
+  }, [fetchArticle, fetchPdfData]);
 
+  const handleScreeningDecision = useCallback(
+    async (payload) => {
       try {
-        const projectData = await projectService.getProjectById(projectId);
-        if (!cancelled) {
-          setProject(projectData);
-        }
+        const updated = await articleService.submitScreeningDecision(projectId, articleId, payload);
+        setArticle(updated);
+        toast.success("Decisao de screening registrada.");
+        return updated;
       } catch (currentError) {
-        if (!cancelled) {
-          console.error("Erro ao carregar contexto do projeto:", currentError);
-        }
-      }
-    }
-
-    fetchProjectContext();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId]);
-
-  useEffect(() => {
-    if (article) {
-      fetchPdfData();
-    }
-  }, [article, fetchPdfData]);
-
-  const handleChangeStatus = useCallback(
-    async (nextStatus) => {
-      try {
-        await articleService.updateArticleStatus(projectId, articleId, nextStatus);
-        setArticle((current) => ({ ...current, status: nextStatus }));
-        toast.success(`Status atualizado para ${nextStatus}`);
-      } catch (currentError) {
-        toast.error("Erro ao atualizar status: " + currentError.message);
+        toast.error("Erro ao registrar screening: " + currentError.message);
+        throw currentError;
       }
     },
     [articleId, projectId]
   );
 
-  const handleApplyDecision = useCallback(
-    async ({
-      decision,
-      reason = null,
-      exclusionCriteria = [],
-      answeringRQs = [],
-    }) => {
+  const handleEligibilityDecision = useCallback(
+    async (payload) => {
       try {
-        const updatedArticle = await articleService.updateArticleDecision(
-          projectId,
-          articleId,
-          {
-            decision,
-            reason,
-            exclusionCriteria,
-            answeringRQs,
-          }
-        );
-
-        setArticle(updatedArticle);
-        toast.success("Decisão de triagem registrada com sucesso!");
-        return updatedArticle;
+        const updated = await articleService.submitEligibilityDecision(projectId, articleId, payload);
+        setArticle(updated);
+        toast.success("Decisao de elegibilidade registrada.");
+        return updated;
       } catch (currentError) {
-        toast.error("Erro ao registrar decisão: " + currentError.message);
+        toast.error("Erro ao registrar elegibilidade: " + currentError.message);
         throw currentError;
       }
     },
@@ -129,8 +95,8 @@ function useArticleDetailsPage() {
   const handleSaveNotes = useCallback(
     async (notes) => {
       try {
-        await articleService.updateArticleNotes(projectId, articleId, notes);
-        setArticle((current) => ({ ...current, notas: notes }));
+        const updated = await articleService.updateArticleNotes(projectId, articleId, notes);
+        setArticle(updated);
         toast.success("Notas salvas com sucesso!");
       } catch (currentError) {
         toast.error("Erro ao salvar notas: " + currentError.message);
@@ -143,11 +109,9 @@ function useArticleDetailsPage() {
     if (!article) {
       return;
     }
-
     if (!confirm(`Tem certeza que deseja deletar o artigo "${article.title}"?`)) {
       return;
     }
-
     try {
       await articleService.deleteArticle(projectId, articleId);
       toast.success("Artigo deletado com sucesso!");
@@ -169,15 +133,16 @@ function useArticleDetailsPage() {
     articleId,
     error,
     handleAddNote,
-    handleApplyDecision,
-    handleChangeStatus,
     handleDeleteArticle,
+    handleEligibilityDecision,
     handleSaveNotes,
+    handleScreeningDecision,
     loading,
     navigate,
     pdfData,
     project,
     projectId,
+    refreshArticle,
     rightTab,
     setRightTab,
   };

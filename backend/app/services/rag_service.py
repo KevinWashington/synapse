@@ -139,7 +139,7 @@ class RAGAgentService:
                     {
                         "ids": all_ids,
                         "project_id": project_id,
-                        "filters": {"status": ["pendente", "analisado"]},
+                        "filters": {"review_outcome": ["included"]},
                     },
                 )
                 ranked_sql_papers = self._sort_papers_by_id_order(
@@ -408,7 +408,10 @@ class RAGAgentService:
         if not candidate_phrases or not hasattr(db, "execute"):
             return None
 
-        stmt = select(Article).where(Article.projectId == project_id)
+        stmt = select(Article).where(
+            Article.projectId == project_id,
+            Article.reviewOutcome == "included",
+        )
         if owner_id is not None:
             stmt = stmt.where(Article.ownerId == owner_id)
 

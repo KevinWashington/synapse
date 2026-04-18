@@ -67,6 +67,9 @@ class ProjectService {
         searchStrings,
         criteriosInclusao,
         criteriosExclusao,
+        eligibilityChecklist,
+        screeningGuidance,
+        selectionReportNotes,
         // Excluir campos que não devem ser enviados
         articles: _articles,
         stats: _stats,
@@ -90,6 +93,9 @@ class ProjectService {
         searchStrings,
         criteriosInclusao,
         criteriosExclusao,
+        eligibilityChecklist,
+        screeningGuidance,
+        selectionReportNotes,
       };
 
       Object.keys(updateData).forEach((key) => {

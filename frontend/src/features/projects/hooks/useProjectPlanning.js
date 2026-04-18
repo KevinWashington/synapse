@@ -23,6 +23,9 @@ const INITIAL_DATA = {
   searchStrings: [],
   criteriosInclusao: [],
   criteriosExclusao: [],
+  eligibilityChecklist: [],
+  screeningGuidance: "",
+  selectionReportNotes: "",
 };
 
 function buildFrameworkData(rawPicoc, framework) {
@@ -52,6 +55,9 @@ function buildInitialData(project, framework) {
     searchStrings: project.searchStrings || [],
     criteriosInclusao: project.criteriosInclusao || [],
     criteriosExclusao: project.criteriosExclusao || [],
+    eligibilityChecklist: project.eligibilityChecklist || [],
+    screeningGuidance: project.screeningGuidance || "",
+    selectionReportNotes: project.selectionReportNotes || "",
   };
 }
 

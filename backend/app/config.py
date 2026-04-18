@@ -1,5 +1,6 @@
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -39,6 +40,17 @@ class Settings(BaseSettings):
     SQL_MCP_TIMEOUT_SECONDS: int = 15
     SQL_MCP_MAX_ROWS: int = 200
     SQL_MCP_ALLOW_WRITE_TABLES: str = "articles,projects"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def normalize_debug_flag(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "prod", "production"}:
+                return False
+            if normalized in {"debug", "dev", "development"}:
+                return True
+        return value
 
     def validate_runtime(self) -> None:
         missing = []

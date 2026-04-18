@@ -1,5 +1,34 @@
 import { ApiError, apiService } from "@/services/api";
 
+function extractFilename(contentDisposition, fallbackName) {
+  if (!contentDisposition) {
+    return fallbackName;
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const simpleMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  if (simpleMatch?.[1]) {
+    return simpleMatch[1];
+  }
+
+  return fallbackName;
+}
+
+function triggerBrowserDownload(blob, filename) {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+}
+
 class ArtigosService {
   constructor() {
     this.baseEndpoint = "/api/projetos";
@@ -10,355 +39,209 @@ class ArtigosService {
   }
 
   async getArticlesByProject(projectId, filters = {}) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      const params = {};
-
-      // Filtros opcionais
-      if (filters.status) params.status = filters.status;
-      if (filters.search) params.search = filters.search;
-      if (filters.page) params.page = filters.page;
-      if (filters.limit) params.limit = filters.limit;
-
-      return await apiService.get(this.getProjectEndpoint(projectId), params);
-    } catch (error) {
-      console.error(`Erro ao buscar artigos do projeto ${projectId}:`, error);
-      throw error;
+    if (!projectId) {
+      throw new Error("ID do projeto e obrigatorio");
     }
+
+    const params = {};
+    if (filters.search) params.search = filters.search;
+    if (filters.status) params.status = filters.status;
+    if (filters.phase) params.phase = filters.phase;
+    if (filters.outcome) params.outcome = filters.outcome;
+    if (filters.sourceCategory) params.sourceCategory = filters.sourceCategory;
+    if (filters.hasPdf !== undefined) params.hasPdf = String(filters.hasPdf);
+    if (filters.page) params.page = filters.page;
+    if (filters.limit) params.limit = filters.limit;
+
+    return apiService.get(this.getProjectEndpoint(projectId), params);
   }
 
   async getArticleById(projectId, articleId) {
-    try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo são obrigatórios");
-      }
-
-      return await apiService.get(
-        `${this.getProjectEndpoint(projectId)}/${articleId}`
-      );
-    } catch (error) {
-      console.error(`Erro ao buscar artigo ${articleId}:`, error);
-      throw error;
-    }
-  }
-
-  getPdfUrl(projectId, articleId) {
     if (!projectId || !articleId) {
-      throw new Error("IDs do projeto e artigo são obrigatórios");
+      throw new Error("IDs do projeto e artigo sao obrigatorios");
     }
-
-    const baseURL = apiService.baseURL.endsWith("/")
-      ? apiService.baseURL
-      : `${apiService.baseURL}/`;
-    return `${baseURL}api/projetos/${projectId}/artigos/${articleId}/pdf`;
+    return apiService.get(`${this.getProjectEndpoint(projectId)}/${articleId}`);
   }
 
-  getPdfDownloadUrl(projectId, articleId) {
-    if (!projectId || !articleId) {
-      throw new Error("IDs do projeto e artigo são obrigatórios");
+  async createArticleJson(projectId, articleData) {
+    if (!projectId) {
+      throw new Error("ID do projeto e obrigatorio");
     }
-
-    const baseURL = apiService.baseURL.endsWith("/")
-      ? apiService.baseURL
-      : `${apiService.baseURL}/`;
-    return `${baseURL}api/projetos/${projectId}/artigos/${articleId}/download`;
+    return apiService.post(this.getProjectEndpoint(projectId), articleData);
   }
 
-  async getPdfData(projectId, articleId) {
+  async importBibTeX(projectId, payload) {
+    if (!projectId) {
+      throw new Error("ID do projeto e obrigatorio");
+    }
+    return apiService.post(`${this.getProjectEndpoint(projectId)}/import-bibtex`, payload);
+  }
+
+  async getSelectionSummary(projectId) {
+    if (!projectId) {
+      throw new Error("ID do projeto e obrigatorio");
+    }
+    return apiService.get(`${this.getProjectEndpoint(projectId)}/selection-summary`);
+  }
+
+  async getSelectionReport(projectId) {
+    if (!projectId) {
+      throw new Error("ID do projeto e obrigatorio");
+    }
+    return apiService.get(`${this.baseEndpoint}/${projectId}/selection-report`);
+  }
+
+  async exportSelectionReport(projectId, format = "json") {
+    const response = await apiService.requestRaw(
+      `${this.baseEndpoint}/${projectId}/selection-report/export?format=${format}`,
+      { method: "GET" }
+    );
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get("content-disposition");
+    const filename = extractFilename(
+      contentDisposition,
+      `selection-report.${format === "csv" ? "csv" : "json"}`
+    );
+    triggerBrowserDownload(blob, filename);
+  }
+
+  async analyzeDuplicates(projectId) {
+    return apiService.post(`${this.getProjectEndpoint(projectId)}/dedup/analyze`, {});
+  }
+
+  async getDuplicateCandidates(projectId) {
+    return apiService.get(`${this.getProjectEndpoint(projectId)}/dedup/candidates`);
+  }
+
+  async applyDuplicateDecisions(projectId, decisions) {
+    return apiService.post(`${this.getProjectEndpoint(projectId)}/dedup/apply`, {
+      decisions,
+    });
+  }
+
+  async promoteToScreening(projectId, articleIds) {
+    return apiService.post(`${this.getProjectEndpoint(projectId)}/promote-to-screening`, {
+      articleIds,
+    });
+  }
+
+  async submitScreeningDecision(projectId, articleId, decisionData) {
+    return apiService.post(
+      `${this.getProjectEndpoint(projectId)}/${articleId}/screening-decision`,
+      decisionData
+    );
+  }
+
+  async batchEvaluateScreening(projectId, options = {}) {
+    return apiService.post(`${this.getProjectEndpoint(projectId)}/screening/batch-evaluate`, {
+      limit: options.limit ?? 200,
+      onlyPending: options.onlyPending ?? true,
+      forceReevaluate: options.forceReevaluate ?? false,
+      dryRun: options.dryRun ?? false,
+    });
+  }
+
+  async updateFullTextStatus(projectId, articleId, data) {
+    return apiService.patch(`${this.getProjectEndpoint(projectId)}/${articleId}/full-text-status`, data);
+  }
+
+  async submitEligibilityDecision(projectId, articleId, data) {
+    return apiService.post(
+      `${this.getProjectEndpoint(projectId)}/${articleId}/eligibility-decision`,
+      data
+    );
+  }
+
+  async getPdfBlob(projectId, articleId, options = {}) {
     try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo sÃ£o obrigatÃ³rios");
-      }
-
-      const response = await apiService.request(
-        `${this.getProjectEndpoint(projectId)}/${articleId}/pdf`,
-        {
-          method: "GET",
-          suppressErrorStatuses: [404],
-        }
-      );
-
-      return response.arrayBuffer();
+      const endpoint = `${this.getProjectEndpoint(projectId)}/${articleId}/${options.download ? "download" : "pdf"}`;
+      const response = await apiService.requestRaw(endpoint, {
+        method: "GET",
+        suppressErrorStatuses: [404],
+      });
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("content-disposition");
+      const defaultFilename = `artigo-${articleId}.pdf`;
+      return {
+        blob,
+        filename: extractFilename(contentDisposition, defaultFilename),
+      };
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) {
         return null;
       }
-
-      console.error(`Erro ao obter PDF do artigo ${articleId}:`, error);
       throw error;
     }
   }
 
-  async createArticle(projectId, formData) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      // Validação básica
-      if (!formData.get("title") || !formData.get("authors")) {
-        throw new Error("Título e autores são obrigatórios");
-      }
-
-      // Usar apiService para upload de arquivo
-      return await apiService.postFormData(
-        this.getProjectEndpoint(projectId),
-        formData
-      );
-    } catch (error) {
-      console.error(`Erro ao criar artigo no projeto ${projectId}:`, error);
-      throw error;
+  async getPdfData(projectId, articleId) {
+    const pdfFile = await this.getPdfBlob(projectId, articleId);
+    if (!pdfFile) {
+      return null;
     }
+    return pdfFile.blob.arrayBuffer();
   }
 
-  async createArticleJson(projectId, articleData) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      if (!articleData?.title || !articleData?.authors) {
-        throw new Error("Título e autores são obrigatórios");
-      }
-
-      return await apiService.post(this.getProjectEndpoint(projectId), articleData);
-    } catch (error) {
-      console.error(`Erro ao criar artigo JSON no projeto ${projectId}:`, error);
-      throw error;
+  async downloadPdf(projectId, articleId) {
+    const pdfFile = await this.getPdfBlob(projectId, articleId, { download: true });
+    if (!pdfFile) {
+      return null;
     }
+    triggerBrowserDownload(pdfFile.blob, pdfFile.filename);
+    return pdfFile.filename;
+  }
+
+  async openPdfInNewTab(projectId, articleId) {
+    const pdfFile = await this.getPdfBlob(projectId, articleId);
+    if (!pdfFile) {
+      return null;
+    }
+    const objectUrl = URL.createObjectURL(pdfFile.blob);
+    window.open(objectUrl, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    return objectUrl;
   }
 
   async uploadPdf(projectId, articleId, file) {
-    try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo são obrigatórios");
-      }
-
-      if (!file) {
-        throw new Error("Arquivo PDF é obrigatório");
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      return await apiService.postFormData(
-        `${this.getProjectEndpoint(projectId)}/${articleId}/pdf`,
-        formData
-      );
-    } catch (error) {
-      console.error(`Erro ao enviar PDF do artigo ${articleId}:`, error);
-      throw error;
-    }
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiService.postFormData(`${this.getProjectEndpoint(projectId)}/${articleId}/pdf`, formData);
   }
 
   async updateArticle(projectId, articleId, updateData) {
-    try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo são obrigatórios");
-      }
-
-      // Se updateData contém FormData, usar putFormData, senão usar put
-      if (updateData instanceof FormData) {
-        return await apiService.putFormData(
-          `${this.getProjectEndpoint(projectId)}/${articleId}`,
-          updateData
-        );
-      } else {
-        return await apiService.put(
-          `${this.getProjectEndpoint(projectId)}/${articleId}`,
-          updateData
-        );
-      }
-    } catch (error) {
-      console.error(`Erro ao atualizar artigo ${articleId}:`, error);
-      throw error;
-    }
+    return apiService.put(`${this.getProjectEndpoint(projectId)}/${articleId}`, updateData);
   }
 
   async updateArticleNotes(projectId, articleId, notas) {
-    try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo são obrigatórios");
-      }
-
-      if (notas === undefined || notas === null) {
-        throw new Error("Notas são obrigatórias");
-      }
-
-      return await apiService.patch(
-        `${this.getProjectEndpoint(projectId)}/${articleId}/notes`,
-        { notas }
-      );
-    } catch (error) {
-      console.error(`Erro ao atualizar notas do artigo ${articleId}:`, error);
-      throw error;
-    }
-  }
-
-  async updateArticleStatus(projectId, articleId, status) {
-    try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo são obrigatórios");
-      }
-
-      if (!status || !["pendente", "analisado", "excluido"].includes(status)) {
-        throw new Error("Status inválido");
-      }
-
-      return await apiService.patch(
-        `${this.getProjectEndpoint(projectId)}/${articleId}/status`,
-        { status }
-      );
-    } catch (error) {
-      console.error(`Erro ao atualizar status do artigo ${articleId}:`, error);
-      throw error;
-    }
-  }
-
-  async updateArticleDecision(projectId, articleId, decisionData) {
-    try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo são obrigatórios");
-      }
-
-      const decision = decisionData?.decision;
-      if (!decision || !["pendente", "incluido", "excluido"].includes(decision)) {
-        throw new Error("Decisão inválida");
-      }
-
-      return await apiService.put(
-        `${this.getProjectEndpoint(projectId)}/${articleId}/decision`,
-        {
-          decision,
-          reason: decisionData?.reason || null,
-          exclusionCriteria: decisionData?.exclusionCriteria || [],
-          answeringRQs: decisionData?.answeringRQs || [],
-          useSuggestedRQs: decisionData?.useSuggestedRQs ?? true,
-        }
-      );
-    } catch (error) {
-      console.error(`Erro ao atualizar decisão do artigo ${articleId}:`, error);
-      throw error;
-    }
-  }
-
-  async batchEvaluateArticles(projectId, options = {}) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      return await apiService.post(
-        `${this.getProjectEndpoint(projectId)}/batch-evaluate`,
-        {
-          limit: options.limit ?? 200,
-          onlyPending: options.onlyPending ?? true,
-          onlyUnscored: options.onlyUnscored ?? true,
-          forceReevaluate: options.forceReevaluate ?? false,
-          applySuggestedStatus: options.applySuggestedStatus ?? false,
-          dryRun: options.dryRun ?? false,
-        }
-      );
-    } catch (error) {
-      console.error(`Erro ao avaliar artigos em lote no projeto ${projectId}:`, error);
-      throw error;
-    }
-  }
-
-  async getProjectFilterSummary(projectId) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      return await apiService.get(`${this.getProjectEndpoint(projectId)}/filter-summary`);
-    } catch (error) {
-      console.error(`Erro ao buscar resumo de triagem do projeto ${projectId}:`, error);
-      throw error;
-    }
+    return apiService.patch(`${this.getProjectEndpoint(projectId)}/${articleId}/notes`, { notas });
   }
 
   async getProjectRQSynthesis(projectId) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      return await apiService.get(`${this.getProjectEndpoint(projectId)}/rq-synthesis`);
-    } catch (error) {
-      console.error(`Erro ao buscar síntese por RQ do projeto ${projectId}:`, error);
-      throw error;
-    }
+    return apiService.get(`${this.getProjectEndpoint(projectId)}/rq-synthesis`);
   }
 
   async deleteArticle(projectId, articleId) {
-    try {
-      if (!projectId || !articleId) {
-        throw new Error("IDs do projeto e artigo são obrigatórios");
-      }
-
-      return await apiService.delete(
-        `${this.getProjectEndpoint(projectId)}/${articleId}`
-      );
-    } catch (error) {
-      console.error(`Erro ao deletar artigo ${articleId}:`, error);
-      throw error;
-    }
+    return apiService.delete(`${this.getProjectEndpoint(projectId)}/${articleId}`);
   }
 
-  /**
-   * Busca dados do grafo de relacionamentos do projeto
-   * @param {number} projectId - ID do projeto
-   * @param {Object} options - Opções de filtro
-  * @param {string} options.relationshipType - Tipo: 'all', 'semantic', 'methodology', 'authors', 'keywords', 'venue', 'authored', 'has-keyword', 'published-in'
-   * @param {number} options.minSimilarity - Threshold mínimo para similaridade semântica (0.0 a 1.0)
-   */
   async getProjectGraph(projectId, options = {}) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      const params = {};
-      if (options.relationshipType) params.relationship_type = options.relationshipType;
-      if (options.minSimilarity !== undefined) params.min_similarity = options.minSimilarity;
-
-      return await apiService.get(
-        `${this.baseEndpoint}/${projectId}/grafo`,
-        params
-      );
-    } catch (error) {
-      console.error(`Erro ao buscar grafo do projeto ${projectId}:`, error);
-      throw error;
-    }
+    const params = {};
+    if (options.relationshipType) params.relationship_type = options.relationshipType;
+    if (options.minSimilarity !== undefined) params.min_similarity = options.minSimilarity;
+    return apiService.get(`${this.baseEndpoint}/${projectId}/grafo`, params);
   }
 
   async reprocessProjectGraph(projectId, options = {}) {
-    try {
-      if (!projectId) {
-        throw new Error("ID do projeto é obrigatório");
-      }
-
-      const params = new URLSearchParams();
-      if (options.onlyMissingEmbeddings !== undefined) {
-        params.set("only_missing_embeddings", String(options.onlyMissingEmbeddings));
-      }
-
-      const query = params.toString();
-      const endpoint = `${this.baseEndpoint}/${projectId}/reprocessar-grafo${
-        query ? `?${query}` : ""
-      }`;
-
-      return await apiService.post(endpoint, {});
-    } catch (error) {
-      console.error(`Erro ao reprocessar grafo do projeto ${projectId}:`, error);
-      throw error;
+    const params = new URLSearchParams();
+    if (options.onlyMissingEmbeddings !== undefined) {
+      params.set("only_missing_embeddings", String(options.onlyMissingEmbeddings));
     }
+    const query = params.toString();
+    return apiService.post(
+      `${this.baseEndpoint}/${projectId}/reprocessar-grafo${query ? `?${query}` : ""}`,
+      {}
+    );
   }
-
 }
 
 const articleService = new ArtigosService();

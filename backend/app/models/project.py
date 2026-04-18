@@ -26,7 +26,10 @@ class Project(Base):
     searchStrings: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
     criteriosInclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
     criteriosExclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
-    
+    eligibilityChecklist: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
+    screeningGuidance: Mapped[str | None] = mapped_column(Text, nullable=True)
+    selectionReportNotes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Foreign key
     ownerId: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     

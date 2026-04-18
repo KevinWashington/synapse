@@ -9,13 +9,8 @@ class ApiService {
     return localStorage.getItem("token");
   }
 
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const {
-      skipErrorLog = false,
-      suppressErrorStatuses = [],
-      ...fetchOptions
-    } = options;
+  buildRequestConfig(options = {}) {
+    const { ...fetchOptions } = options;
 
     const config = {
       headers: {
@@ -34,6 +29,22 @@ class ApiService {
       config.body = JSON.stringify(config.body);
     }
 
+    if (config.body instanceof FormData && config.headers["Content-Type"]) {
+      delete config.headers["Content-Type"];
+    }
+
+    return config;
+  }
+
+  async requestRaw(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const {
+      skipErrorLog = false,
+      suppressErrorStatuses = [],
+      ...fetchOptions
+    } = options;
+    const config = this.buildRequestConfig(fetchOptions);
+
     try {
       const response = await fetch(url, config);
 
@@ -46,30 +57,13 @@ class ApiService {
         }
 
         throw new ApiError(
-          errorData.error || "Erro na requisição",
+          errorData.error || "Erro na requisicao",
           response.status,
           errorData
         );
       }
 
-      const contentType = response.headers.get("content-type");
-
-      // Se for PDF ou outro tipo binário, retornar a resposta diretamente
-      if (
-        contentType &&
-        (contentType.includes("application/pdf") ||
-          contentType.includes("image/") ||
-          contentType.includes("application/octet-stream"))
-      ) {
-        return response;
-      }
-
-      // Se não for JSON, retornar null
-      if (!contentType || !contentType.includes("application/json")) {
-        return null;
-      }
-
-      return await response.json();
+      return response;
     } catch (error) {
       const shouldSuppressLog =
         skipErrorLog ||
@@ -84,10 +78,30 @@ class ApiService {
         throw error;
       }
 
-      throw new ApiError("Erro de conexão com o servidor", 0, {
+      throw new ApiError("Erro de conexao com o servidor", 0, {
         originalError: error.message,
       });
     }
+  }
+
+  async request(endpoint, options = {}) {
+    const response = await this.requestRaw(endpoint, options);
+    const contentType = response.headers.get("content-type");
+
+    if (
+      contentType &&
+      (contentType.includes("application/pdf") ||
+        contentType.includes("image/") ||
+        contentType.includes("application/octet-stream"))
+    ) {
+      return response;
+    }
+
+    if (!contentType || !contentType.includes("application/json")) {
+      return null;
+    }
+
+    return await response.json();
   }
 
   async get(endpoint, params = {}) {
@@ -143,7 +157,6 @@ class ApiService {
   }
 }
 
-// Classe de erro personalizada
 class ApiError extends Error {
   constructor(message, status, data = {}) {
     super(message);

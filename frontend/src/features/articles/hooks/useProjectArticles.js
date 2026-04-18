@@ -1,263 +1,376 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { articleService } from "@features/articles/services/articleService";
 import { toast } from "@/lib/toast";
 
-export const useProjectArticles = (project) => {
+const PHASE_FILTERS = {
+  identification: { phase: "identification" },
+  screening: { phase: "screening" },
+  eligibility: { phase: "eligibility" },
+  included: { outcome: "included" },
+};
+
+export const useProjectArticles = (project, onGraphNeedsRefresh) => {
+  const [activeFlowTab, setActiveFlowTab] = useState("overview");
+  const [articles, setArticles] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [summary, setSummary] = useState(null);
+  const [report, setReport] = useState(null);
+  const [duplicateCandidates, setDuplicateCandidates] = useState([]);
   const [isLoadingArticles, setIsLoadingArticles] = useState(false);
-  const [isLoadingFilterSummary, setIsLoadingFilterSummary] = useState(false);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [isLoadingDuplicates, setIsLoadingDuplicates] = useState(false);
+  const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
   const [isLoadingRQSynthesis, setIsLoadingRQSynthesis] = useState(false);
-  const [isSavingDecision, setIsSavingDecision] = useState(false);
-  const [isDecisionDialogOpen, setIsDecisionDialogOpen] = useState(false);
-  const [decisionArticle, setDecisionArticle] = useState(null);
-  const [decisionInitialValue, setDecisionInitialValue] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("todos");
-  const [articles, setArticles] = useState([]);
-  const [pagination, setPagination] = useState({});
-  const [filterSummary, setFilterSummary] = useState(null);
   const [rqSynthesisData, setRqSynthesisData] = useState(null);
+  const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
+  const [selectedDuplicateMap, setSelectedDuplicateMap] = useState({});
+  const [screeningArticle, setScreeningArticle] = useState(null);
+  const [eligibilityArticle, setEligibilityArticle] = useState(null);
 
-  const loadFilterSummary = useCallback(async () => {
-    if (!project?.id) return;
-
-    try {
-      setIsLoadingFilterSummary(true);
-      const response = await articleService.getProjectFilterSummary(project.id);
-      setFilterSummary(response || null);
-    } catch (error) {
-      console.error("Erro ao carregar resumo de triagem:", error);
-      setFilterSummary(null);
-    } finally {
-      setIsLoadingFilterSummary(false);
-    }
-  }, [project?.id]);
-
-  const fetchArticles = useCallback(
-    async (filters = {}) => {
-      if (!project?.id) return;
-
-      try {
-        setIsLoadingArticles(true);
-
-        const params = {
-          page: 1,
-          limit: 50,
-          ...filters,
-        };
-
-        if (searchTerm) params.search = searchTerm;
-        if (filterStatus !== "todos") params.status = filterStatus;
-
-        const response = await articleService.getArticlesByProject(project.id, params);
-
-        setArticles(response.articles || []);
-        setPagination({
-          totalDocuments: response.total || 0,
-          page: response.page || 1,
-          limit: response.limit || 50,
-        });
-      } catch (error) {
-        console.error("Erro ao carregar artigos:", error);
-      } finally {
-        setIsLoadingArticles(false);
-      }
-    },
-    [project?.id, searchTerm, filterStatus]
-  );
-
-  useEffect(() => {
-    if (!project?.id) return;
-
-    const shouldDebounce = searchTerm || filterStatus !== "todos";
-    const timeoutId = setTimeout(() => {
-      fetchArticles();
-    }, shouldDebounce ? 500 : 0);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, filterStatus, project?.id, fetchArticles]);
-
-  useEffect(() => {
-    if (!project?.id) return;
-    loadFilterSummary();
-  }, [project?.id, loadFilterSummary]);
-
-  const loadRQSynthesis = useCallback(async () => {
+  const loadSummary = useCallback(async () => {
     if (!project?.id) {
       return;
     }
-
     try {
-      setIsLoadingRQSynthesis(true);
-      const response = await articleService.getProjectRQSynthesis(project.id);
-      setRqSynthesisData(response || null);
+      setIsLoadingSummary(true);
+      const response = await articleService.getSelectionSummary(project.id);
+      setSummary(response);
     } catch (error) {
-      console.error("Erro ao carregar síntese por RQ:", error);
-      setRqSynthesisData(null);
-      toast.error("Erro ao carregar síntese por RQ: " + error.message);
+      console.error("Erro ao carregar resumo do funil:", error);
     } finally {
-      setIsLoadingRQSynthesis(false);
+      setIsLoadingSummary(false);
     }
   }, [project?.id]);
 
-  const refreshProjectData = useCallback(
-    async ({ refreshFilter = true, refreshSynthesis = Boolean(rqSynthesisData) } = {}) => {
-      await fetchArticles();
-      if (refreshFilter) {
-        await loadFilterSummary();
-      }
-      if (refreshSynthesis && rqSynthesisData) {
-        await loadRQSynthesis();
-      }
-    },
-    [fetchArticles, loadFilterSummary, loadRQSynthesis, rqSynthesisData]
-  );
-
-  const runBatchEvaluate = async (options = {}) => {
-    if (!project?.id) return;
-
+  const loadReport = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
     try {
-      setIsBatchEvaluating(true);
-      const response = await articleService.batchEvaluateArticles(project.id, options);
-      const summary = response?.summary || {};
-      const evaluated = summary.evaluated || 0;
-      const skippedAlreadyEvaluated = summary.skippedAlreadyEvaluated || 0;
-      if (evaluated === 0 && skippedAlreadyEvaluated > 0) {
-        toast.success(
-          "Nenhum artigo novo para triagem: os pendentes já tinham score da IA."
-        );
-      } else {
-        toast.success(
-          `Triagem concluída: ${evaluated} avaliados, ${summary.suggestedIncluded || 0} sugeridos para inclusão e ${summary.suggestedExcluded || 0} para exclusão.`
-        );
-      }
-      await refreshProjectData();
+      setIsLoadingReport(true);
+      const response = await articleService.getSelectionReport(project.id);
+      setReport(response);
     } catch (error) {
-      console.error("Erro na triagem em lote:", error);
-      toast.error("Erro ao executar triagem em lote: " + error.message);
+      console.error("Erro ao carregar relatorio:", error);
     } finally {
-      setIsBatchEvaluating(false);
+      setIsLoadingReport(false);
     }
-  };
+  }, [project?.id]);
 
-  const handleUpdateArticleStatus = async (article, newStatus) => {
+  const loadDuplicateCandidates = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
     try {
-      await articleService.updateArticleStatus(project.id, article.id, newStatus);
-      await refreshProjectData();
-      toast.success(`Status do artigo atualizado para ${newStatus}`);
+      setIsLoadingDuplicates(true);
+      const response = await articleService.getDuplicateCandidates(project.id);
+      setDuplicateCandidates(response || []);
+      setSelectedDuplicateMap((current) => {
+        const next = {};
+        (response || []).forEach((group) => {
+          next[group.groupKey] = current[group.groupKey] || group.candidateIds?.[0] || null;
+        });
+        return next;
+      });
     } catch (error) {
-      console.error("Erro ao atualizar status do artigo:", error);
-      toast.error("Erro ao atualizar status: " + error.message);
+      console.error("Erro ao carregar duplicatas:", error);
+      setDuplicateCandidates([]);
+    } finally {
+      setIsLoadingDuplicates(false);
     }
-  };
+  }, [project?.id]);
 
-  const handleDeleteArticle = async (article) => {
-    if (!confirm(`Tem certeza que deseja deletar o artigo "${article.title}"?`)) {
+  const loadArticles = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+    if (!PHASE_FILTERS[activeFlowTab]) {
+      setArticles([]);
       return;
     }
 
     try {
-      await articleService.deleteArticle(project.id, article.id);
-      toast.success("Artigo deletado com sucesso!");
-      await refreshProjectData();
+      setIsLoadingArticles(true);
+      const response = await articleService.getArticlesByProject(project.id, {
+        ...PHASE_FILTERS[activeFlowTab],
+        search: searchTerm || undefined,
+        limit: 100,
+      });
+      setArticles(response.articles || []);
+      if (activeFlowTab !== "identification") {
+        setSelectedIdentificationIds([]);
+      }
     } catch (error) {
-      console.error("Erro ao deletar artigo:", error);
-      toast.error("Erro ao deletar artigo: " + error.message);
+      console.error("Erro ao carregar artigos:", error);
+      setArticles([]);
+    } finally {
+      setIsLoadingArticles(false);
     }
-  };
+  }, [activeFlowTab, project?.id, searchTerm]);
 
-  const openDecisionDialog = useCallback((article, initialDecision = null) => {
-    setDecisionArticle(article);
-    setDecisionInitialValue(initialDecision);
-    setIsDecisionDialogOpen(true);
+  useEffect(() => {
+    loadSummary();
+    loadReport();
+    loadDuplicateCandidates();
+  }, [loadDuplicateCandidates, loadReport, loadSummary]);
+
+  useEffect(() => {
+    loadArticles();
+  }, [loadArticles]);
+
+  const refreshAll = useCallback(
+    async ({ refreshRQSynthesis = false } = {}) => {
+      await Promise.all([loadSummary(), loadReport(), loadDuplicateCandidates(), loadArticles()]);
+      if (refreshRQSynthesis && rqSynthesisData) {
+        const synthesis = await articleService.getProjectRQSynthesis(project.id);
+        setRqSynthesisData(synthesis);
+      }
+    },
+    [loadArticles, loadDuplicateCandidates, loadReport, loadSummary, project?.id, rqSynthesisData]
+  );
+
+  const identificationArticles = useMemo(
+    () => articles.filter((article) => article.currentPhase === "identification"),
+    [articles]
+  );
+
+  const toggleIdentificationSelection = useCallback((articleId) => {
+    setSelectedIdentificationIds((current) =>
+      current.includes(articleId)
+        ? current.filter((value) => value !== articleId)
+        : [...current, articleId]
+    );
   }, []);
 
-  const closeDecisionDialog = useCallback(() => {
-    setIsDecisionDialogOpen(false);
-    setDecisionArticle(null);
-    setDecisionInitialValue(null);
-  }, []);
+  const runDedupAnalysis = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+    try {
+      setIsLoadingDuplicates(true);
+      const response = await articleService.analyzeDuplicates(project.id);
+      setDuplicateCandidates(response.candidates || []);
+      toast.success(`${response.candidateCount || 0} grupo(s) de duplicata detectado(s).`);
+      await refreshAll();
+    } catch (error) {
+      toast.error("Erro ao analisar duplicatas: " + error.message);
+    } finally {
+      setIsLoadingDuplicates(false);
+    }
+  }, [project?.id, refreshAll]);
 
-  const submitDecision = useCallback(
-    async (decisionPayload) => {
-      if (!project?.id || !decisionArticle?.id) {
-        throw new Error("Artigo inválido para decisão manual.");
+  const applyDuplicateReview = useCallback(async () => {
+    if (!project?.id || duplicateCandidates.length === 0) {
+      return;
+    }
+    try {
+      const decisions = duplicateCandidates
+        .map((group) => {
+          const canonicalArticleId = selectedDuplicateMap[group.groupKey];
+          if (!canonicalArticleId) {
+            return null;
+          }
+          return {
+            groupKey: group.groupKey,
+            canonicalArticleId,
+            duplicateArticleIds: group.candidateIds.filter((id) => id !== canonicalArticleId),
+            reasonCode: group.reasonCode,
+            reasonText: group.reasonText,
+          };
+        })
+        .filter(Boolean);
+
+      if (!decisions.length) {
+        toast.warning("Selecione pelo menos um artigo canônico para aplicar a deduplicacao.");
+        return;
       }
 
+      const response = await articleService.applyDuplicateDecisions(project.id, decisions);
+      toast.success(`${response.removedDuplicates || 0} duplicata(s) consolidadas.`);
+      await refreshAll();
+    } catch (error) {
+      toast.error("Erro ao aplicar revisao de duplicatas: " + error.message);
+    }
+  }, [duplicateCandidates, project?.id, refreshAll, selectedDuplicateMap]);
+
+  const promoteSelectedToScreening = useCallback(async () => {
+    if (!project?.id || !selectedIdentificationIds.length) {
+      toast.warning("Selecione registros de Identification para enviar ao screening.");
+      return;
+    }
+
+    try {
+      const response = await articleService.promoteToScreening(project.id, selectedIdentificationIds);
+      toast.success(`${response.movedCount || 0} registro(s) enviados para screening.`);
+      setSelectedIdentificationIds([]);
+      setActiveFlowTab("screening");
+      await refreshAll();
+    } catch (error) {
+      toast.error("Erro ao enviar registros para screening: " + error.message);
+    }
+  }, [project?.id, refreshAll, selectedIdentificationIds]);
+
+  const submitScreeningDecision = useCallback(
+    async (payload) => {
+      if (!project?.id || !screeningArticle?.id) {
+        return;
+      }
       try {
         setIsSavingDecision(true);
-        await articleService.updateArticleDecision(
-          project.id,
-          decisionArticle.id,
-          decisionPayload
-        );
-
-        await refreshProjectData();
-
-        toast.success("Decisão de triagem registrada com sucesso!");
-        closeDecisionDialog();
+        await articleService.submitScreeningDecision(project.id, screeningArticle.id, payload);
+        toast.success("Decisao de screening registrada.");
+        setScreeningArticle(null);
+        await refreshAll();
       } catch (error) {
-        console.error("Erro ao registrar decisão manual:", error);
+        toast.error("Erro ao salvar screening: " + error.message);
         throw error;
       } finally {
         setIsSavingDecision(false);
       }
     },
-    [closeDecisionDialog, decisionArticle?.id, project?.id, refreshProjectData]
+    [project?.id, refreshAll, screeningArticle]
   );
 
-  const handleNewArticleSuccess = useCallback(() => {
-    void refreshProjectData();
-  }, [refreshProjectData]);
+  const submitEligibilityDecision = useCallback(
+    async (payload) => {
+      if (!project?.id || !eligibilityArticle?.id) {
+        return;
+      }
+      try {
+        setIsSavingDecision(true);
+        await articleService.submitEligibilityDecision(project.id, eligibilityArticle.id, payload);
+        toast.success("Decisao de elegibilidade registrada.");
+        onGraphNeedsRefresh?.();
+        setEligibilityArticle(null);
+        await refreshAll({ refreshRQSynthesis: true });
+      } catch (error) {
+        toast.error("Erro ao salvar elegibilidade: " + error.message);
+        throw error;
+      } finally {
+        setIsSavingDecision(false);
+      }
+    },
+    [eligibilityArticle, onGraphNeedsRefresh, project?.id, refreshAll]
+  );
 
-  const handleImportSuccess = useCallback(() => {
-    void refreshProjectData();
-  }, [refreshProjectData]);
+  const updateFullTextStatus = useCallback(
+    async (article, fullTextStatus) => {
+      if (!project?.id || !article?.id) {
+        return;
+      }
+      try {
+        const reasonText =
+          fullTextStatus === "unavailable"
+            ? prompt("Informe o motivo para texto completo indisponivel:")
+            : null;
+        if (fullTextStatus === "unavailable" && !reasonText?.trim()) {
+          return;
+        }
+        await articleService.updateFullTextStatus(project.id, article.id, {
+          fullTextStatus,
+          reasonText,
+        });
+        toast.success("Status do texto completo atualizado.");
+        await refreshAll();
+      } catch (error) {
+        toast.error("Erro ao atualizar status do texto completo: " + error.message);
+      }
+    },
+    [project?.id, refreshAll]
+  );
 
-  const handleEditSuccess = useCallback(() => {
-    void refreshProjectData();
-  }, [refreshProjectData]);
+  const runBatchEvaluate = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+    try {
+      setIsBatchEvaluating(true);
+      const response = await articleService.batchEvaluateScreening(project.id, {
+        onlyPending: true,
+        forceReevaluate: false,
+      });
+      toast.success(
+        `Triagem IA: ${response.summary?.evaluated || 0} avaliados, ${response.summary?.suggestedIncluded || 0} sugeridos para inclusao e ${response.summary?.suggestedExcluded || 0} para exclusao.`
+      );
+      await refreshAll();
+    } catch (error) {
+      toast.error("Erro ao executar triagem IA: " + error.message);
+    } finally {
+      setIsBatchEvaluating(false);
+    }
+  }, [project?.id, refreshAll]);
 
-  const handleUploadPdfSuccess = useCallback(() => {
-    void refreshProjectData({ refreshFilter: false });
-  }, [refreshProjectData]);
+  const loadRQSynthesis = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+    try {
+      setIsLoadingRQSynthesis(true);
+      const response = await articleService.getProjectRQSynthesis(project.id);
+      setRqSynthesisData(response || null);
+    } catch (error) {
+      toast.error("Erro ao carregar sintese por RQ: " + error.message);
+    } finally {
+      setIsLoadingRQSynthesis(false);
+    }
+  }, [project?.id]);
 
-  const statusList = [
-    { value: "todos", label: "Todos" },
-    { value: "pendente", label: "Pendentes" },
-    { value: "analisado", label: "Analisados" },
-    { value: "excluido", label: "Excluídos" },
-  ];
+  const handleDeleteArticle = useCallback(
+    async (article) => {
+      if (!project?.id || !article?.id) {
+        return;
+      }
+      if (!confirm(`Deseja remover o registro "${article.title}"?`)) {
+        return;
+      }
+      try {
+        await articleService.deleteArticle(project.id, article.id);
+        toast.success("Registro removido com sucesso.");
+        await refreshAll({ refreshRQSynthesis: true });
+      } catch (error) {
+        toast.error("Erro ao remover registro: " + error.message);
+      }
+    },
+    [project?.id, refreshAll]
+  );
 
   return {
-    isLoadingArticles,
-    isLoadingFilterSummary,
-    isBatchEvaluating,
-    isLoadingRQSynthesis,
-    isSavingDecision,
-    isDecisionDialogOpen,
-    decisionArticle,
-    decisionInitialValue,
-    searchTerm,
-    setSearchTerm,
-    filterStatus,
-    setFilterStatus,
+    activeFlowTab,
+    applyDuplicateReview,
     articles,
-    pagination,
-    filterSummary,
-    rqSynthesisData,
-    fetchArticles,
-    runBatchEvaluate,
-    loadRQSynthesis,
-    openDecisionDialog,
-    closeDecisionDialog,
-    submitDecision,
-    handleUpdateArticleStatus,
+    duplicateCandidates,
+    eligibilityArticle,
     handleDeleteArticle,
-    handleNewArticleSuccess,
-    handleImportSuccess,
-    handleEditSuccess,
-    handleUploadPdfSuccess,
-    statusList,
+    identificationArticles,
+    isBatchEvaluating,
+    isLoadingArticles,
+    isLoadingDuplicates,
+    isLoadingReport,
+    isLoadingRQSynthesis,
+    isLoadingSummary,
+    isSavingDecision,
+    loadRQSynthesis,
+    promoteSelectedToScreening,
+    report,
+    refreshAll,
+    rqSynthesisData,
+    runBatchEvaluate,
+    runDedupAnalysis,
+    screeningArticle,
+    searchTerm,
+    selectedDuplicateMap,
+    selectedIdentificationIds,
+    setActiveFlowTab,
+    setEligibilityArticle,
+    setScreeningArticle,
+    setSearchTerm,
+    setSelectedDuplicateMap,
+    submitEligibilityDecision,
+    submitScreeningDecision,
+    summary,
+    toggleIdentificationSelection,
+    updateFullTextStatus,
   };
 };

@@ -163,7 +163,7 @@ class PostgresMCPService:
             return {"papers": []}
             
         filters = filters or {}
-        status_filter = filters.get("status", ["pendente", "analisado"])
+        outcome_filter = filters.get("review_outcome", ["included"])
         
         # Arrays são passados via cast explícito para compatibilidade com asyncpg.
         query = """
@@ -177,16 +177,17 @@ class PostgresMCPService:
                    year,
                    journal,
                    notas,
-                   status
+                   status,
+                   "reviewOutcome" as review_outcome
             FROM articles
             WHERE "projectId" = :project_id
               AND "paperId" = ANY(CAST(:ids AS text[]))
-              AND status = ANY(CAST(:status_list AS text[]))
+              AND "reviewOutcome" = ANY(CAST(:outcome_list AS text[]))
         """
         
         result = await self.mcp_query(
             query=query, 
-            params={"project_id": project_id, "ids": ids, "status_list": status_filter},
+            params={"project_id": project_id, "ids": ids, "outcome_list": outcome_filter},
             max_rows=len(ids) # Permite retornar todos os IDs solicitados
         )
         

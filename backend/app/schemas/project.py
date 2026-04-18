@@ -1,9 +1,11 @@
 from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
 class PICOCSchema(BaseModel):
     """Schema de componentes de framework com chaves canônicas em inglês."""
+
     outcome: str | None = Field(None, max_length=500)
     population: str | None = Field(None, max_length=500)
     intervention: str | None = Field(None, max_length=500)
@@ -13,30 +15,29 @@ class PICOCSchema(BaseModel):
     studyDesign: str | None = Field(None, max_length=500)
 
 
-class ProjectCreate(BaseModel):
+class ProjectBase(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=100)
+    objetivo: str | None = Field(None, min_length=1, max_length=1000)
+    status: str | None = "ideia"
+    framework: str | None = "PICOC"
+    picoc: PICOCSchema | None = None
+    researchQuestions: list[str] | None = Field(default_factory=list)
+    keywords: list[str] | None = Field(default_factory=list)
+    searchStrings: list[str] | None = Field(default_factory=list)
+    criteriosInclusao: list[str] | None = Field(default_factory=list)
+    criteriosExclusao: list[str] | None = Field(default_factory=list)
+    eligibilityChecklist: list[str] | None = Field(default_factory=list)
+    screeningGuidance: str | None = Field(None, max_length=4000)
+    selectionReportNotes: str | None = Field(None, max_length=4000)
+
+
+class ProjectCreate(ProjectBase):
     title: str = Field(..., min_length=1, max_length=100)
     objetivo: str = Field(..., min_length=1, max_length=1000)
-    status: str = Field(default="ideia")
-    framework: str = Field(default="PICOC")
-    picoc: PICOCSchema | None = None
-    researchQuestions: list[str] | None = []
-    keywords: list[str] | None = []
-    searchStrings: list[str] | None = []
-    criteriosInclusao: list[str] | None = []
-    criteriosExclusao: list[str] | None = []
 
 
-class ProjectUpdate(BaseModel):
-    title: str | None = Field(None, max_length=100)
-    objetivo: str | None = Field(None, max_length=1000)
-    status: str | None = None
-    framework: str | None = None
-    picoc: PICOCSchema | None = None
-    researchQuestions: list[str] | None = None
-    keywords: list[str] | None = None
-    searchStrings: list[str] | None = None
-    criteriosInclusao: list[str] | None = None
-    criteriosExclusao: list[str] | None = None
+class ProjectUpdate(ProjectBase):
+    pass
 
 
 class ProjectResponse(BaseModel):
@@ -46,11 +47,14 @@ class ProjectResponse(BaseModel):
     status: str
     framework: str = "PICOC"
     picoc: dict | None = None
-    researchQuestions: list[str] | None = []
-    keywords: list[str] | None = []
-    searchStrings: list[str] | None = []
-    criteriosInclusao: list[str] | None = []
-    criteriosExclusao: list[str] | None = []
+    researchQuestions: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    searchStrings: list[str] = Field(default_factory=list)
+    criteriosInclusao: list[str] = Field(default_factory=list)
+    criteriosExclusao: list[str] = Field(default_factory=list)
+    eligibilityChecklist: list[str] = Field(default_factory=list)
+    screeningGuidance: str | None = None
+    selectionReportNotes: str | None = None
     ownerId: int
     createdAt: datetime
     updatedAt: datetime
@@ -60,6 +64,6 @@ class ProjectResponse(BaseModel):
         from_attributes = True
 
 
-class ProjectListResponse(BaseModel): 
+class ProjectListResponse(BaseModel):
     projects: list[ProjectResponse]
     total: int
