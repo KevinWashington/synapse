@@ -27,6 +27,8 @@ class Project(Base):
     criteriosInclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
     criteriosExclusao: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
     eligibilityChecklist: Mapped[list[str] | None] = mapped_column(ARRAY(Text), default=list)
+    dataExtractionSchema: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True, default=list)
+    qualityAssessmentSchema: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True, default=list)
     screeningGuidance: Mapped[str | None] = mapped_column(Text, nullable=True)
     selectionReportNotes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -72,9 +72,8 @@ function useProjectsPage() {
   );
 
   const handleProjectClick = useCallback((project) => {
-    setSelectedProject(project);
-    setDetailOpen(true);
-  }, []);
+    navigate(`/projetos/${project.id}`);
+  }, [navigate]);
 
   const handleExpandProject = useCallback(() => {
     if (selectedProject?.id) {

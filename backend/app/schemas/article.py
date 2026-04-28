@@ -1,11 +1,12 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 ENTRY_METHODS = Literal["manual", "bibtex"]
 SOURCE_CATEGORIES = Literal["database", "grey_literature", "manual_other"]
+STUDY_TYPES = Literal["journal_article", "conference_paper", "review", "thesis", "book_chapter", "other"]
 CURRENT_PHASES = Literal["identification", "screening", "eligibility", "included"]
 REVIEW_OUTCOMES = Literal[
     "active",
@@ -36,6 +37,7 @@ class ArticleCreate(BaseModel):
     sourceName: str = Field(..., min_length=1, max_length=120)
     entryMethod: ENTRY_METHODS = "manual"
     importBatchLabel: str | None = Field(None, max_length=120)
+    studyType: STUDY_TYPES | None = None
     paperId: str | None = Field(None, max_length=120)
     doi: str | None = Field(None, max_length=100)
     abstract: str | None = Field(None, max_length=8000)
@@ -55,6 +57,7 @@ class ArticleUpdate(BaseModel):
     sourceCategory: SOURCE_CATEGORIES | None = None
     sourceName: str | None = Field(None, min_length=1, max_length=120)
     importBatchLabel: str | None = Field(None, max_length=120)
+    studyType: STUDY_TYPES | None = None
     paperId: str | None = Field(None, max_length=120)
     doi: str | None = Field(None, max_length=100)
     abstract: str | None = None
@@ -90,6 +93,7 @@ class ImportBibTeXRequest(BaseModel):
     sourceCategory: SOURCE_CATEGORIES
     sourceName: str = Field(..., min_length=1, max_length=120)
     importBatchLabel: str | None = Field(None, max_length=120)
+    studyType: STUDY_TYPES | None = None
     entries: list[ImportBibTeXArticleInput] = Field(default_factory=list)
 
 
@@ -189,6 +193,12 @@ class EligibilityDecisionRequest(BaseModel):
     answeringRQs: list[int] = Field(default_factory=list)
 
 
+class ArticleEvidenceUpdate(BaseModel):
+    extractionData: dict[str, Any] = Field(default_factory=dict)
+    qualityAssessmentAnswers: dict[str, Literal["yes", "partial", "no", "na"] | None] = Field(default_factory=dict)
+    markExtractionComplete: bool = False
+
+
 class BatchEvaluateRequest(BaseModel):
     limit: int = Field(default=200, ge=1, le=2000)
     onlyPending: bool = True
@@ -233,6 +243,7 @@ class ArticleResponse(BaseModel):
     sourceName: str
     entryMethod: str
     importBatchLabel: str | None = None
+    studyType: str | None = None
     currentPhase: str
     reviewOutcome: str
     duplicateGroupKey: str | None = None
@@ -268,6 +279,11 @@ class ArticleResponse(BaseModel):
     exclusionCriteria: list[str] | None = None
     answeringRQs: list[int] | None = None
     decisionUpdatedAt: datetime | None = None
+    extractionData: dict | None = None
+    extractionCompletedAt: datetime | None = None
+    qualityAssessmentAnswers: dict | None = None
+    qualityScore: float | None = None
+    qualityRating: str | None = None
     aiMethodology: str | None = None
     aiDatabase: str | None = None
     aiDomain: str | None = None

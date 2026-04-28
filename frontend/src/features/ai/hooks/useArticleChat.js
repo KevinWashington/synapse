@@ -6,35 +6,31 @@ function buildWelcomeMessage({ article, articleContent, loadingContent, pdfData 
 
   if (article?.hasPdf === false) {
     statusMessage = article?.abstract
-      ? "Este artigo nÃ£o possui PDF. Posso ajudar com base no resumo e nos metadados disponÃ­veis."
-      : "Este artigo nÃ£o possui PDF. Posso ajudar com os metadados cadastrados.";
+      ? "Este artigo nao possui PDF. Posso ajudar com base no resumo e nos metadados disponiveis."
+      : "Este artigo nao possui PDF. Posso ajudar com os metadados cadastrados.";
   } else if (!pdfData) {
     statusMessage = "Aguardando carregamento do PDF...";
   } else if (loadingContent) {
-    statusMessage = "Extraindo conteúdo do PDF...";
+    statusMessage = "Extraindo conteudo do PDF...";
   } else if (articleContent) {
-    statusMessage = "Conteúdo do PDF carregado com sucesso!";
+    statusMessage = "Conteudo do PDF carregado com sucesso.";
   } else {
-    statusMessage = "PDF carregado, mas conteúdo não disponível.";
+    statusMessage = "PDF carregado, mas o conteudo ainda nao esta disponivel.";
   }
 
   return {
     id: "welcome",
     role: "assistant",
-    content: `Olá! Sou seu assistente de pesquisa acadêmica. Estou analisando o artigo "${article.title}". ${statusMessage}\n\n${
-      articleContent ? "Posso ajudar você com:" : "Aguarde o carregamento completo para:"
-    }\n\n• Análise do conteúdo\n• Explicação de conceitos\n• Identificação de pontos-chave\n• Sugestões para suas notas\n\n${
-      articleContent
-        ? "Faça suas perguntas sobre o artigo!"
-        : "O conteúdo será disponibilizado em breve."
-    }`,
+    content: `Ola! Estou analisando o artigo "${article.title}". ${statusMessage}\n\n${
+      articleContent ? "Posso ajudar com:" : "Assim que o conteudo estiver pronto, posso ajudar com:"
+    }\n\n- Analise do conteudo\n- Explicacao de conceitos\n- Identificacao de pontos-chave\n- Sugestoes para suas notas`,
   };
 }
 
 async function extractPdfContent(pdfData) {
   if (!(pdfData instanceof ArrayBuffer)) {
-    console.error("pdfData inválido:", typeof pdfData, pdfData);
-    throw new Error("Dados do PDF inválidos");
+    console.error("pdfData invalido:", typeof pdfData, pdfData);
+    throw new Error("Dados do PDF invalidos");
   }
 
   const pdfjsLib = await import(
@@ -70,6 +66,17 @@ function useArticleChat({ article, onAddNote, pdfData }) {
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
+    setArticleContent(null);
+    setError(null);
+    setInput("");
+    setIsLoading(false);
+    setLoadingContent(false);
+    setMessages([]);
+  }, [article?.id]);
+
+  useEffect(() => {
+    let shouldIgnore = false;
+
     async function loadArticleContent() {
       if (!article || articleContent || !pdfData) {
         return;
@@ -79,15 +86,23 @@ function useArticleChat({ article, onAddNote, pdfData }) {
 
       try {
         const extractedText = await extractPdfContent(pdfData);
-        setArticleContent(extractedText);
+        if (!shouldIgnore) {
+          setArticleContent(extractedText);
+        }
       } catch (loadError) {
-        console.error("Erro ao extrair conteúdo do PDF:", loadError);
+        console.error("Erro ao extrair conteudo do PDF:", loadError);
       } finally {
-        setLoadingContent(false);
+        if (!shouldIgnore) {
+          setLoadingContent(false);
+        }
       }
     }
 
     loadArticleContent();
+
+    return () => {
+      shouldIgnore = true;
+    };
   }, [article, articleContent, pdfData]);
 
   useEffect(() => {

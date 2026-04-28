@@ -6,15 +6,18 @@ import pytest
 
 def _load_articles_router_module(monkeypatch):
     monkeypatch.setenv("DEBUG", "false")
-    sys.modules.pop("app.models.article", None)
-    sys.modules.pop("app.routers.articles", None)
 
     import app.config as config_module
 
     importlib.reload(config_module)
-    importlib.import_module("app.models.article")
+    for module_name in ("app.models.user", "app.models.project", "app.models.article"):
+        existing = sys.modules.get(module_name)
+        if existing is not None and getattr(existing, "__file__", None) is None:
+            sys.modules.pop(module_name, None)
+        if module_name not in sys.modules:
+            importlib.import_module(module_name)
     module = importlib.import_module("app.routers.articles")
-    return module
+    return importlib.reload(module)
 
 
 class FakeUser:
@@ -22,8 +25,11 @@ class FakeUser:
 
 
 class FakeProject:
+    id = 9
     title = "Projeto RQ"
     researchQuestions = ["RQ1", "RQ2", "RQ3"]
+    dataExtractionSchema = []
+    qualityAssessmentSchema = []
 
 
 class FakeArticle:

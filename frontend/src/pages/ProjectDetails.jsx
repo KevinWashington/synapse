@@ -5,18 +5,20 @@ import {
   FileTextIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState, LoadingState } from "@/components/layout";
 import {
   EditProjectPanel,
   ProjectDetailsHeader,
-  ProjectFrameworkBadge,
+  ProjectOverview,
   useProjectDetailsPage,
 } from "@/features/projects";
 import { usePageTitle } from "@hooks/usePageTitle";
 
 const ProjectArticles = lazy(() => import("@features/articles/components/ProjectArticles"));
-const ArticleGraph = lazy(() => import("@features/articles/components/ArticleGraph"));
+const ProjectPrismaFlow = lazy(() => import("@features/articles/components/ProjectPrismaFlow"));
+const ProjectAnalytics = lazy(() =>
+  import("@features/projects/components/ProjectAnalytics")
+);
 const ProjectPlanning = lazy(() =>
   import("@features/projects/components/ProjectPlanning")
 );
@@ -26,7 +28,7 @@ function ProjectTabLoader() {
 }
 
 function ProjectDetails() {
-  const updateTitle = usePageTitle({ title: "", backUrl: "/projetos" });
+  const updateTitle = usePageTitle({ title: "" });
   const {
     activeTab,
     editData,
@@ -37,6 +39,7 @@ function ProjectDetails() {
     handleDeleteProject,
     handleEditProject,
     handleGraphNeedsRefresh,
+    handleProjectUpdated,
     handleSaveEdit,
     loading,
     navigate,
@@ -52,15 +55,22 @@ function ProjectDetails() {
     }
 
     updateTitle({
-      title: project.title,
+      title: "",
       badge: (
-        <div className="flex items-center gap-2">
-          <StatusBadge status={project.status} />
-          <ProjectFrameworkBadge framework={project.framework} />
+        <div className="flex min-w-0 items-center gap-2 text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => navigate("/projetos")}
+            className="text-[#6259ff] hover:text-[#5148ee]"
+          >
+            Projetos
+          </button>
+          <span className="text-[#a4adc2]">/</span>
+          <span className="truncate text-[#667391]">{project.title}</span>
         </div>
       ),
     });
-  }, [project, updateTitle]);
+  }, [navigate, project?.title, updateTitle]);
 
   if (loading) {
     return <LoadingState message="Carregando projeto..." fullPage />;
@@ -98,6 +108,8 @@ function ProjectDetails() {
     <div className="flex h-full flex-col">
       <ProjectDetailsHeader
         activeTab={activeTab}
+        project={project}
+        onContinueScreening={() => navigate(`/projetos/${project.id}?tab=artigos&flow=screening`)}
         onDeleteProject={handleDeleteProject}
         onEditProject={handleEditProject}
         onTabChange={setActiveTab}
@@ -105,18 +117,39 @@ function ProjectDetails() {
 
       <div className="min-h-0 flex-1">
         <Suspense fallback={<ProjectTabLoader />}>
-          {activeTab === "planejamento" && <ProjectPlanning project={project} />}
+          {activeTab === "overview" && (
+            <ProjectOverview
+              project={project}
+              onGoToScreening={() => navigate(`/projetos/${project.id}?tab=artigos&flow=screening`)}
+              onImportArticles={() => navigate(`/projetos/${project.id}?tab=artigos&flow=identification&action=import`)}
+              onOpenArticle={(articleId) => navigate(`/projetos/${project.id}/artigos/${articleId}`)}
+              onOpenPlanning={() => setActiveTab("planejamento")}
+              onViewFlow={() => navigate(`/projetos/${project.id}?tab=fluxo`)}
+            />
+          )}
+          {activeTab === "planejamento" && (
+            <ProjectPlanning project={project} onProjectUpdated={handleProjectUpdated} />
+          )}
           {activeTab === "artigos" && (
             <ProjectArticles
               project={project}
               onNavigate={navigate}
               onGraphNeedsRefresh={handleGraphNeedsRefresh}
+              onViewFlow={() => navigate(`/projetos/${project.id}?tab=fluxo`)}
+            />
+          )}
+          {activeTab === "fluxo" && (
+            <ProjectPrismaFlow
+              project={project}
+              onEditFlow={() => navigate(`/projetos/${project.id}?tab=artigos&flow=identification`)}
             />
           )}
           {activeTab === "grafo" && (
-            <ArticleGraph
-              projectId={project.id}
+            <ProjectAnalytics
+              project={project}
               graphRefreshToken={graphRefreshToken}
+              onGoToScreening={() => navigate(`/projetos/${project.id}?tab=artigos&flow=screening`)}
+              onOpenArticle={(articleId) => navigate(`/projetos/${project.id}/artigos/${articleId}?flow=included&workspace=extracao`)}
             />
           )}
         </Suspense>

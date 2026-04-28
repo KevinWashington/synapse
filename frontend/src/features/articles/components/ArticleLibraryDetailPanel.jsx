@@ -10,6 +10,9 @@ function ArticleLibraryDetailPanel({
   projectId,
 }) {
   const navigate = useNavigate();
+  const articleDetailsUrl = article
+    ? `/projetos/${projectId}/artigos/${article.id}?tab=artigos&workspace=notas`
+    : null;
 
   return (
     <SlidePanel
@@ -20,7 +23,7 @@ function ArticleLibraryDetailPanel({
       badge={article && <StatusBadge status={article.status} />}
       onExpand={
         article
-          ? () => navigate(`/projetos/${projectId}/artigos/${article.id}`)
+          ? () => navigate(articleDetailsUrl)
           : undefined
       }
     >
@@ -116,7 +119,7 @@ function ArticleLibraryDetailPanel({
           <div className="flex gap-2 pt-2">
             <Button
               size="sm"
-              onClick={() => navigate(`/projetos/${projectId}/artigos/${article.id}`)}
+              onClick={() => navigate(articleDetailsUrl)}
             >
               Revisar Artigo
             </Button>

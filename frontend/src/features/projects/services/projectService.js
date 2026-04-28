@@ -68,6 +68,8 @@ class ProjectService {
         criteriosInclusao,
         criteriosExclusao,
         eligibilityChecklist,
+        dataExtractionSchema,
+        qualityAssessmentSchema,
         screeningGuidance,
         selectionReportNotes,
         // Excluir campos que não devem ser enviados
@@ -94,6 +96,8 @@ class ProjectService {
         criteriosInclusao,
         criteriosExclusao,
         eligibilityChecklist,
+        dataExtractionSchema,
+        qualityAssessmentSchema,
         screeningGuidance,
         selectionReportNotes,
       };
@@ -179,6 +183,57 @@ class ProjectService {
       });
     } catch (error) {
       console.error("Erro ao gerar critérios:", error);
+      throw error;
+    }
+  }
+
+  async getProjectOverview(id) {
+    try {
+      if (!id) {
+        throw new Error("ID do projeto é obrigatório");
+      }
+
+      return await apiService.get(`${this.endpoint}/${id}/overview`);
+    } catch (error) {
+      console.error(`Erro ao buscar visão geral do projeto ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async generateDataExtractionSchema(
+    researchQuestions,
+    picocData,
+    project,
+    framework = "PICOC"
+  ) {
+    try {
+      return await apiService.post("/api/generate-data-extraction-schema", {
+        researchQuestions,
+        picocData,
+        projeto: project,
+        framework,
+      });
+    } catch (error) {
+      console.error("Erro ao gerar esquema de extracao:", error);
+      throw error;
+    }
+  }
+
+  async generateQualityAssessmentSchema(
+    researchQuestions,
+    picocData,
+    project,
+    framework = "PICOC"
+  ) {
+    try {
+      return await apiService.post("/api/generate-quality-assessment-schema", {
+        researchQuestions,
+        picocData,
+        projeto: project,
+        framework,
+      });
+    } catch (error) {
+      console.error("Erro ao gerar criterios de qualidade:", error);
       throw error;
     }
   }

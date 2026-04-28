@@ -77,6 +77,42 @@ async def init_db():
         await conn.execute(text(
             'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "decisionUpdatedAt" TIMESTAMP WITH TIME ZONE'
         ))
+        await conn.execute(text(
+            'ALTER TABLE projects ADD COLUMN IF NOT EXISTS "dataExtractionSchema" JSON DEFAULT \'[]\'::json'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE projects ADD COLUMN IF NOT EXISTS "qualityAssessmentSchema" JSON DEFAULT \'[]\'::json'
+        ))
+        await conn.execute(text(
+            'UPDATE projects SET "dataExtractionSchema" = \'[]\'::json WHERE "dataExtractionSchema" IS NULL'
+        ))
+        await conn.execute(text(
+            'UPDATE projects SET "qualityAssessmentSchema" = \'[]\'::json WHERE "qualityAssessmentSchema" IS NULL'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "extractionData" JSON DEFAULT \'{}\'::json'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "extractionCompletedAt" TIMESTAMP WITH TIME ZONE'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "qualityAssessmentAnswers" JSON DEFAULT \'{}\'::json'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "qualityScore" DOUBLE PRECISION'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "qualityRating" VARCHAR(20)'
+        ))
+        await conn.execute(text(
+            'ALTER TABLE articles ADD COLUMN IF NOT EXISTS "studyType" VARCHAR(50)'
+        ))
+        await conn.execute(text(
+            'UPDATE articles SET "extractionData" = \'{}\'::json WHERE "extractionData" IS NULL'
+        ))
+        await conn.execute(text(
+            'UPDATE articles SET "qualityAssessmentAnswers" = \'{}\'::json WHERE "qualityAssessmentAnswers" IS NULL'
+        ))
 
 
 async def get_db() -> AsyncSession:

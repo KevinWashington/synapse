@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
 import { toast } from "@/lib/toast";
 
@@ -8,11 +9,23 @@ const PHASE_FILTERS = {
   eligibility: { phase: "eligibility" },
   included: { outcome: "included" },
 };
+const FLOW_TABS = new Set([
+  "overview",
+  "identification",
+  "screening",
+  "eligibility",
+  "included",
+  "report",
+]);
 
 export const useProjectArticles = (project, onGraphNeedsRefresh) => {
-  const [activeFlowTab, setActiveFlowTab] = useState("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeFlowTab, setActiveFlowTabState] = useState(() => {
+    const requestedFlow = searchParams.get("flow");
+    return FLOW_TABS.has(requestedFlow) ? requestedFlow : "overview";
+  });
   const [articles, setArticles] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTermsByFlow, setSearchTermsByFlow] = useState({});
   const [summary, setSummary] = useState(null);
   const [report, setReport] = useState(null);
   const [duplicateCandidates, setDuplicateCandidates] = useState([]);
@@ -22,12 +35,50 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   const [isLoadingDuplicates, setIsLoadingDuplicates] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
-  const [isLoadingRQSynthesis, setIsLoadingRQSynthesis] = useState(false);
-  const [rqSynthesisData, setRqSynthesisData] = useState(null);
+  const [isLoadingSynthesisReport, setIsLoadingSynthesisReport] = useState(false);
+  const [synthesisReportData, setSynthesisReportData] = useState(null);
   const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
   const [selectedDuplicateMap, setSelectedDuplicateMap] = useState({});
   const [screeningArticle, setScreeningArticle] = useState(null);
   const [eligibilityArticle, setEligibilityArticle] = useState(null);
+  const searchTerm = searchTermsByFlow[activeFlowTab] || "";
+
+  useEffect(() => {
+    const requestedFlow = searchParams.get("flow");
+    const nextFlow = FLOW_TABS.has(requestedFlow) ? requestedFlow : "overview";
+
+    setActiveFlowTabState((current) => (current === nextFlow ? current : nextFlow));
+  }, [searchParams]);
+
+  const setActiveFlowTab = useCallback(
+    (nextFlowTab) => {
+      const resolvedFlowTab = FLOW_TABS.has(nextFlowTab) ? nextFlowTab : "overview";
+
+      setActiveFlowTabState(resolvedFlowTab);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+
+        if (resolvedFlowTab === "overview") {
+          next.delete("flow");
+        } else {
+          next.set("flow", resolvedFlowTab);
+        }
+
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
+
+  const setSearchTerm = useCallback(
+    (value) => {
+      setSearchTermsByFlow((current) => ({
+        ...current,
+        [activeFlowTab]: value,
+      }));
+    },
+    [activeFlowTab]
+  );
 
   const loadSummary = useCallback(async () => {
     if (!project?.id) {
@@ -82,11 +133,14 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     }
   }, [project?.id]);
 
-  const loadArticles = useCallback(async () => {
+  const loadArticles = useCallback(async (flowOverride = activeFlowTab) => {
     if (!project?.id) {
       return;
     }
-    if (!PHASE_FILTERS[activeFlowTab]) {
+    const resolvedFlowTab = FLOW_TABS.has(flowOverride) ? flowOverride : activeFlowTab;
+    const currentSearchTerm = searchTermsByFlow[resolvedFlowTab] || "";
+
+    if (!PHASE_FILTERS[resolvedFlowTab]) {
       setArticles([]);
       return;
     }
@@ -94,12 +148,12 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     try {
       setIsLoadingArticles(true);
       const response = await articleService.getArticlesByProject(project.id, {
-        ...PHASE_FILTERS[activeFlowTab],
-        search: searchTerm || undefined,
+        ...PHASE_FILTERS[resolvedFlowTab],
+        search: currentSearchTerm || undefined,
         limit: 100,
       });
       setArticles(response.articles || []);
-      if (activeFlowTab !== "identification") {
+      if (resolvedFlowTab !== "identification") {
         setSelectedIdentificationIds([]);
       }
     } catch (error) {
@@ -108,7 +162,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     } finally {
       setIsLoadingArticles(false);
     }
-  }, [activeFlowTab, project?.id, searchTerm]);
+  }, [activeFlowTab, project?.id, searchTermsByFlow]);
 
   useEffect(() => {
     loadSummary();
@@ -117,18 +171,38 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   }, [loadDuplicateCandidates, loadReport, loadSummary]);
 
   useEffect(() => {
-    loadArticles();
-  }, [loadArticles]);
+    loadArticles(activeFlowTab);
+  }, [activeFlowTab, loadArticles]);
 
   const refreshAll = useCallback(
-    async ({ refreshRQSynthesis = false } = {}) => {
-      await Promise.all([loadSummary(), loadReport(), loadDuplicateCandidates(), loadArticles()]);
-      if (refreshRQSynthesis && rqSynthesisData) {
-        const synthesis = await articleService.getProjectRQSynthesis(project.id);
-        setRqSynthesisData(synthesis);
+    async ({ refreshSynthesisReport = false, targetFlowTab } = {}) => {
+      const flowToLoad = targetFlowTab || activeFlowTab;
+
+      if (targetFlowTab) {
+        setActiveFlowTab(targetFlowTab);
+      }
+
+      await Promise.all([
+        loadSummary(),
+        loadReport(),
+        loadDuplicateCandidates(),
+        loadArticles(flowToLoad),
+      ]);
+      if (refreshSynthesisReport && synthesisReportData) {
+        const synthesis = await articleService.getProjectSynthesisReport(project.id);
+        setSynthesisReportData(synthesis);
       }
     },
-    [loadArticles, loadDuplicateCandidates, loadReport, loadSummary, project?.id, rqSynthesisData]
+    [
+      activeFlowTab,
+      loadArticles,
+      loadDuplicateCandidates,
+      loadReport,
+      loadSummary,
+      project?.id,
+      setActiveFlowTab,
+      synthesisReportData,
+    ]
   );
 
   const identificationArticles = useMemo(
@@ -197,18 +271,17 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
 
   const promoteSelectedToScreening = useCallback(async () => {
     if (!project?.id || !selectedIdentificationIds.length) {
-      toast.warning("Selecione registros de Identification para enviar ao screening.");
+      toast.warning("Selecione registros de identificacao para enviar para triagem.");
       return;
     }
 
     try {
       const response = await articleService.promoteToScreening(project.id, selectedIdentificationIds);
-      toast.success(`${response.movedCount || 0} registro(s) enviados para screening.`);
+      toast.success(`${response.movedCount || 0} registro(s) enviados para triagem.`);
       setSelectedIdentificationIds([]);
-      setActiveFlowTab("screening");
-      await refreshAll();
+      await refreshAll({ targetFlowTab: "screening" });
     } catch (error) {
-      toast.error("Erro ao enviar registros para screening: " + error.message);
+      toast.error("Erro ao enviar registros para triagem: " + error.message);
     }
   }, [project?.id, refreshAll, selectedIdentificationIds]);
 
@@ -220,11 +293,11 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       try {
         setIsSavingDecision(true);
         await articleService.submitScreeningDecision(project.id, screeningArticle.id, payload);
-        toast.success("Decisao de screening registrada.");
+        toast.success("Decisao de triagem registrada.");
         setScreeningArticle(null);
         await refreshAll();
       } catch (error) {
-        toast.error("Erro ao salvar screening: " + error.message);
+        toast.error("Erro ao salvar triagem: " + error.message);
         throw error;
       } finally {
         setIsSavingDecision(false);
@@ -244,7 +317,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         toast.success("Decisao de elegibilidade registrada.");
         onGraphNeedsRefresh?.();
         setEligibilityArticle(null);
-        await refreshAll({ refreshRQSynthesis: true });
+        await refreshAll({ refreshSynthesisReport: true });
       } catch (error) {
         toast.error("Erro ao salvar elegibilidade: " + error.message);
         throw error;
@@ -261,16 +334,9 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         return;
       }
       try {
-        const reasonText =
-          fullTextStatus === "unavailable"
-            ? prompt("Informe o motivo para texto completo indisponivel:")
-            : null;
-        if (fullTextStatus === "unavailable" && !reasonText?.trim()) {
-          return;
-        }
         await articleService.updateFullTextStatus(project.id, article.id, {
           fullTextStatus,
-          reasonText,
+          reasonText: null,
         });
         toast.success("Status do texto completo atualizado.");
         await refreshAll();
@@ -302,18 +368,18 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     }
   }, [project?.id, refreshAll]);
 
-  const loadRQSynthesis = useCallback(async () => {
+  const loadSynthesisReport = useCallback(async () => {
     if (!project?.id) {
       return;
     }
     try {
-      setIsLoadingRQSynthesis(true);
-      const response = await articleService.getProjectRQSynthesis(project.id);
-      setRqSynthesisData(response || null);
+      setIsLoadingSynthesisReport(true);
+      const response = await articleService.getProjectSynthesisReport(project.id);
+      setSynthesisReportData(response || null);
     } catch (error) {
-      toast.error("Erro ao carregar sintese por RQ: " + error.message);
+      toast.error("Erro ao carregar sintese estruturada: " + error.message);
     } finally {
-      setIsLoadingRQSynthesis(false);
+      setIsLoadingSynthesisReport(false);
     }
   }, [project?.id]);
 
@@ -328,7 +394,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       try {
         await articleService.deleteArticle(project.id, article.id);
         toast.success("Registro removido com sucesso.");
-        await refreshAll({ refreshRQSynthesis: true });
+        await refreshAll({ refreshSynthesisReport: true });
       } catch (error) {
         toast.error("Erro ao remover registro: " + error.message);
       }
@@ -348,14 +414,14 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     isLoadingArticles,
     isLoadingDuplicates,
     isLoadingReport,
-    isLoadingRQSynthesis,
+    isLoadingSynthesisReport,
     isLoadingSummary,
     isSavingDecision,
-    loadRQSynthesis,
+    loadSynthesisReport,
     promoteSelectedToScreening,
     report,
     refreshAll,
-    rqSynthesisData,
+    synthesisReportData,
     runBatchEvaluate,
     runDedupAnalysis,
     screeningArticle,

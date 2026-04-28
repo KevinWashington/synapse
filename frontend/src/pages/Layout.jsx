@@ -1,10 +1,9 @@
-﻿import { useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Menu from "@components/Menu";
 import ThemeToggle from "@components/ThemeToggle";
 import { Button } from "@/components/ui/Button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
-import { UserIcon, LogOut, Bell, ArrowLeft } from "lucide-react";
+import { UserIcon, LogOut, Bell, ArrowLeft, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,38 +12,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth";
 import { PageTitleProvider } from "@/context/pageTitleContext";
 import { usePageTitleValue } from "@hooks/usePageTitleValue";
 
 const Layout = () => {
+  const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(true);
+  const isArticleWorkspace = /^\/projetos\/[^/]+\/artigos\/[^/]+/.test(location.pathname);
 
   return (
-    <div className="flex min-h-screen bg-[var(--syn-sidebar-bg)]">
-      <Menu setIsMenuOpen={setIsMenuOpen} isMenuOpen={isMenuOpen} />
+    <div className="flex min-h-screen bg-[#fbfcff] text-[#0f1734]">
+      {!isArticleWorkspace ? <Menu /> : null}
 
-      {/* Main content area */}
-      <div
-        className={cn(
-          "flex min-h-screen flex-1 flex-col transition-[margin] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          isMenuOpen ? "md:ml-[220px]" : "md:ml-16"
-        )}
-      >
-        {/* Content card wrapper */}
-        <div className="flex-1 flex flex-col m-0 md:m-2 md:ml-0 rounded-none md:rounded-xl bg-[var(--syn-bg-secondary)] dark:bg-[var(--syn-bg-secondary)] overflow-hidden">
-          <PageTitleProvider>
+      <div className={`flex min-h-screen flex-1 flex-col ${isArticleWorkspace ? "" : "md:ml-[240px]"}`}>
+        <PageTitleProvider>
+          {!isArticleWorkspace ? (
             <HeaderBar navigate={navigate} logout={logout} user={user} />
+          ) : null}
 
-            {/* Page content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <Outlet />
-            </div>
-          </PageTitleProvider>
-        </div>
+          <main
+            className={
+              isArticleWorkspace
+                ? "h-screen flex-1 overflow-hidden p-0"
+                : "flex-1 overflow-y-auto px-5 pb-8 pt-4 md:px-10 lg:px-14"
+            }
+          >
+            <Outlet />
+          </main>
+        </PageTitleProvider>
       </div>
     </div>
   );
@@ -54,18 +51,18 @@ function HeaderBar({ navigate, logout, user }) {
   const { title, backUrl, actions, badge } = usePageTitleValue();
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 bg-[var(--syn-bg-primary)] dark:bg-[var(--syn-bg-primary)] border-b border-[var(--syn-border)]">
-      <div className="flex items-center gap-3 min-w-0">
+    <header className="flex h-[72px] items-center justify-between bg-[#fbfcff] px-5 pt-3 md:px-10 lg:px-14">
+      <div className="flex min-w-0 items-center gap-3">
         {backUrl && (
           <button
             onClick={() => navigate(backUrl)}
-            className="h-8 w-8 rounded-lg border border-[var(--syn-border)] flex items-center justify-center text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)] transition-colors shrink-0"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#e8ebf4] bg-white text-[#56627f] transition-colors hover:bg-[#f4f6fb]"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
         )}
         {title && (
-          <h1 className="text-lg font-semibold text-[var(--syn-text-primary)] truncate">
+          <h1 className="truncate text-lg font-semibold text-[#101936]">
             {title}
           </h1>
         )}
@@ -73,25 +70,28 @@ function HeaderBar({ navigate, logout, user }) {
       </div>
 
       <div className="flex items-center gap-3">
-        {actions && (
-          <div className="flex items-center gap-2">{actions}</div>
-        )}
-        <ThemeToggle />
-        <Button variant="ghost" size="icon" className="h-9 w-9 text-[var(--syn-text-secondary)]">
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <ThemeToggle className="h-10 w-10 rounded-full border-[#edf0f7] bg-white text-[#182344] shadow-none hover:bg-[#f6f7fb]" />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 rounded-full border border-[#edf0f7] bg-white text-[#182344] shadow-none hover:bg-[#f6f7fb]"
+        >
           <Bell className="h-4 w-4" />
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 h-9 px-2">
-              <Avatar className="h-7 w-7">
+            <Button
+              variant="ghost"
+              className="flex h-10 items-center gap-2 rounded-full px-1.5 text-[#182344] hover:bg-[#f6f7fb]"
+            >
+              <Avatar className="h-9 w-9">
                 <AvatarImage src="/avatar.png" alt="Perfil" />
-                <AvatarFallback className="text-[10px]">
+                <AvatarFallback className="bg-[#eef1ff] text-[10px] text-[#6259ff]">
                   <UserIcon className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium text-[var(--syn-text-primary)] hidden sm:block">
-                {user?.name || "UsuÃ¡rio"}
-              </span>
+              <ChevronDown className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -114,4 +114,3 @@ function HeaderBar({ navigate, logout, user }) {
 }
 
 export default Layout;
-

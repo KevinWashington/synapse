@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/Textarea";
 
 function ScreeningDecisionDialog({
   article,
+  initialDecision = "included",
   isOpen,
   isSaving,
   onClose,
@@ -27,10 +28,10 @@ function ScreeningDecisionDialog({
     if (!isOpen) {
       return;
     }
-    setDecision("included");
+    setDecision(initialDecision);
     setReasonText(article?.screeningReasonText || "");
     setError("");
-  }, [article, isOpen]);
+  }, [article, initialDecision, isOpen]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -50,7 +51,7 @@ function ScreeningDecisionDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Decisao de Screening</DialogTitle>
+          <DialogTitle>Decisao de triagem</DialogTitle>
           <DialogDescription>{article?.title || "Registro selecionado"}</DialogDescription>
         </DialogHeader>
 
@@ -70,7 +71,7 @@ function ScreeningDecisionDialog({
               onClick={() => setDecision("excluded")}
               disabled={isSaving}
             >
-              Excluir no screening
+              Excluir na triagem
             </Button>
           </div>
 

@@ -8,6 +8,7 @@ critérios de inclusão/exclusão, avaliação de artigos e chat.
 import json
 import logging
 import re
+from typing import Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -17,9 +18,16 @@ from app.frameworks import (
     build_research_questions_prompt,
     build_search_string_prompt,
     build_criteria_prompt,
+    build_data_extraction_schema_prompt,
+    build_quality_assessment_schema_prompt,
     _build_components_text,
 )
 from app.schemas.ai import MCPRequestEnvelope, MCPResponseEnvelope
+from app.services.evidence_service import (
+    EXTRACTION_FIELD_TYPES,
+    sanitize_data_extraction_schema,
+    sanitize_quality_assessment_schema,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -159,6 +167,59 @@ class AIService:
             "exclusao": exclusion
         }
 
+    async def generate_data_extraction_schema(
+        self,
+        research_questions: list[str],
+        components: dict,
+        framework: str = "PICOC",
+        project_context: dict | None = None,
+    ) -> list[dict[str, Any]]:
+        """Generate extraction schema metadata anchored to research questions."""
+        if not research_questions:
+            return []
+
+        system_msg, user_msg = build_data_extraction_schema_prompt(
+            framework,
+            components,
+            research_questions,
+            project_context,
+        )
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_msg),
+            ("user", user_msg),
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
+        result = await chain.ainvoke({})
+
+        return self._build_generated_extraction_schema(result, research_questions)
+
+    async def generate_quality_assessment_schema(
+        self,
+        research_questions: list[str],
+        components: dict,
+        framework: str = "PICOC",
+        project_context: dict | None = None,
+    ) -> list[dict[str, Any]]:
+        """Generate quality assessment criteria tailored to the project context."""
+        system_msg, user_msg = build_quality_assessment_schema_prompt(
+            framework,
+            components,
+            research_questions,
+            project_context,
+        )
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_msg),
+            ("user", user_msg),
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
+        result = await chain.ainvoke({})
+
+        return self._build_generated_quality_schema(result)
+
     async def evaluate_article(self, article_data: dict, project_data: dict) -> dict:
         """Evaluate an article's relevance and extract metadata for graph relationships."""
         abstract = article_data.get("abstract", "")
@@ -283,6 +344,9 @@ Avalie o artigo e extraia os metadados agora:""")
 
     async def chat(self, message: str, article_context: dict | None = None) -> str:
         """Chat with AI for article analysis using literal extraction."""
+        if message.strip().startswith("ELIGIBILITY_CHECKLIST_ASSIST"):
+            return await self.assist_eligibility_checklist(message, article_context)
+
         system_prompt = """PERSONA: Você é um Mecanismo de Extração Literal (Literal Extraction Engine). Sua única função é operar como uma API de software que localiza e extrai trechos exatos de um texto-fonte. Você não interpreta, não resume e não gera texto novo."""
         
         if article_context:
@@ -332,6 +396,76 @@ REGRAS:
         chain = prompt | self.llm | StrOutputParser()
         
         return await chain.ainvoke({"message": message})
+
+    async def assist_eligibility_checklist(
+        self,
+        message: str,
+        article_context: dict | None = None,
+    ) -> str:
+        """Return checklist-level eligibility assistance as JSON."""
+        article_context = article_context or {}
+        article_block = f"""
+Title: {article_context.get('title', 'Not provided')}
+Authors: {article_context.get('authors', 'Not provided')}
+Year: {article_context.get('year', 'Not provided')}
+Journal: {article_context.get('journal', 'Not provided')}
+DOI: {article_context.get('doi', 'Not provided')}
+Abstract:
+{article_context.get('abstract') or 'Not provided'}
+
+Extracted full text:
+{article_context.get('content') or 'Not available'}
+"""
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an eligibility assistant for systematic reviews.
+
+Rules:
+1. The final decision is always human.
+2. Use only the provided metadata, abstract, and extracted full text.
+3. Do not invent evidence. If textual support is absent, use status "unclear".
+4. For each checklist item, return status "met", "not_met", "unclear", or "not_applicable".
+5. Use short literal evidence when possible.
+6. Return valid JSON only, with no markdown.
+
+Required format:
+{{
+  "items": [
+    {{
+      "key": "item-1",
+      "status": "met",
+      "evidence": "short literal excerpt or empty string",
+      "note": "short note"
+    }}
+  ],
+  "suggestedDecision": "included | excluded | review",
+  "reasonText": "short editable draft for the researcher"
+}}"""),
+            ("user", """Product request:
+{message}
+
+Article context:
+{article_block}"""),
+        ])
+
+        chain = prompt | self.llm | StrOutputParser()
+        result = await chain.ainvoke({
+            "message": message,
+            "article_block": article_block,
+        })
+
+        payload = self._extract_json_payload(result)
+        if isinstance(payload, dict):
+            return json.dumps(payload, ensure_ascii=False)
+
+        return json.dumps(
+            {
+                "items": [],
+                "suggestedDecision": "review",
+                "reasonText": "A IA nao retornou uma avaliacao estruturada. Revise o texto completo manualmente.",
+            },
+            ensure_ascii=False,
+        )
     
     async def chat_project(
         self,
@@ -499,6 +633,134 @@ REGRAS:
             items.append(current_item.strip().strip('"').strip("'"))
 
         return items
+
+    def _build_generated_extraction_schema(
+        self,
+        text: str,
+        research_questions: list[str],
+    ) -> list[dict[str, Any]]:
+        payload = self._extract_json_payload(text)
+        raw_items: list[Any] = []
+
+        if isinstance(payload, dict):
+            candidate_items = payload.get("items") or payload.get("fields") or payload.get("dataExtractionSchema")
+            if isinstance(candidate_items, list):
+                raw_items = candidate_items
+        elif isinstance(payload, list):
+            raw_items = payload
+
+        metadata_by_index: dict[int, dict[str, Any]] = {}
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+
+            raw_index = item.get("researchQuestionIndex")
+            try:
+                index = int(raw_index)
+            except (TypeError, ValueError):
+                continue
+
+            if index < 1 or index > len(research_questions):
+                continue
+
+            field_type = str(item.get("type") or "text").strip().lower()
+            if field_type not in EXTRACTION_FIELD_TYPES:
+                field_type = "text"
+
+            options = item.get("options") if field_type in {"single_select", "multi_select"} else []
+            metadata_by_index[index] = {
+                "type": field_type,
+                "options": options if isinstance(options, list) else [],
+            }
+
+        fields = []
+        for index, question in enumerate(research_questions, start=1):
+            cleaned_question = str(question or "").strip()
+            if not cleaned_question:
+                continue
+
+            metadata = metadata_by_index.get(index, {})
+            fields.append(
+                {
+                    "key": f"rq_{index}",
+                    "label": self._truncate_schema_label(cleaned_question),
+                    "type": metadata.get("type", "text"),
+                    "options": metadata.get("options", []),
+                }
+            )
+
+        return sanitize_data_extraction_schema(fields)
+
+    def _build_generated_quality_schema(self, text: str) -> list[dict[str, Any]]:
+        payload = self._extract_json_payload(text)
+        raw_items: list[Any] = []
+
+        if isinstance(payload, dict):
+            candidate_items = payload.get("criteria") or payload.get("qualityAssessmentSchema")
+            if isinstance(candidate_items, list):
+                raw_items = candidate_items
+        elif isinstance(payload, list):
+            raw_items = payload
+
+        criteria: list[dict[str, Any]] = []
+        for item in raw_items:
+            if isinstance(item, str):
+                label = item.strip()
+            elif isinstance(item, dict):
+                label = str(item.get("label") or item.get("name") or "").strip()
+            else:
+                label = ""
+
+            if not label:
+                continue
+
+            criteria.append({"label": self._truncate_schema_label(label)})
+
+        sanitized = sanitize_quality_assessment_schema(criteria)
+        if sanitized:
+            return sanitized
+
+        return sanitize_quality_assessment_schema(
+            [
+                {"label": "O contexto e a populacao do estudo sao descritos com clareza?"},
+                {"label": "O desenho metodologico e adequado para responder a pergunta de pesquisa?"},
+                {"label": "A coleta de dados ou fontes de evidencia sao descritas de forma suficiente?"},
+                {"label": "A analise dos dados ou evidencias e conduzida com rigor?"},
+                {"label": "Ameacas a validade, vieses ou limitacoes sao discutidos?"},
+            ]
+        )
+
+    def _extract_json_payload(self, text: str) -> dict[str, Any] | list[Any] | None:
+        normalized = str(text or "").strip()
+        if not normalized:
+            return None
+
+        fence_match = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", normalized, re.DOTALL)
+        if fence_match:
+            normalized = fence_match.group(1).strip()
+
+        for pattern in (r"(\{.*\})", r"(\[.*\])"):
+            match = re.search(pattern, normalized, re.DOTALL)
+            if not match:
+                continue
+
+            candidate = match.group(1).strip()
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+
+        try:
+            return json.loads(normalized)
+        except json.JSONDecodeError:
+            logger.warning("Falha ao extrair JSON estruturado da resposta do modelo.")
+            return None
+
+    def _truncate_schema_label(self, value: str, limit: int = 120) -> str:
+        normalized = str(value or "").strip()
+        if len(normalized) <= limit:
+            return normalized
+        return f"{normalized[: limit - 3].rstrip()}..."
 
     def validate_mcp_envelope(self, payload: dict) -> MCPRequestEnvelope | None:
         """Validate MCP JSON-RPC envelope shape before tool invocation."""

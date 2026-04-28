@@ -15,7 +15,7 @@ import {
 import ArticleDialogErrorAlert from "@features/articles/components/ArticleDialogErrorAlert";
 import ArticleDialogFooter from "@features/articles/components/ArticleDialogFooter";
 import { articleService } from "@features/articles/services/articleService";
-import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS } from "@features/articles/utils/selectionFlow";
+import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS, STUDY_TYPE_OPTIONS } from "@features/articles/utils/selectionFlow";
 import { toast } from "@/lib/toast";
 
 function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
@@ -24,6 +24,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
   const [error, setError] = useState("");
   const [sourceCategory, setSourceCategory] = useState("database");
   const [sourceName, setSourceName] = useState("Scopus");
+  const [studyType, setStudyType] = useState("");
   const [batchLabel, setBatchLabel] = useState("");
 
   function cleanBibTeXValue(value) {
@@ -88,6 +89,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
     setError("");
     setSourceCategory("database");
     setSourceName("Scopus");
+    setStudyType("");
     setBatchLabel("");
     onClose();
   }
@@ -127,6 +129,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
       const response = await articleService.importBibTeX(projectId, {
         sourceCategory,
         sourceName,
+        studyType: studyType || null,
         importBatchLabel: batchLabel || null,
         entries,
       });
@@ -150,7 +153,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
             Importar BibTeX
           </DialogTitle>
           <DialogDescription>
-            Importe registros para a fase de Identification com origem rastreavel.
+            Importe registros para a fase de Identificacao com origem rastreavel.
           </DialogDescription>
         </DialogHeader>
 
@@ -187,6 +190,23 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tipo de estudo</Label>
+            <Select value={studyType || "unclassified"} onValueChange={(value) => setStudyType(value === "unclassified" ? "" : value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unclassified">Nao classificado</SelectItem>
+                {STUDY_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

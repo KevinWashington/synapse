@@ -477,3 +477,116 @@ Framework {framework}:
 Gere os critérios de inclusão e exclusão agora:"""
 
     return system_prompt, user_prompt
+
+
+def build_data_extraction_schema_prompt(
+    framework: str,
+    components: dict,
+    research_questions: list[str],
+    project_context: dict | None = None,
+) -> tuple[str, str]:
+    """Build prompt for AI-assisted extraction schema generation.
+
+    The resulting schema must preserve a 1:1 mapping with the research questions:
+    each generated field stores the answer that an included article provides for
+    that question.
+    """
+    semantic = _get_framework_semantic_instruction(framework)
+    components_text = _build_components_text(framework, components)
+    questions_text = "\n".join(f"{i+1}. {q}" for i, q in enumerate(research_questions))
+
+    project_title = "N\u00e3o especificado"
+    project_objective = "N\u00e3o especificado"
+    if project_context:
+        project_title = project_context.get("title") or "N\u00e3o especificado"
+        project_objective = project_context.get("objetivo") or project_context.get("objective") or "N\u00e3o especificado"
+
+    system_prompt = f"""Voc\u00ea \u00e9 um especialista em extra\u00e7\u00e3o de dados para revis\u00f5es sistem\u00e1ticas.
+Sua tarefa \u00e9 analisar as perguntas de pesquisa e sugerir o formato mais adequado para as colunas de uma tabela de extra\u00e7\u00e3o.
+
+{semantic}
+
+Regras obrigat\u00f3rias:
+1. Deve existir EXATAMENTE uma coluna para cada pergunta de pesquisa, na mesma ordem.
+2. Cada coluna armazenar\u00e1 a RESPOSTA do artigo para a respectiva pergunta de pesquisa.
+3. N\u00e3o crie colunas extras de metadados como autor, ano, pa\u00eds ou metodologia.
+4. Escolha o tipo da coluna usando apenas: "text", "number", "single_select", "multi_select", "boolean".
+5. Prefira "text" para perguntas anal\u00edticas, explicativas, comparativas ou abertas.
+6. Use "boolean" apenas quando a resposta natural for sim/n\u00e3o.
+7. Use "number" apenas quando a resposta esperada for claramente num\u00e9rica.
+8. Use "single_select" ou "multi_select" apenas quando houver categorias claras e est\u00e1veis.
+9. Se usar campos de sele\u00e7\u00e3o, forne\u00e7a no m\u00e1ximo 6 op\u00e7\u00f5es curtas e distintas.
+10. Responda APENAS em JSON v\u00e1lido, sem markdown, no formato:
+{{
+  "items": [
+    {{
+      "researchQuestionIndex": 1,
+      "type": "text",
+      "options": []
+    }}
+  ]
+}}"""
+
+    user_prompt = f"""Contexto do Projeto:
+T\u00edtulo: {project_title}
+Objetivo: {project_objective}
+
+Framework {framework}:
+{components_text}
+
+Perguntas de Pesquisa:
+{questions_text}
+
+Gere o JSON agora:"""
+
+    return system_prompt, user_prompt
+
+
+def build_quality_assessment_schema_prompt(
+    framework: str,
+    components: dict,
+    research_questions: list[str],
+    project_context: dict | None = None,
+) -> tuple[str, str]:
+    """Build prompt for AI-assisted quality assessment criteria generation."""
+    semantic = _get_framework_semantic_instruction(framework)
+    components_text = _build_components_text(framework, components)
+    questions_text = "\n".join(f"{i+1}. {q}" for i, q in enumerate(research_questions)) if research_questions else "N\u00e3o especificadas"
+
+    project_title = "N\u00e3o especificado"
+    project_objective = "N\u00e3o especificado"
+    if project_context:
+        project_title = project_context.get("title") or "N\u00e3o especificado"
+        project_objective = project_context.get("objetivo") or project_context.get("objective") or "N\u00e3o especificado"
+
+    system_prompt = f"""Voc\u00ea \u00e9 um especialista em avalia\u00e7\u00e3o de qualidade metodol\u00f3gica para revis\u00f5es sistem\u00e1ticas.
+Sua tarefa \u00e9 propor crit\u00e9rios de qualidade que possam ser avaliados com a escala fixa: yes, partial, no, na.
+
+{semantic}
+
+Regras obrigat\u00f3rias:
+1. Gere entre 5 e 7 crit\u00e9rios.
+2. Cada crit\u00e9rio deve ser curto, objetivo e verific\u00e1vel no artigo.
+3. Os crit\u00e9rios devem ajudar a julgar a confiabilidade metodol\u00f3gica dos estudos para responder \u00e0s perguntas de pesquisa.
+4. Evite crit\u00e9rios vagos como "artigo bom" ou "resultado relevante".
+5. Prefira formula\u00e7\u00f5es avali\u00e1veis como clareza de contexto, adequa\u00e7\u00e3o do desenho, descri\u00e7\u00e3o da coleta, rigor da an\u00e1lise, amea\u00e7as \u00e0 validade e alinhamento com a pergunta.
+6. Responda APENAS em JSON v\u00e1lido, sem markdown, no formato:
+{{
+  "criteria": [
+    {{ "label": "Criterion text" }}
+  ]
+}}"""
+
+    user_prompt = f"""Contexto do Projeto:
+T\u00edtulo: {project_title}
+Objetivo: {project_objective}
+
+Framework {framework}:
+{components_text}
+
+Perguntas de Pesquisa:
+{questions_text}
+
+Gere o JSON agora:"""
+
+    return system_prompt, user_prompt

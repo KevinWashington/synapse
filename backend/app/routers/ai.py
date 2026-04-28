@@ -12,6 +12,10 @@ from app.schemas.ai import (
     ChatResponse,
     CriteriaRequest,
     CriteriaResponse,
+    DataExtractionSchemaRequest,
+    DataExtractionSchemaResponse,
+    QualityAssessmentSchemaRequest,
+    QualityAssessmentSchemaResponse,
     ProjectChatRequest,
     ProjectChatResponse,
     ArticleSource,
@@ -250,6 +254,70 @@ async def generate_criteria(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "error": "Falha na geração de critérios",
+                "message": str(e)
+            }
+        )
+
+
+@router.post("/generate-data-extraction-schema", response_model=DataExtractionSchemaResponse)
+async def generate_data_extraction_schema(
+    data: DataExtractionSchemaRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate extraction schema so each column stores the answer to one research question."""
+    try:
+        ai_service = get_ai_service()
+
+        framework = data.framework or "PICOC"
+        components = data.picocData.model_dump(exclude_none=True)
+        project_ctx = data.projeto.model_dump() if data.projeto else None
+
+        schema = await ai_service.generate_data_extraction_schema(
+            data.researchQuestions,
+            components,
+            framework=framework,
+            project_context=project_ctx,
+        )
+
+        return DataExtractionSchemaResponse(dataExtractionSchema=schema)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Falha na geracao do esquema de extracao",
+                "message": str(e)
+            }
+        )
+
+
+@router.post("/generate-quality-assessment-schema", response_model=QualityAssessmentSchemaResponse)
+async def generate_quality_assessment_schema(
+    data: QualityAssessmentSchemaRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate quality assessment criteria tailored to the review protocol."""
+    try:
+        ai_service = get_ai_service()
+
+        framework = data.framework or "PICOC"
+        components = data.picocData.model_dump(exclude_none=True)
+        project_ctx = data.projeto.model_dump() if data.projeto else None
+
+        schema = await ai_service.generate_quality_assessment_schema(
+            data.researchQuestions,
+            components,
+            framework=framework,
+            project_context=project_ctx,
+        )
+
+        return QualityAssessmentSchemaResponse(qualityAssessmentSchema=schema)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Falha na geracao dos criterios de qualidade",
                 "message": str(e)
             }
         )

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SlidePanel } from "@/components/ui/SlidePanel";
 import ArticleCommonFields from "@features/articles/components/ArticleCommonFields";
 import { articleService } from "@features/articles/services/articleService";
-import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS } from "@features/articles/utils/selectionFlow";
+import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS, STUDY_TYPE_OPTIONS } from "@features/articles/utils/selectionFlow";
 import { toast } from "@/lib/toast";
 
 function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
@@ -25,6 +25,7 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
     sourceCategory: "database",
     sourceNamePreset: "Scopus",
     sourceNameCustom: "",
+    studyType: "",
   });
 
   function handleInputChange(field, value) {
@@ -64,6 +65,7 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
         sourceCategory: formData.sourceCategory,
         sourceName:
           formData.sourceNamePreset === "outra" ? formData.sourceNameCustom : formData.sourceNamePreset,
+        studyType: formData.studyType || null,
         entryMethod: "manual",
       });
       onSuccess?.(response);
@@ -88,6 +90,7 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
         sourceCategory: "database",
         sourceNamePreset: "Scopus",
         sourceNameCustom: "",
+        studyType: "",
       });
     setErrors({});
     onClose();
@@ -98,7 +101,7 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
       isOpen={isOpen}
       onClose={handleClose}
       title="Novo Registro"
-      breadcrumb="Identification"
+        breadcrumb="Identificacao"
       footer={
         <div className="flex items-center justify-end gap-3">
           <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
@@ -162,6 +165,23 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
             ) : null}
             {errors.sourceName ? <p className="text-sm text-red-500">{errors.sourceName}</p> : null}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Tipo de estudo</Label>
+          <Select value={formData.studyType || "unclassified"} onValueChange={(value) => handleInputChange("studyType", value === "unclassified" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unclassified">Nao classificado</SelectItem>
+              {STUDY_TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <ArticleCommonFields

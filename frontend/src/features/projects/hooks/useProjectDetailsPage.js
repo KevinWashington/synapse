@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { projectService } from "@features/projects/services/projectService";
 import { toast } from "@/lib/toast";
 
@@ -8,14 +8,19 @@ const INITIAL_EDIT_DATA = {
   objetivo: "",
   status: "",
 };
+const PROJECT_DETAIL_TABS = new Set(["overview", "planejamento", "artigos", "fluxo", "grafo"]);
 
 function useProjectDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("planejamento");
+  const [activeTab, setActiveTabState] = useState(() => {
+    const requestedTab = searchParams.get("tab");
+    return PROJECT_DETAIL_TABS.has(requestedTab) ? requestedTab : "overview";
+  });
   const [editOpen, setEditOpen] = useState(false);
   const [editData, setEditData] = useState(INITIAL_EDIT_DATA);
   const [editLoading, setEditLoading] = useState(false);
@@ -37,6 +42,40 @@ function useProjectDetailsPage() {
   useEffect(() => {
     fetchProject();
   }, [fetchProject]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    const nextTab = PROJECT_DETAIL_TABS.has(requestedTab)
+      ? requestedTab
+      : "overview";
+
+    setActiveTabState((current) => (current === nextTab ? current : nextTab));
+  }, [searchParams]);
+
+  const setActiveTab = useCallback(
+    (nextTab) => {
+      const resolvedTab = PROJECT_DETAIL_TABS.has(nextTab) ? nextTab : "overview";
+      const defaultTab = "overview";
+
+      setActiveTabState(resolvedTab);
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+
+        if (resolvedTab === defaultTab) {
+          next.delete("tab");
+        } else {
+          next.set("tab", resolvedTab);
+        }
+
+        if (resolvedTab !== "fluxo") {
+          next.delete("flow");
+        }
+
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
 
   const handleEditProject = useCallback(() => {
     setEditData({
@@ -86,6 +125,10 @@ function useProjectDetailsPage() {
     setGraphRefreshToken((current) => current + 1);
   }, []);
 
+  const handleProjectUpdated = useCallback((updatedProject) => {
+    setProject(updatedProject);
+  }, []);
+
   return {
     activeTab,
     editData,
@@ -96,6 +139,7 @@ function useProjectDetailsPage() {
     handleDeleteProject,
     handleEditProject,
     handleGraphNeedsRefresh,
+    handleProjectUpdated,
     handleSaveEdit,
     loading,
     navigate,

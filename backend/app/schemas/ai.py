@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from app.schemas.project import DataExtractionFieldSchema, QualityCriterionSchema
+
 
 class FrameworkComponentsInput(BaseModel):
     """Input de componentes de framework com chaves canônicas em inglês."""
@@ -69,6 +71,28 @@ class CriteriaRequest(BaseModel):
 class CriteriaResponse(BaseModel):
     inclusao: list[str]
     exclusao: list[str]
+
+
+class DataExtractionSchemaRequest(BaseModel):
+    researchQuestions: list[str]
+    picocData: FrameworkComponentsInput
+    projeto: ProjectContext | None = None
+    framework: str = "PICOC"
+
+
+class DataExtractionSchemaResponse(BaseModel):
+    dataExtractionSchema: list[DataExtractionFieldSchema]
+
+
+class QualityAssessmentSchemaRequest(BaseModel):
+    researchQuestions: list[str]
+    picocData: FrameworkComponentsInput
+    projeto: ProjectContext | None = None
+    framework: str = "PICOC"
+
+
+class QualityAssessmentSchemaResponse(BaseModel):
+    qualityAssessmentSchema: list[QualityCriterionSchema]
 
 
 class ArticleSource(BaseModel):

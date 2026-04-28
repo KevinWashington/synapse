@@ -20,6 +20,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.schemas.article import (
     ArticleCreate,
+    ArticleEvidenceUpdate,
     ArticleListResponse,
     ArticleNotesUpdate,
     ArticleResponse,
@@ -46,6 +47,14 @@ from app.schemas.article import (
     SelectionReportResponse,
     SelectionSummaryPhaseItem,
     SelectionSummaryResponse,
+)
+from app.services.evidence_service import (
+    QUALITY_RATING_ORDER,
+    apply_quality_metrics,
+    calculate_quality_metrics,
+    merge_extraction_data,
+    merge_quality_assessment_answers,
+    normalize_quality_response,
 )
 
 
@@ -245,10 +254,13 @@ def _build_article_response(article: Article) -> ArticleResponse:
     response = ArticleResponse.model_validate(article)
     response.hasPdf = article.pdfData is not None
     response.eligibilityChecklistAnswers = article.eligibilityChecklistAnswers or {}
+    response.extractionData = article.extractionData or {}
+    response.qualityAssessmentAnswers = article.qualityAssessmentAnswers or {}
     response.aiSuggestedRQs = article.aiSuggestedRQs or []
     response.aiKeywords = article.aiKeywords or []
     response.exclusionCriteria = article.exclusionCriteria or []
     response.answeringRQs = article.answeringRQs or []
+    response.qualityRating = article.qualityRating or "unrated"
     return response
 
 
@@ -278,6 +290,461 @@ def _build_evidence_excerpt(article: Article) -> str | None:
     if len(candidate) <= 280:
         return candidate
     return candidate[:277] + "..."
+
+
+def _linked_rqs_for_article(article: Article, rq_count: int) -> list[int]:
+    return sorted({rq for rq in (getattr(article, "answeringRQs", None) or []) if 1 <= rq <= rq_count})
+
+
+def _decision_label_for_article(article: Article) -> str:
+    if getattr(article, "reviewOutcome", None):
+        return article.reviewOutcome
+    return getattr(article, "manualDecision", None) or getattr(article, "status", None) or "-"
+
+
+def _build_rq_synthesis_payload(research_questions: list[str], included_articles: list[Article]) -> dict:
+    rq_count = len(research_questions)
+    rq_to_articles: dict[int, list[Article]] = {index: [] for index in range(1, rq_count + 1)}
+    included_without_rq: list[Article] = []
+
+    for article in included_articles:
+        linked_rqs = _linked_rqs_for_article(article, rq_count)
+        if not linked_rqs:
+            included_without_rq.append(article)
+            continue
+        for rq in linked_rqs:
+            rq_to_articles[rq].append(article)
+
+    rq_synthesis = []
+    for index, question in enumerate(research_questions, start=1):
+        rq_articles = rq_to_articles.get(index, [])
+        rq_synthesis.append(
+            {
+                "rqNumber": index,
+                "question": question,
+                "evidenceCount": len(rq_articles),
+                "articles": [
+                    {
+                        "id": article.id,
+                        "paperId": article.paperId,
+                        "title": article.title,
+                        "authors": getattr(article, "authors", None),
+                        "year": getattr(article, "year", None),
+                        "status": getattr(article, "status", None),
+                        "manualDecision": getattr(article, "manualDecision", None),
+                        "reason": getattr(article, "eligibilityReasonText", None)
+                        or getattr(article, "manualDecisionReason", None),
+                        "evidenceExcerpt": _build_evidence_excerpt(article),
+                    }
+                    for article in rq_articles
+                ],
+            }
+        )
+
+    matrix = []
+    for article in included_articles:
+        matrix.append(
+            {
+                "articleId": article.id,
+                "paperId": getattr(article, "paperId", None),
+                "title": getattr(article, "title", None),
+                "year": getattr(article, "year", None),
+                "decision": _decision_label_for_article(article),
+                "rqs": _linked_rqs_for_article(article, rq_count),
+            }
+        )
+
+    answered_rqs = sum(1 for index in range(1, rq_count + 1) if rq_to_articles.get(index))
+    coverage_percentage = round((answered_rqs / rq_count) * 100, 2) if rq_count else 0
+
+    return {
+        "rqCount": rq_count,
+        "rqSynthesis": rq_synthesis,
+        "matrix": matrix,
+        "coverage": {
+            "answeredRQCount": answered_rqs,
+            "answeredRQPercentage": coverage_percentage,
+            "includedArticles": len(included_articles),
+            "includedWithoutRQLinks": len(included_without_rq),
+        },
+        "unlinkedIncludedArticles": [
+            {
+                "id": article.id,
+                "paperId": getattr(article, "paperId", None),
+                "title": getattr(article, "title", None),
+                "year": getattr(article, "year", None),
+                "status": getattr(article, "status", None),
+                "manualDecision": getattr(article, "manualDecision", None),
+            }
+            for article in included_without_rq
+        ],
+    }
+
+
+def _build_distribution_rows(
+    counts: dict[str, int],
+    *,
+    denominator: int,
+    order: list[str] | tuple[str, ...] | None = None,
+) -> list[dict]:
+    keys = list(order) if order else sorted(counts.keys())
+    rows = []
+    for key in keys:
+        count = counts.get(key, 0)
+        if count == 0 and not order:
+            continue
+        percentage = round((count / denominator) * 100, 2) if denominator else 0
+        rows.append(
+            {
+                "value": key,
+                "count": count,
+                "percentage": percentage,
+            }
+        )
+    return rows
+
+
+def _stringify_distribution_value(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _select_visualization_field(extraction_schema: list[dict], rq_number: int) -> dict | None:
+    rq_key = f"rq_{rq_number}"
+    for field in extraction_schema:
+        if field.get("key") == rq_key:
+            return field
+
+    fallback_index = rq_number - 1
+    if 0 <= fallback_index < len(extraction_schema):
+        return extraction_schema[fallback_index]
+    return None
+
+
+def _visualization_type_for_field(field_type: str | None) -> str:
+    if field_type == "number":
+        return "bar_chart"
+    if field_type == "boolean":
+        return "category_bar_chart"
+    if field_type == "single_select":
+        return "category_bar_chart"
+    if field_type == "multi_select":
+        return "multi_category_bar_chart"
+    if field_type == "text":
+        return "qualitative_table"
+    return "not_available"
+
+
+def _visualization_reason_for_field(field_type: str | None) -> str:
+    reasons = {
+        "number": "Campo numerico permite comparar valores extraidos entre estudos.",
+        "boolean": "Campo booleano permite comparar a frequencia de respostas Sim e Nao.",
+        "single_select": "Campo categorico permite comparar a frequencia de cada categoria extraida.",
+        "multi_select": "Campo de selecao multipla permite contar a recorrencia de cada opcao nos estudos.",
+        "text": "Campo textual deve ser apresentado como tabela qualitativa para preservar o contexto da resposta.",
+    }
+    return reasons.get(field_type or "", "Nao ha tipo de campo estruturado para sugerir uma visualizacao.")
+
+
+def _coerce_visualization_number(value) -> int | float | None:
+    if value is None or value == "" or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().replace(",", ".")
+        if not normalized:
+            return None
+        try:
+            number = float(normalized)
+        except ValueError:
+            return None
+        return int(number) if number.is_integer() else number
+    return None
+
+
+def _articles_for_visualization_rq(
+    included_articles: list[Article],
+    rq_number: int,
+    rq_count: int,
+) -> list[Article]:
+    linked_articles = [
+        article
+        for article in included_articles
+        if rq_number in _linked_rqs_for_article(article, rq_count)
+    ]
+    return linked_articles or included_articles
+
+
+def _build_visualization_rows(field: dict, articles: list[Article], denominator: int) -> list[dict]:
+    field_key = field.get("key")
+    field_type = field.get("type") or "text"
+
+    if not field_key:
+        return []
+
+    if field_type == "number":
+        rows = []
+        for article in articles:
+            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
+            value = _coerce_visualization_number(raw_value)
+            if value is None:
+                continue
+            rows.append(
+                {
+                    "articleId": article.id,
+                    "title": getattr(article, "title", None),
+                    "year": getattr(article, "year", None),
+                    "value": value,
+                }
+            )
+        return rows
+
+    if field_type in {"boolean", "single_select", "multi_select"}:
+        counts: dict[str, int] = {}
+        counted_values = 0
+        for article in articles:
+            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
+            values = raw_value if field_type == "multi_select" and isinstance(raw_value, list) else [raw_value]
+            for item in values:
+                normalized = _stringify_distribution_value(item)
+                if normalized is None or normalized == "":
+                    continue
+                counts[normalized] = counts.get(normalized, 0) + 1
+                counted_values += 1
+
+        return _build_distribution_rows(counts, denominator=counted_values or denominator)
+
+    if field_type == "text":
+        rows = []
+        for article in articles:
+            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
+            value = str(raw_value or "").strip()
+            if not value:
+                continue
+            rows.append(
+                {
+                    "articleId": article.id,
+                    "title": getattr(article, "title", None),
+                    "year": getattr(article, "year", None),
+                    "value": value,
+                }
+            )
+        return rows
+
+    return []
+
+
+def _build_visualization_suggestions(
+    research_questions: list[str],
+    extraction_schema: list[dict],
+    included_articles: list[Article],
+) -> list[dict]:
+    rq_count = len(research_questions)
+    suggestions = []
+
+    for rq_number, question in enumerate(research_questions, start=1):
+        field = _select_visualization_field(extraction_schema, rq_number)
+        if not field:
+            suggestions.append(
+                {
+                    "rqNumber": rq_number,
+                    "question": question,
+                    "field": None,
+                    "visualizationType": "not_available",
+                    "status": "missing_field",
+                    "reason": "Nenhum campo de extracao foi configurado para esta pergunta.",
+                    "rows": [],
+                }
+            )
+            continue
+
+        field_type = field.get("type") or "text"
+        candidate_articles = _articles_for_visualization_rq(included_articles, rq_number, rq_count)
+        rows = _build_visualization_rows(field, candidate_articles, denominator=len(candidate_articles))
+        suggestions.append(
+            {
+                "rqNumber": rq_number,
+                "question": question,
+                "field": {
+                    "key": field.get("key"),
+                    "label": field.get("label") or field.get("key"),
+                    "type": field_type,
+                },
+                "visualizationType": _visualization_type_for_field(field_type),
+                "status": "ready" if rows else "needs_data",
+                "reason": _visualization_reason_for_field(field_type),
+                "rows": rows,
+            }
+        )
+
+    return suggestions
+
+
+def _build_synthesis_report(project: Project, articles: list[Article]) -> dict:
+    research_questions = project.researchQuestions or []
+    extraction_schema = project.dataExtractionSchema or []
+    quality_schema = project.qualityAssessmentSchema or []
+    included_articles = [article for article in articles if _is_included_for_synthesis(article)]
+
+    rq_payload = _build_rq_synthesis_payload(research_questions, included_articles)
+
+    extraction_rows = []
+    distribution_charts = []
+
+    year_counts: dict[str, int] = {}
+    quality_rating_counts = {rating: 0 for rating in QUALITY_RATING_ORDER}
+    quality_summary_articles = []
+
+    for article in included_articles:
+        quality_score, quality_rating = calculate_quality_metrics(
+            getattr(article, "qualityAssessmentAnswers", None) or {},
+            quality_schema,
+        )
+        quality_summary_articles.append(
+            {
+                "articleId": article.id,
+                "score": quality_score,
+                "rating": quality_rating,
+                "answers": getattr(article, "qualityAssessmentAnswers", None) or {},
+            }
+        )
+        quality_rating_counts[quality_rating] = quality_rating_counts.get(quality_rating, 0) + 1
+
+        year_value = getattr(article, "year", None)
+        if year_value is not None:
+            year_key = str(year_value)
+            year_counts[year_key] = year_counts.get(year_key, 0) + 1
+
+        extraction_values = {}
+        article_extraction_data = getattr(article, "extractionData", None) or {}
+        for field in extraction_schema:
+            extraction_values[field["key"]] = article_extraction_data.get(field["key"])
+
+        extraction_rows.append(
+            {
+                "articleId": article.id,
+                "paperId": getattr(article, "paperId", None),
+                "title": getattr(article, "title", None),
+                "year": getattr(article, "year", None),
+                "sourceName": getattr(article, "sourceName", None),
+                "rqs": _linked_rqs_for_article(article, len(research_questions)),
+                "qualityScore": quality_score,
+                "qualityRating": quality_rating,
+                "values": extraction_values,
+            }
+        )
+
+    if included_articles:
+        distribution_charts.append(
+            {
+                "key": "year",
+                "label": "Publication Year",
+                "rows": _build_distribution_rows(year_counts, denominator=len(included_articles)),
+            }
+        )
+        distribution_charts.append(
+            {
+                "key": "qualityRating",
+                "label": "Quality Rating",
+                "rows": _build_distribution_rows(
+                    quality_rating_counts,
+                    denominator=len(included_articles),
+                    order=QUALITY_RATING_ORDER,
+                ),
+            }
+        )
+
+    for field in extraction_schema:
+        if field.get("type") not in {"single_select", "multi_select", "boolean"}:
+            continue
+
+        field_counts: dict[str, int] = {}
+        denominator = 0
+        field_key = field["key"]
+
+        for article in included_articles:
+            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
+            if field.get("type") == "multi_select":
+                values = raw_value if isinstance(raw_value, list) else []
+                if not values:
+                    continue
+                for item in values:
+                    normalized = _stringify_distribution_value(item)
+                    if not normalized:
+                        continue
+                    field_counts[normalized] = field_counts.get(normalized, 0) + 1
+                    denominator += 1
+                continue
+
+            normalized = _stringify_distribution_value(raw_value)
+            if normalized is None or normalized == "":
+                continue
+            field_counts[normalized] = field_counts.get(normalized, 0) + 1
+            denominator += 1
+
+        if not field_counts:
+            continue
+
+        distribution_charts.append(
+            {
+                "key": field_key,
+                "label": field.get("label") or field_key,
+                "rows": _build_distribution_rows(field_counts, denominator=denominator),
+            }
+        )
+
+    rated_scores = [item["score"] for item in quality_summary_articles if item["score"] is not None]
+    by_criterion = []
+    for criterion in quality_schema:
+        criterion_counts = {value: 0 for value in ("yes", "partial", "no", "na")}
+        answered_count = 0
+        for article_info in quality_summary_articles:
+            response = normalize_quality_response(article_info["answers"].get(criterion["key"]))
+            if response is None:
+                continue
+            criterion_counts[response] += 1
+            answered_count += 1
+
+        by_criterion.append(
+            {
+                "key": criterion["key"],
+                "label": criterion["label"],
+                "rows": _build_distribution_rows(
+                    criterion_counts,
+                    denominator=answered_count,
+                    order=("yes", "partial", "no", "na"),
+                ),
+            }
+        )
+
+    return {
+        "projectId": project.id,
+        "projectTitle": project.title,
+        **rq_payload,
+        "extractionColumns": extraction_schema,
+        "extractionRows": extraction_rows,
+        "distributionCharts": distribution_charts,
+        "visualizationSuggestions": _build_visualization_suggestions(
+            research_questions,
+            extraction_schema,
+            included_articles,
+        ),
+        "qualitySummary": {
+            "ratedArticles": len(rated_scores),
+            "unratedArticles": max(len(included_articles) - len(rated_scores), 0),
+            "averageScore": round(sum(rated_scores) / len(rated_scores), 2) if rated_scores else None,
+            "byRating": _build_distribution_rows(
+                quality_rating_counts,
+                denominator=len(included_articles),
+                order=QUALITY_RATING_ORDER,
+            ),
+            "byCriterion": by_criterion,
+        },
+    }
 
 
 def _build_vector_payload(article: Article, qdrant) -> dict:
@@ -521,6 +988,7 @@ def _create_article_entity(
     source_category: str,
     source_name: str,
     import_batch_label: str | None,
+    study_type: str | None = None,
 ) -> Article:
     article = Article(
         title=payload.title,
@@ -541,6 +1009,7 @@ def _create_article_entity(
         sourceCategory=source_category,
         sourceName=source_name,
         importBatchLabel=import_batch_label,
+        studyType=study_type if study_type is not None else getattr(payload, "studyType", None),
         currentPhase="identification",
         reviewOutcome="active",
         screeningDecision="pending",
@@ -873,6 +1342,7 @@ async def create_article(
         source_category=data.sourceCategory,
         source_name=data.sourceName,
         import_batch_label=data.importBatchLabel,
+        study_type=data.studyType,
     )
 
     await _evaluate_article_if_possible(article, project)
@@ -903,6 +1373,7 @@ async def import_bibtex_entries(
             source_category=data.sourceCategory,
             source_name=data.sourceName,
             import_batch_label=batch_label,
+            study_type=data.studyType,
         )
         await _evaluate_article_if_possible(article, project)
         db.add(article)
@@ -1227,6 +1698,7 @@ async def eligibility_decision(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    project = await get_project_or_404(projectId, current_user.id, db)
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     if article.currentPhase not in {"eligibility", "included"}:
         raise HTTPException(
@@ -1273,6 +1745,7 @@ async def eligibility_decision(
         article.includedAt = None
         article.answeringRQs = []
 
+    apply_quality_metrics(article, project.qualityAssessmentSchema or [])
     _set_legacy_state_from_workflow(article)
     await db.commit()
     await db.refresh(article)
@@ -1280,8 +1753,50 @@ async def eligibility_decision(
     return _build_article_response(article)
 
 
-@router.get("/{projectId}/artigos/rq-synthesis")
-async def get_project_rq_synthesis(
+@router.patch("/{projectId}/artigos/{articleId}/evidence", response_model=ArticleResponse)
+async def update_article_evidence(
+    projectId: int,
+    articleId: int,
+    data: ArticleEvidenceUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    project = await get_project_or_404(projectId, current_user.id, db)
+    article = await get_article_or_404(articleId, projectId, current_user.id, db)
+
+    if not _is_included_for_synthesis(article):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Artigo fora do corpus",
+                "message": "A extracao estruturada so pode ser editada para artigos incluidos.",
+            },
+        )
+
+    extraction_schema = project.dataExtractionSchema or []
+    quality_schema = project.qualityAssessmentSchema or []
+
+    article.extractionData = merge_extraction_data(
+        getattr(article, "extractionData", None) or {},
+        data.extractionData,
+        extraction_schema,
+    )
+    article.qualityAssessmentAnswers = merge_quality_assessment_answers(
+        getattr(article, "qualityAssessmentAnswers", None) or {},
+        data.qualityAssessmentAnswers,
+        quality_schema,
+    )
+    apply_quality_metrics(article, quality_schema)
+    if data.markExtractionComplete:
+        article.extractionCompletedAt = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(article)
+    return _build_article_response(article)
+
+
+@router.get("/{projectId}/artigos/synthesis-report")
+async def get_project_synthesis_report(
     projectId: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1291,87 +1806,24 @@ async def get_project_rq_synthesis(
         select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
     )
     articles = result.scalars().all()
+    return _build_synthesis_report(project, articles)
 
-    research_questions = project.researchQuestions or []
-    rq_count = len(research_questions)
 
-    included_articles = [article for article in articles if _is_included_for_synthesis(article)]
-    rq_to_articles: dict[int, list[Article]] = {index: [] for index in range(1, rq_count + 1)}
-    included_without_rq: list[Article] = []
-
-    for article in included_articles:
-        linked_rqs = [rq for rq in (article.answeringRQs or []) if 1 <= rq <= rq_count]
-        if not linked_rqs:
-            included_without_rq.append(article)
-            continue
-        for rq in sorted(set(linked_rqs)):
-            rq_to_articles[rq].append(article)
-
-    rq_synthesis = []
-    for index, question in enumerate(research_questions, start=1):
-        rq_articles = rq_to_articles.get(index, [])
-        rq_synthesis.append(
-            {
-                "rqNumber": index,
-                "question": question,
-                "evidenceCount": len(rq_articles),
-                "articles": [
-                    {
-                        "id": article.id,
-                        "paperId": article.paperId,
-                        "title": article.title,
-                        "authors": article.authors,
-                        "year": article.year,
-                        "status": article.status,
-                        "manualDecision": article.manualDecision,
-                            "reason": getattr(article, "eligibilityReasonText", None) or getattr(article, "manualDecisionReason", None),
-                        "evidenceExcerpt": _build_evidence_excerpt(article),
-                    }
-                    for article in rq_articles
-                ],
-            }
-        )
-
-    matrix = []
-    for article in included_articles:
-        article_links = set(rq for rq in (article.answeringRQs or []) if 1 <= rq <= rq_count)
-        matrix.append(
-            {
-                "articleId": article.id,
-                "paperId": article.paperId,
-                "title": article.title,
-                "year": article.year,
-                "decision": article.reviewOutcome if getattr(article, "reviewOutcome", None) else article.manualDecision or article.status,
-                "rqs": [index for index in range(1, rq_count + 1) if index in article_links],
-            }
-        )
-
-    answered_rqs = sum(1 for index in range(1, rq_count + 1) if rq_to_articles.get(index))
-    coverage_percentage = round((answered_rqs / rq_count) * 100, 2) if rq_count else 0
-
+@router.get("/{projectId}/artigos/rq-synthesis")
+async def get_project_rq_synthesis(
+    projectId: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    report = await get_project_synthesis_report(projectId=projectId, current_user=current_user, db=db)
     return {
-        "projectId": projectId,
-        "projectTitle": project.title,
-        "rqCount": rq_count,
-        "rqSynthesis": rq_synthesis,
-        "matrix": matrix,
-        "coverage": {
-            "answeredRQCount": answered_rqs,
-            "answeredRQPercentage": coverage_percentage,
-            "includedArticles": len(included_articles),
-            "includedWithoutRQLinks": len(included_without_rq),
-        },
-        "unlinkedIncludedArticles": [
-            {
-                "id": article.id,
-                "paperId": article.paperId,
-                "title": article.title,
-                "year": article.year,
-                "status": article.status,
-                "manualDecision": article.manualDecision,
-            }
-            for article in included_without_rq
-        ],
+        "projectId": report["projectId"],
+        "projectTitle": report["projectTitle"],
+        "rqCount": report["rqCount"],
+        "rqSynthesis": report["rqSynthesis"],
+        "matrix": report["matrix"],
+        "coverage": report["coverage"],
+        "unlinkedIncludedArticles": report["unlinkedIncludedArticles"],
     }
 
 

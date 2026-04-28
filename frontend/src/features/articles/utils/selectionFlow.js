@@ -18,20 +18,29 @@ export const SOURCE_CATEGORY_OPTIONS = [
   { value: "manual_other", label: "Origem manual" },
 ];
 
+export const STUDY_TYPE_OPTIONS = [
+  { value: "journal_article", label: "Artigo de periodico" },
+  { value: "conference_paper", label: "Conferencia" },
+  { value: "review", label: "Revisao" },
+  { value: "thesis", label: "Tese" },
+  { value: "book_chapter", label: "Capitulo de livro" },
+  { value: "other", label: "Outro" },
+];
+
 export const FLOW_TABS = [
-  { key: "overview", label: "Overview" },
-  { key: "identification", label: "Identification" },
-  { key: "screening", label: "Screening" },
-  { key: "eligibility", label: "Eligibility" },
-  { key: "included", label: "Included" },
-  { key: "report", label: "Report" },
+  { key: "overview", label: "Visao geral" },
+  { key: "identification", label: "Identificacao" },
+  { key: "screening", label: "Triagem" },
+  { key: "eligibility", label: "Elegibilidade" },
+  { key: "included", label: "Incluidos" },
+  { key: "report", label: "Relatorio" },
 ];
 
 export const PHASE_LABELS = {
-  identification: "Identification",
-  screening: "Screening",
-  eligibility: "Eligibility",
-  included: "Included",
+  identification: "Identificacao",
+  screening: "Triagem",
+  eligibility: "Elegibilidade",
+  included: "Incluidos",
 };
 
 export const OUTCOME_LABELS = {
@@ -47,5 +56,5 @@ export function formatSourceLabel(article) {
   if (!article) {
     return "-";
   }
-  return `${article.sourceName} · ${article.sourceCategory}`;
+  return `${article.sourceName} - ${article.sourceCategory}`;
 }

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { AlertTriangleIcon, LoaderIcon, SaveIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { SlidePanel } from "@/components/ui/SlidePanel";
 import ArticleCommonFields from "@features/articles/components/ArticleCommonFields";
 import ArticlePublicationFields from "@features/articles/components/ArticlePublicationFields";
 import ArticleStatusSelector from "@features/articles/components/ArticleStatusSelector";
 import { articleService } from "@features/articles/services/articleService";
+import { STUDY_TYPE_OPTIONS } from "@features/articles/utils/selectionFlow";
 import { toast } from "@/lib/toast";
 
 function EditArticleModal({ isOpen, onClose, onSuccess, project, article }) {
@@ -23,6 +25,7 @@ function EditArticleModal({ isOpen, onClose, onSuccess, project, article }) {
     volume: "",
     number: "",
     issn: "",
+    studyType: "",
     status: "pendente",
   });
 
@@ -40,6 +43,7 @@ function EditArticleModal({ isOpen, onClose, onSuccess, project, article }) {
         volume: article.volume || "",
         number: article.number || "",
         issn: article.issn || "",
+        studyType: article.studyType || "",
         status: article.status || "pendente",
       });
     }
@@ -76,6 +80,7 @@ function EditArticleModal({ isOpen, onClose, onSuccess, project, article }) {
         volume: formData.volume,
         number: formData.number,
         issn: formData.issn,
+        studyType: formData.studyType || null,
         status: formData.status,
       });
 
@@ -103,6 +108,7 @@ function EditArticleModal({ isOpen, onClose, onSuccess, project, article }) {
       volume: "",
       number: "",
       issn: "",
+      studyType: "",
       status: "pendente",
     });
     setError("");
@@ -165,6 +171,23 @@ function EditArticleModal({ isOpen, onClose, onSuccess, project, article }) {
           formData={formData}
           onFieldChange={handleInputChange}
         />
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-[var(--syn-text-primary)]">Tipo de estudo</label>
+          <Select value={formData.studyType || "unclassified"} onValueChange={(value) => handleInputChange("studyType", value === "unclassified" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unclassified">Nao classificado</SelectItem>
+              {STUDY_TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <ArticleStatusSelector
           onChange={(status) => handleInputChange("status", status)}

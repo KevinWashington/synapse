@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, LargeBinary, Table, Column, Index, JSON
+from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, LargeBinary, Table, Column, Index, JSON, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ARRAY
 from pgvector.sqlalchemy import Vector
@@ -44,6 +44,7 @@ class Article(Base):
     sourceCategory: Mapped[str] = mapped_column(String(30), default="manual_other", nullable=False)
     sourceName: Mapped[str] = mapped_column(String(120), nullable=False, default="Manual")
     importBatchLabel: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    studyType: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     currentPhase: Mapped[str] = mapped_column(String(30), default="identification", nullable=False)
     reviewOutcome: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
@@ -62,6 +63,11 @@ class Article(Base):
     eligibilityReasonText: Mapped[str | None] = mapped_column(Text, nullable=True)
     eligibilityReviewedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     eligibilityChecklistAnswers: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
+    extractionData: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
+    extractionCompletedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    qualityAssessmentAnswers: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
+    qualityScore: Mapped[float | None] = mapped_column(Float, nullable=True)
+    qualityRating: Mapped[str | None] = mapped_column(String(20), nullable=True, default="unrated")
     includedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Compatibility status for legacy views/services.
