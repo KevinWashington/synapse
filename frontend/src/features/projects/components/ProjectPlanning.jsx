@@ -567,12 +567,6 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
         <PlanningCard
           title={framework}
           description="Defina a pergunta de pesquisa estruturada."
-          action={
-            <Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white">
-              <Edit3Icon className="h-4 w-4" />
-              Editar
-            </Button>
-          }
         >
           <div className="divide-y divide-[#edf0f7]">
             {frameworkComponents.map((component, index) => (

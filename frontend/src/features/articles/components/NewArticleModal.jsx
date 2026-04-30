@@ -3,8 +3,21 @@ import { LoaderIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
-import { SlidePanel } from "@/components/ui/SlidePanel";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
 import ArticleCommonFields from "@features/articles/components/ArticleCommonFields";
 import { articleService } from "@features/articles/services/articleService";
 import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS, STUDY_TYPE_OPTIONS } from "@features/articles/utils/selectionFlow";
@@ -86,136 +99,142 @@ function NewArticleModal({ isOpen, onClose, onSuccess, projectId }) {
       journal: "",
       doi: "",
       abstract: "",
-        notas: "",
-        sourceCategory: "database",
-        sourceNamePreset: "Scopus",
-        sourceNameCustom: "",
-        studyType: "",
-      });
+      notas: "",
+      sourceCategory: "database",
+      sourceNamePreset: "Scopus",
+      sourceNameCustom: "",
+      studyType: "",
+    });
     setErrors({});
     onClose();
   }
 
   return (
-    <SlidePanel
-      isOpen={isOpen}
-      onClose={handleClose}
-      title="Novo Registro"
-        breadcrumb="Identificacao"
-      footer={
-        <div className="flex items-center justify-end gap-3">
-          <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} disabled={loading} className="gap-2">
-            {loading ? (
-              <>
-                <LoaderIcon className="h-4 w-4 animate-spin" />
-                Salvando...
-              </>
-            ) : (
-              <>
-                <PlusIcon className="h-4 w-4" />
-                Adicionar
-              </>
-            )}
-          </Button>
-        </div>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-6 p-6">
-        <div className="grid gap-4 md:grid-cols-2">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PlusIcon className="h-4 w-4 text-[#6259ff]" />
+            Novo Registro
+          </DialogTitle>
+          <DialogDescription>
+            Adicione manualmente um registro na etapa de identificacao.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5 py-2">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Categoria da origem</Label>
+              <Select value={formData.sourceCategory} onValueChange={(value) => handleInputChange("sourceCategory", value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOURCE_CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.sourceCategory ? <p className="text-sm text-red-500">{errors.sourceCategory}</p> : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Origem</Label>
+              <Select value={formData.sourceNamePreset} onValueChange={(value) => handleInputChange("sourceNamePreset", value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOURCE_NAME_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {formData.sourceNamePreset === "outra" ? (
+                <Input
+                  value={formData.sourceNameCustom}
+                  onChange={(event) => handleInputChange("sourceNameCustom", event.target.value)}
+                  placeholder="Descreva a origem"
+                />
+              ) : null}
+              {errors.sourceName ? <p className="text-sm text-red-500">{errors.sourceName}</p> : null}
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label>Categoria da origem</Label>
-            <Select value={formData.sourceCategory} onValueChange={(value) => handleInputChange("sourceCategory", value)}>
+            <Label>Tipo de estudo</Label>
+            <Select value={formData.studyType || "unclassified"} onValueChange={(value) => handleInputChange("studyType", value === "unclassified" ? "" : value)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SOURCE_CATEGORY_OPTIONS.map((option) => (
+                <SelectItem value="unclassified">Nao classificado</SelectItem>
+                {STUDY_TYPE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.sourceCategory ? <p className="text-sm text-red-500">{errors.sourceCategory}</p> : null}
           </div>
+
+          <ArticleCommonFields
+            currentYear={currentYear}
+            errors={errors}
+            fieldPrefix="create-article"
+            formData={formData}
+            journalLabel="Periodico/Conferencia"
+            onFieldChange={handleInputChange}
+            placeholders={{
+              title: "Ex: Artificial Intelligence in Higher Education",
+              authors: "Ex: Smith, J.; Johnson, A.; Brown, M.",
+              year: "",
+              journal: "Ex: Journal of Educational Technology",
+              doi: "Ex: 10.1234/journal.2023.001",
+              abstract: "Insira o resumo do artigo...",
+            }}
+            requiredFields
+            showCounters
+          />
 
           <div className="space-y-2">
-            <Label>Origem</Label>
-            <Select value={formData.sourceNamePreset} onValueChange={(value) => handleInputChange("sourceNamePreset", value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SOURCE_NAME_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {formData.sourceNamePreset === "outra" ? (
-              <Input
-                value={formData.sourceNameCustom}
-                onChange={(event) => handleInputChange("sourceNameCustom", event.target.value)}
-                placeholder="Descreva a origem"
-              />
-            ) : null}
-            {errors.sourceName ? <p className="text-sm text-red-500">{errors.sourceName}</p> : null}
+            <Label htmlFor="new-article-notes">Notas iniciais</Label>
+            <textarea
+              id="new-article-notes"
+              value={formData.notas}
+              onChange={(event) => handleInputChange("notas", event.target.value)}
+              rows={3}
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-1 focus-visible:outline-none"
+              placeholder="Observacoes opcionais do registro..."
+            />
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label>Tipo de estudo</Label>
-          <Select value={formData.studyType || "unclassified"} onValueChange={(value) => handleInputChange("studyType", value === "unclassified" ? "" : value)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unclassified">Nao classificado</SelectItem>
-              {STUDY_TYPE_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <ArticleCommonFields
-          currentYear={currentYear}
-          errors={errors}
-          fieldPrefix="create-article"
-          formData={formData}
-          journalLabel="Periodico/Conferencia"
-          onFieldChange={handleInputChange}
-          placeholders={{
-            title: "Ex: Artificial Intelligence in Higher Education",
-            authors: "Ex: Smith, J.; Johnson, A.; Brown, M.",
-            year: "",
-            journal: "Ex: Journal of Educational Technology",
-            doi: "Ex: 10.1234/journal.2023.001",
-            abstract: "Insira o resumo do artigo...",
-          }}
-          requiredFields
-          showCounters
-        />
-
-        <div className="space-y-2">
-          <Label htmlFor="new-article-notes">Notas iniciais</Label>
-          <textarea
-            id="new-article-notes"
-            value={formData.notas}
-            onChange={(event) => handleInputChange("notas", event.target.value)}
-            rows={3}
-            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-1 focus-visible:outline-none"
-            placeholder="Observacoes opcionais do registro..."
-          />
-        </div>
-      </form>
-    </SlidePanel>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading} className="gap-2">
+              {loading ? (
+                <>
+                  <LoaderIcon className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="h-4 w-4" />
+                  Adicionar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

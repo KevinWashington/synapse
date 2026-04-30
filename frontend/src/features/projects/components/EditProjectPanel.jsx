@@ -1,10 +1,17 @@
 import { memo, useCallback } from "react";
-import { LoaderIcon } from "lucide-react";
+import { LoaderIcon, PencilIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
-import { SlidePanel } from "@/components/ui/SlidePanel";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
 import ProjectStatusSelector from "./ProjectStatusSelector";
 
 function EditProjectPanel({
@@ -37,13 +44,46 @@ function EditProjectPanel({
   );
 
   return (
-    <SlidePanel
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Editar Projeto"
-      breadcrumb="Projetos"
-      footer={
-        <div className="flex items-center justify-end gap-3">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PencilIcon className="h-4 w-4 text-[#6259ff]" />
+            Editar Projeto
+          </DialogTitle>
+          <DialogDescription>
+            Atualize as informacoes do projeto.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="edit-title" className="text-[var(--syn-text-primary)]">
+              Titulo
+            </Label>
+            <Input id="edit-title" value={value.title} onChange={handleTitleChange} />
+          </div>
+          <div className="space-y-2">
+            <Label
+              htmlFor="edit-objetivo"
+              className="text-[var(--syn-text-primary)]"
+            >
+              Objetivo
+            </Label>
+            <Textarea
+              id="edit-objetivo"
+              value={value.objetivo}
+              onChange={handleObjetivoChange}
+              rows={4}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-[var(--syn-text-primary)]">Status</Label>
+            <ProjectStatusSelector value={value.status} onChange={handleStatusChange} />
+          </div>
+        </div>
+
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
@@ -53,47 +93,13 @@ function EditProjectPanel({
                 <LoaderIcon className="h-4 w-4 animate-spin" /> Salvando...
               </>
             ) : (
-              "Salvar Alterações"
+              "Salvar Alteracoes"
             )}
           </Button>
-        </div>
-      }
-    >
-      <div className="p-6 space-y-6">
-        <div className="space-y-1">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--syn-text-secondary)]">
-            Informações do Projeto
-          </h3>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="edit-title" className="text-[var(--syn-text-primary)]">
-            Título
-          </Label>
-          <Input id="edit-title" value={value.title} onChange={handleTitleChange} />
-        </div>
-        <div className="space-y-2">
-          <Label
-            htmlFor="edit-objetivo"
-            className="text-[var(--syn-text-primary)]"
-          >
-            Objetivo
-          </Label>
-          <Textarea
-            id="edit-objetivo"
-            value={value.objetivo}
-            onChange={handleObjetivoChange}
-            rows={4}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-[var(--syn-text-primary)]">Status</Label>
-          <ProjectStatusSelector value={value.status} onChange={handleStatusChange} />
-        </div>
-      </div>
-    </SlidePanel>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 export default memo(EditProjectPanel);
-
-

@@ -10,10 +10,7 @@ import {
   DownloadIcon,
   ExternalLinkIcon,
   FileTextIcon,
-  FilterIcon,
-  Grid2X2Icon,
   HelpCircleIcon,
-  ListIcon,
   LoaderIcon,
   MoreVerticalIcon,
   PlusIcon,
@@ -327,14 +324,6 @@ function StageListPanel({
               className="h-11 rounded-lg border-[#dfe4ef] bg-white pl-11 text-sm shadow-none"
             />
           </div>
-          <Button variant="outline" className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white">
-            <FilterIcon className="h-4 w-4" />
-            Filtros
-          </Button>
-          <Button variant="outline" className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white">
-            Mais opcoes
-            <MoreVerticalIcon className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="mt-5 flex gap-5 overflow-x-auto border-b border-[#edf0f7]">
@@ -370,10 +359,6 @@ function StageListPanel({
                 Enviar para triagem
               </Button>
             ) : null}
-            <span>Ordenar por:</span>
-            <Button variant="outline" size="sm" className="h-8 rounded-lg border-[#dfe4ef] bg-white text-xs">Mais recentes</Button>
-            <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#dfe4ef] bg-[#f0edff] text-[#6259ff]"><ListIcon className="h-4 w-4" /></Button>
-            <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#dfe4ef] bg-white"><Grid2X2Icon className="h-4 w-4" /></Button>
           </div>
         </div>
       </div>
@@ -449,13 +434,8 @@ function StageListPanel({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
-        <span>Mostrando 1 a {formatNumber(articles.length)} de {formatNumber(getStageCount(summary, activeStage))} artigos</span>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#dfe4ef] bg-white"><ChevronLeftIcon className="h-4 w-4" /></Button>
-          <span className="grid h-8 w-8 place-items-center rounded-lg border border-[#bdb7ff] bg-[#f0edff] text-sm font-semibold text-[#6259ff]">1</span>
-          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#dfe4ef] bg-white"><ChevronRightIcon className="h-4 w-4" /></Button>
-        </div>
+      <div className="flex items-center border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
+        <span>Mostrando {formatNumber(articles.length)} de {formatNumber(getStageCount(summary, activeStage))} artigos</span>
       </div>
     </section>
   );
@@ -526,13 +506,10 @@ function ArticleDetailPanel({
           {article.year} · {article.journal}{article.doi ? ` · DOI: ${article.doi}` : ""}
         </p>
 
-        <div className="mt-5 flex gap-6 border-b border-[#edf0f7] text-sm font-semibold">
-          <span className="relative pb-3 text-[#6259ff] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t after:bg-[#6259ff]">
+        <div className="mt-5 border-b border-[#edf0f7] pb-3">
+          <span className="text-sm font-semibold text-[#6259ff]">
             {isIncludedStage ? "Dados do estudo" : activeStage === "eligibility" ? "Texto completo" : "Resumo"}
           </span>
-          <span className="pb-3 text-[#56627f]">Detalhes</span>
-          <span className="pb-3 text-[#56627f]">Citacoes</span>
-          <span className="pb-3 text-[#56627f]">Anexos ({article.hasPdf ? 1 : 0})</span>
         </div>
 
         {isIncludedStage ? (
@@ -798,10 +775,6 @@ function StageSidebar({
           ) : null}
           {activeStage === "included" ? (
             <>
-              <Button variant="outline" className="h-10 w-full justify-start gap-2 rounded-lg border-[#dfe4ef] bg-white">
-                <DatabaseIcon className="h-4 w-4" />
-                Iniciar extracao de dados
-              </Button>
               <Button variant="outline" className="h-10 w-full justify-start rounded-lg border-[#dfe4ef] bg-white" onClick={onExportStage}>
                 Exportar lista de incluidos
               </Button>
@@ -979,8 +952,9 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
           <PlusIcon className="h-4 w-4" />
           Importar artigos
         </Button>
-        <Button variant="outline" size="icon" className="h-10 w-10 rounded-lg border-[#dfe4ef] bg-white" onClick={() => setShowNewArticleModal(true)}>
-          <MoreVerticalIcon className="h-4 w-4" />
+        <Button className="h-10 gap-2 rounded-lg bg-[#6259ff] px-4 text-white hover:bg-[#5148ee]" onClick={() => setShowNewArticleModal(true)}>
+          <PlusIcon className="h-4 w-4" />
+          Adicionar artigo  
         </Button>
       </div>
 

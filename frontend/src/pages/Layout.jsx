@@ -3,7 +3,7 @@ import Menu from "@components/Menu";
 import ThemeToggle from "@components/ThemeToggle";
 import { Button } from "@/components/ui/Button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
-import { UserIcon, LogOut, Bell, ArrowLeft, ChevronDown } from "lucide-react";
+import { UserIcon, LogOut, ArrowLeft, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,13 +72,6 @@ function HeaderBar({ navigate, logout, user }) {
       <div className="flex items-center gap-3">
         {actions && <div className="flex items-center gap-2">{actions}</div>}
         <ThemeToggle className="h-10 w-10 rounded-full border-[#edf0f7] bg-white text-[#182344] shadow-none hover:bg-[#f6f7fb]" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 rounded-full border border-[#edf0f7] bg-white text-[#182344] shadow-none hover:bg-[#f6f7fb]"
-        >
-          <Bell className="h-4 w-4" />
-        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

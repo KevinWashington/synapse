@@ -10,7 +10,6 @@ export { default as PdfViewer } from "./components/PdfViewer";
 export { default as NotesEditor } from "./components/NotesEditor";
 export { default as ArticleGraph } from "./components/ArticleGraph";
 export { default as ArticleLibraryDetailPanel } from "./components/ArticleLibraryDetailPanel";
-export { default as ArticleStatusActions } from "./components/ArticleStatusActions";
 export { default as ArticleAIBanner } from "./components/ArticleAIBanner";
 export { default as ArticleWorkspacePanel } from "./components/ArticleWorkspacePanel";
 

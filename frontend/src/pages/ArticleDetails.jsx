@@ -2,20 +2,15 @@ import { lazy, Suspense, useEffect, useState, useMemo } from "react";
 import {
   AlertTriangleIcon,
   ArrowLeftIcon,
-  BellIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
-  CircleHelpIcon,
   ExternalLinkIcon,
   FileIcon,
   FileTextIcon,
   LoaderIcon,
   MessageSquareIcon,
-  MoreVerticalIcon,
   SaveIcon,
   SearchIcon,
-  SettingsIcon,
-  SlidersHorizontalIcon,
   SparklesIcon,
   TrashIcon,
   UploadIcon,
@@ -44,34 +39,7 @@ function ArticlePanelLoader() {
   return <LoadingState message="Carregando conteudo..." />;
 }
 
-const FULL_TEXT_STATUS_LABELS = {
-  not_requested: "Texto completo ainda nao solicitado",
-  pending_upload: "Aguardando upload do PDF",
-  uploaded: "PDF disponivel",
-  unavailable: "Texto completo indisponivel",
-};
 
-function getPhaseGuidance(article) {
-  if (!article) {
-    return "Revise o artigo e avance a decisao conforme o fluxo do projeto.";
-  }
-
-  if (article.reviewOutcome === "included") {
-    return "Artigo incluido no corpus final. O proximo passo e preencher extracao e qualidade.";
-  }
-
-  if (article.currentPhase === "identification" || article.currentPhase === "screening") {
-    return "Use o resumo, notas e assistente para registrar a decisao de triagem.";
-  }
-
-  if (article.currentPhase === "eligibility") {
-    return article.hasPdf
-      ? "PDF disponivel. Revise o texto completo e registre a decisao final."
-      : "Envie o PDF ou marque texto completo indisponivel antes da decisao final.";
-  }
-
-  return "Revise o artigo e avance a decisao conforme o fluxo do projeto.";
-}
 
 function mapSuggestedDecision(aiSuggestedStatus) {
   return aiSuggestedStatus === "excluido" ? "excluded" : "included";
@@ -121,260 +89,7 @@ function getExtractionStatus(article, currentArticleId, schema) {
   return { label: "Pendente", className: "bg-[#f2f4f8] text-[#667391]" };
 }
 
-function ExtractionWorkspace({
-  article,
-  articleId,
-  articleList,
-  articleListLoading,
-  backUrl,
-  isSavingEvidence,
-  navigate,
-  onSaveEvidence,
-  pdfData,
-  project,
-  projectId,
-}) {
-  const [searchTerm, setSearchTerm] = useState("");
-  const extractionSchema = project?.dataExtractionSchema || [];
-  const filteredArticles = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    return (articleList || []).filter((item) => {
-      if (!normalizedSearch) {
-        return true;
-      }
-      return `${item.title} ${item.authors} ${item.journal}`.toLowerCase().includes(normalizedSearch);
-    });
-  }, [articleList, searchTerm]);
-  const completedCount = useMemo(
-    () => (articleList || []).filter((item) => item.extractionCompletedAt).length,
-    [articleList]
-  );
-  const totalCount = articleList?.length || 0;
-  const progress = formatPercent(completedCount, totalCount);
-  const currentIndex = Math.max(
-    0,
-    (articleList || []).findIndex((item) => String(item.id) === String(articleId))
-  );
-  const previousArticle = articleList?.[currentIndex - 1];
-  const nextArticle = articleList?.[currentIndex + 1];
 
-  function openArticle(targetArticle) {
-    if (!targetArticle) {
-      return;
-    }
-    navigate(`/projetos/${projectId}/artigos/${targetArticle.id}?flow=included&workspace=extracao`);
-  }
-
-  return (
-    <div className="flex min-h-[720px] flex-col overflow-hidden xl:h-[calc(100vh-124px)] xl:min-h-0">
-      <div className="mb-5 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-[#0f1734]">Extracao de dados</h1>
-            <span className="rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold text-[#6259ff]">
-              {project?.status === "em-progresso" ? "Em andamento" : project?.status}
-            </span>
-          </div>
-          <p className="mt-2 text-sm text-[#56627f]">
-            Preencha as informacoes do estudo com base no planejamento definido.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="min-w-[260px]">
-            <div className="mb-1 flex items-center justify-between text-xs font-semibold text-[#182344]">
-              <span>Progresso geral</span>
-              <span>{formatNumber(completedCount)} de {formatNumber(totalCount)} estudos · {progress}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-[#e7eaf3]">
-              <div className="h-full rounded-full bg-[#6259ff]" style={{ width: `${progress}%` }} />
-            </div>
-          </div>
-          <Button
-            type="submit"
-            form="article-extraction-form"
-            value="draft"
-            variant="outline"
-            className="h-10 gap-2 rounded-lg border-[#dfe4ef] bg-white"
-            disabled={isSavingEvidence}
-          >
-            <SaveIcon className="h-4 w-4" />
-            Salvar rascunho
-          </Button>
-          <Button
-            type="submit"
-            form="article-extraction-form"
-            value="complete"
-            className="h-10 gap-2 rounded-lg bg-[#6259ff] text-white hover:bg-[#5148ee]"
-            disabled={isSavingEvidence}
-          >
-            <CheckCircle2Icon className="h-4 w-4" />
-            Marcar como concluido
-            <ChevronDownIcon className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[238px_minmax(0,1fr)_minmax(420px,520px)]">
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white p-4">
-          <Button
-            variant="ghost"
-            className="mb-5 h-9 justify-start gap-2 px-0 text-[#6259ff] hover:bg-transparent hover:text-[#5148ee]"
-            onClick={() => navigate(backUrl)}
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-            Voltar para inclusao
-          </Button>
-
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-[#111936]">Estudos incluidos</h2>
-            <span className="rounded-full bg-[#f0f2fb] px-2 py-1 text-xs font-semibold text-[#111936]">
-              {formatNumber(totalCount)}
-            </span>
-          </div>
-
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a4adc2]" />
-            <Input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              className="h-10 rounded-lg border-[#dfe4ef] bg-white pl-9 text-sm shadow-none"
-              placeholder="Buscar estudos"
-            />
-          </div>
-
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_36px] gap-2">
-            <Button variant="outline" className="h-9 justify-between rounded-lg border-[#dfe4ef] bg-white px-3 text-xs">
-              Ordenar: Mais recentes
-              <ChevronDownIcon className="h-3.5 w-3.5" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg border-[#dfe4ef] bg-white">
-              <SlidersHorizontalIcon className="h-4 w-4 text-[#56627f]" />
-            </Button>
-          </div>
-
-          <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-            {articleListLoading ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-xs text-[#667391]">
-                <LoaderIcon className="h-4 w-4 animate-spin" />
-                Carregando estudos...
-              </div>
-            ) : filteredArticles.length ? (
-              filteredArticles.map((item) => {
-                const active = String(item.id) === String(articleId);
-                const status = getExtractionStatus(item, articleId, extractionSchema);
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => openArticle(item)}
-                    className={cn(
-                      "w-full rounded-lg border p-3 text-left transition-colors",
-                      active ? "border-[#bdb7ff] bg-[#fbfaff]" : "border-[#edf0f7] bg-white hover:border-[#cfd6e7]"
-                    )}
-                  >
-                    <p className="line-clamp-3 text-xs font-semibold leading-5 text-[#111936]">{item.title}</p>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[#56627f]">{item.authors}</p>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="text-xs text-[#56627f]">{item.year}</span>
-                      <span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold", status.className)}>
-                        {status.label}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="py-8 text-center text-xs text-[#667391]">Nenhum estudo incluido encontrado.</p>
-            )}
-          </div>
-
-          <div className="mt-4 flex shrink-0 items-center justify-between border-t border-[#edf0f7] pt-3 text-xs text-[#667391]">
-            <span>{formatNumber(currentIndex + 1)} de {formatNumber(totalCount)} selecionado</span>
-            <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#dfe4ef] bg-white">
-              <SettingsIcon className="h-4 w-4" />
-            </Button>
-          </div>
-        </aside>
-
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white p-5">
-          <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <h2 className="line-clamp-2 text-lg font-semibold leading-7 text-[#111936]">{article.title}</h2>
-              <p className="mt-2 line-clamp-1 text-sm text-[#56627f]">
-                {article.authors} ({article.year}) · {article.journal}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => navigate(`/projetos/${projectId}/artigos/${articleId}?flow=included&workspace=notas`)}>
-                Ver detalhes do artigo
-                <ExternalLinkIcon className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
-                <MoreVerticalIcon className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="mb-4 flex shrink-0 gap-6 border-b border-[#edf0f7] text-sm font-semibold">
-            <span className="relative pb-3 text-[#6259ff] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t after:bg-[#6259ff]">PDF</span>
-            <span className="pb-3 text-[#56627f]">Notas</span>
-          </div>
-
-          <div className="min-h-[420px] flex-1 overflow-hidden">
-            <Suspense fallback={<ArticlePanelLoader />}>
-              <PdfViewer article={article} articleId={articleId} pdfData={pdfData} projectId={projectId} />
-            </Suspense>
-          </div>
-        </section>
-
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white">
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#edf0f7] px-4 py-4">
-            <div>
-              <h2 className="text-base font-semibold text-[#111936]">Formulario de extracao</h2>
-              <p className="mt-1 text-xs text-[#667391]">Baseado no planejamento da revisao</p>
-            </div>
-            <Button variant="outline" size="sm" className="h-9 rounded-lg border-[#dfe4ef] bg-white" onClick={() => navigate(`/projetos/${projectId}?tab=planejamento`)}>
-              Ver planejamento
-            </Button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <Suspense fallback={<ArticlePanelLoader />}>
-              <ArticleEvidenceEditor
-                article={article}
-                className="h-full"
-                formId="article-extraction-form"
-                isSaving={isSavingEvidence}
-                onSave={onSaveEvidence}
-                project={project}
-                showFooterActions={false}
-                variant="workspace"
-              />
-            </Suspense>
-          </div>
-        </section>
-      </div>
-
-      <div className="mt-4 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-t border-[#edf0f7] bg-white px-1 py-3 text-xs text-[#56627f]">
-        <Button variant="ghost" className="h-10 justify-start gap-3 text-[#56627f]" onClick={() => openArticle(previousArticle)} disabled={!previousArticle}>
-          <ArrowLeftIcon className="h-4 w-4" />
-          <span className="min-w-0 text-left">
-            <span className="block font-semibold">Anterior</span>
-            {previousArticle ? <span className="block max-w-[260px] truncate">{previousArticle.title}</span> : null}
-          </span>
-        </Button>
-        <span className="text-[#21945a]">Salvo automaticamente</span>
-        <Button variant="ghost" className="h-10 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
-          <span className="min-w-0 text-right">
-            <span className="block font-semibold">Proximo</span>
-            {nextArticle ? <span className="block max-w-[260px] truncate">{nextArticle.title}</span> : null}
-          </span>
-          <ArrowLeftIcon className="h-4 w-4 rotate-180" />
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 function PrismaExtractionWorkspace({
   article,
@@ -456,15 +171,7 @@ function PrismaExtractionWorkspace({
           />
         </div>
 
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_36px] gap-2">
-          <Button variant="outline" className="h-9 justify-between rounded-lg border-[#dfe4ef] bg-white px-3 text-xs">
-            Ordenar: Mais recentes
-            <ChevronDownIcon className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg border-[#dfe4ef] bg-white">
-            <SlidersHorizontalIcon className="h-4 w-4 text-[#56627f]" />
-          </Button>
-        </div>
+
 
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {articleListLoading ? (
@@ -504,11 +211,8 @@ function PrismaExtractionWorkspace({
           )}
         </div>
 
-        <div className="mt-4 flex shrink-0 items-center justify-between border-t border-[#edf0f7] pt-3 text-xs text-[#667391]">
+        <div className="mt-4 flex shrink-0 items-center border-t border-[#edf0f7] pt-3 text-xs text-[#667391]">
           <span>{formatNumber(currentIndex + 1)} de {formatNumber(totalCount)} selecionado</span>
-          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#dfe4ef] bg-white">
-            <SettingsIcon className="h-4 w-4" />
-          </Button>
         </div>
       </aside>
 
@@ -531,12 +235,6 @@ function PrismaExtractionWorkspace({
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-[#253252] hover:bg-[#f2f4fb]">
-              <CircleHelpIcon className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-[#253252] hover:bg-[#f2f4fb]">
-              <BellIcon className="h-5 w-5" />
-            </Button>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6259ff] text-xs font-semibold text-white">
               JS
             </div>
@@ -601,15 +299,10 @@ function PrismaExtractionWorkspace({
                     {article.authors} ({article.year}) - {article.journal}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => navigate(`/projetos/${projectId}/artigos/${articleId}?flow=included&workspace=notas`)}>
+                <Button variant="outline" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => navigate(`/projetos/${projectId}/artigos/${articleId}?flow=included&workspace=notas`)}>
                     Ver detalhes do artigo
                     <ExternalLinkIcon className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
-                    <MoreVerticalIcon className="h-4 w-4" />
-                  </Button>
-                </div>
               </div>
 
               <div className="mb-4 flex shrink-0 gap-6 border-b border-[#edf0f7] text-sm font-semibold">
@@ -819,15 +512,7 @@ function PrismaArticleReviewWorkspace({
           />
         </div>
 
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_36px] gap-2">
-          <Button variant="outline" className="h-9 justify-between rounded-lg border-[#dfe4ef] bg-white px-3 text-xs">
-            Ordenar: Mais recentes
-            <ChevronDownIcon className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg border-[#dfe4ef] bg-white">
-            <SlidersHorizontalIcon className="h-4 w-4 text-[#56627f]" />
-          </Button>
-        </div>
+
 
         <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
           {articleListLoading ? (
@@ -867,11 +552,8 @@ function PrismaArticleReviewWorkspace({
           )}
         </div>
 
-        <div className="mt-4 flex shrink-0 items-center justify-between border-t border-[#edf0f7] pt-3 text-xs text-[#667391]">
+        <div className="mt-4 flex shrink-0 items-center border-t border-[#edf0f7] pt-3 text-xs text-[#667391]">
           <span>{formatNumber(currentIndex + 1)} de {formatNumber(totalCount)} selecionado</span>
-          <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg border-[#dfe4ef] bg-white">
-            <SettingsIcon className="h-4 w-4" />
-          </Button>
         </div>
       </aside>
 
@@ -894,12 +576,6 @@ function PrismaArticleReviewWorkspace({
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-[#253252] hover:bg-[#f2f4fb]">
-              <CircleHelpIcon className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-[#253252] hover:bg-[#f2f4fb]">
-              <BellIcon className="h-5 w-5" />
-            </Button>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6259ff] text-xs font-semibold text-white">
               JS
             </div>

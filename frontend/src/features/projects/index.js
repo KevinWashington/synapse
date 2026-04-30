@@ -1,5 +1,4 @@
 // Projects Feature - Components
-export { default as ProjectCard } from "./components/ProjectCard";
 export { default as NewProjectModal } from "./components/NewProjectModal";
 export { default as ProjectPlanning } from "./components/ProjectPlanning";
 export { default as EditProjectPanel } from "./components/EditProjectPanel";

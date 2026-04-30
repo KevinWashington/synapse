@@ -53,27 +53,8 @@ function App() {
           />
 
           <Route path="artigos" element={withSuspense(<ArticlesPage />)} />
-          <Route
-            path="artigos/importar"
-            element={withSuspense(<ArticlesPage />)}
-          />
-          <Route
-            path="artigos/upload"
-            element={withSuspense(<ArticlesPage />)}
-          />
 
-          <Route path="ia/analise" element={withSuspense(<AIChatPage />)} />
-          <Route path="ia/recomendacoes" element={withSuspense(<AIChatPage />)} />
           <Route path="ia/chat" element={withSuspense(<AIChatPage />)} />
-
-          <Route
-            path="visualizacoes/relacionamentos"
-            element={withSuspense(<DashboardPage />)}
-          />
-          <Route
-            path="visualizacoes/estatisticas"
-            element={withSuspense(<DashboardPage />)}
-          />
 
           <Route path="settings" element={withSuspense(<SettingsPage />)} />
           <Route

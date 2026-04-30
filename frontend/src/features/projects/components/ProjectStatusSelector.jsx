@@ -1,9 +1,19 @@
 import { memo } from "react";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+
 
 const PROJECT_STATUSES = ["ideia", "em-progresso", "concluido", "pausado"];
 
 function ProjectStatusSelector({ value, onChange }) {
+  const getStatusLabel = (s) => {
+    switch(s) {
+      case "ideia": return "Ideia";
+      case "em-progresso": return "Em Progresso";
+      case "concluido": return "Concluido";
+      case "pausado": return "Pausado";
+      default: return s;
+    }
+  };
+
   return (
     <div className="flex flex-wrap gap-2">
       {PROJECT_STATUSES.map((status) => (
@@ -13,11 +23,11 @@ function ProjectStatusSelector({ value, onChange }) {
           onClick={() => onChange(status)}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
             value === status
-              ? "bg-[var(--syn-sidebar-bg)] text-white border-transparent"
-              : "border-[var(--syn-border)] text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
+              ? "bg-[#6259ff] text-white border-transparent"
+              : "border-gray-200 text-gray-600 hover:bg-gray-50"
           }`}
         >
-          <StatusBadge status={status} />
+          {getStatusLabel(status)}
         </button>
       ))}
     </div>

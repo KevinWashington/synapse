@@ -1,5 +1,5 @@
 import { Label } from "@/components/ui/Label";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+
 
 function ArticleStatusSelector({
   label = "Status",
@@ -7,6 +7,17 @@ function ArticleStatusSelector({
   options,
   selectedStatus,
 }) {
+  const getStatusLabel = (s) => {
+    switch(s) {
+      case "pendente": return "Pendente";
+      case "analisado": return "Analisado";
+      case "excluido": return "Excluido";
+      case "incluido": return "Incluido";
+      case "lendo": return "Lendo";
+      default: return s;
+    }
+  };
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
@@ -18,11 +29,11 @@ function ArticleStatusSelector({
             onClick={() => onChange(status)}
             className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
               selectedStatus === status
-                ? "border-transparent bg-[var(--syn-sidebar-bg)] text-white"
-                : "border-[var(--syn-border)] text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)]"
+                ? "border-transparent bg-[#6259ff] text-white"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
           >
-            <StatusBadge status={status} />
+            {getStatusLabel(status)}
           </button>
         ))}
       </div>

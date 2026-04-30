@@ -356,19 +356,8 @@ function Projects() {
           </div>
           <div className="flex items-center justify-between border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
             <span>
-              Mostrando 1 a {visibleProjects.length} de {visibleProjects.length} projetos
+              Mostrando {visibleProjects.length} de {visibleProjects.length} projetos
             </span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg border-[#edf0f7] text-[#9aa4b8]">
-                <ChevronDown className="h-4 w-4 rotate-90" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-9 rounded-lg border-[#c7c4ff] bg-[#f0edff] px-4 text-[#6259ff]">
-                1
-              </Button>
-              <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg border-[#edf0f7] text-[#9aa4b8]">
-                <ChevronDown className="h-4 w-4 -rotate-90" />
-              </Button>
-            </div>
           </div>
         </div>
       ) : (

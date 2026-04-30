@@ -103,7 +103,7 @@ function ProjectDetailsHeader({
             className="h-10 gap-2 rounded-lg border-[#dfe4ef] bg-white text-[#182344] shadow-none"
           >
             <PencilIcon className="h-4 w-4" />
-            Editar planejamento
+            Editar projeto
           </Button>
           <Button
             size="sm"
