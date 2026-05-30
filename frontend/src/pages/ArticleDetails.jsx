@@ -352,13 +352,11 @@ function PrismaExtractionWorkspace({
                 {previousArticle ? <span className="block max-w-[260px] truncate">{previousArticle.title}</span> : null}
               </span>
             </Button>
-            <span className="text-[#21945a]">Salvo automaticamente</span>
             <Button variant="ghost" className="h-10 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
               <span className="min-w-0 text-right">
                 <span className="block font-semibold">Proximo</span>
                 {nextArticle ? <span className="block max-w-[260px] truncate">{nextArticle.title}</span> : null}
               </span>
-              <ArrowLeftIcon className="h-4 w-4 rotate-180" />
             </Button>
           </div>
         </main>
@@ -695,13 +693,11 @@ function PrismaArticleReviewWorkspace({
                 {previousArticle ? <span className="block max-w-[260px] truncate">{previousArticle.title}</span> : null}
               </span>
             </Button>
-            <span className="text-[#21945a]">Salvo automaticamente</span>
             <Button variant="ghost" className="h-10 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
               <span className="min-w-0 text-right">
                 <span className="block font-semibold">Proximo</span>
                 {nextArticle ? <span className="block max-w-[260px] truncate">{nextArticle.title}</span> : null}
               </span>
-              <ArrowLeftIcon className="h-4 w-4 rotate-180" />
             </Button>
           </div>
         </main>

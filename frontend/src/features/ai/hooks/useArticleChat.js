@@ -33,12 +33,7 @@ async function extractPdfContent(pdfData) {
     throw new Error("Dados do PDF invalidos");
   }
 
-  const pdfjsLib = await import(
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.min.mjs"
-  );
-
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.worker.min.mjs";
+  const pdfjsLib = await import("pdfjs-dist");
 
   const loadingTask = pdfjsLib.getDocument({ data: pdfData });
   const pdf = await loadingTask.promise;

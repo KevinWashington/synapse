@@ -63,16 +63,6 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("pt-BR");
 }
 
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-  return `${new Date(value).toLocaleDateString("pt-BR")} as ${new Date(value).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
-}
-
 function totalFromStats(stats) {
   return stats?.identified || 0;
 }
@@ -207,7 +197,7 @@ function StudyTypeCard({ studyTypes, included }) {
 
   return (
     <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
-      <p className="mb-4 text-sm font-semibold text-[#111936]">Distribuicao por tipo de estudo</p>
+      <p className="mb-4 text-sm font-semibold text-[#111936]">Distribuição por tipo de estudo</p>
       <div className="grid items-center gap-4 md:grid-cols-[150px_1fr]">
         <div className="relative h-[150px]">
           {chartData.length ? (

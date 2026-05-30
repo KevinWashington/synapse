@@ -4,10 +4,8 @@ import {
   BookOpen,
   ChevronDown,
   GraduationCap,
-  Grid2X2,
   HeartPulse,
   Leaf,
-  List,
   MoreHorizontal,
   PlusIcon,
   SearchIcon,
@@ -172,7 +170,7 @@ function ProjectRow({ project, index, onClick, onEdit, onDelete }) {
 
       <td className="px-5 py-5 text-sm leading-6 text-[#56627f]">
         <span>{formatUpdatedAt(project)}</span>
-        <span className="block text-xs">por voce</span>
+        <span className="block text-xs">por Você</span>
       </td>
 
       <td className="px-5 py-5 text-right" onClick={stopPropagation}>
@@ -223,7 +221,6 @@ function Projects() {
     showNewProjectModal,
   } = useProjectsPage();
   const [sortOrder, setSortOrder] = useState("recent");
-  const [viewMode, setViewMode] = useState("list");
 
   usePageTitle({ title: "" });
 
@@ -270,7 +267,7 @@ function Projects() {
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative w-full max-w-[420px]">
+        <div className="relative w-full">
           <SearchIcon className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78839d]" />
           <Input
             placeholder="Buscar projetos..."
@@ -281,31 +278,6 @@ function Projects() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="flex h-11 overflow-hidden rounded-lg border border-[#dfe4ef] bg-white">
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={cn(
-                "flex w-11 items-center justify-center border-r border-[#edf0f7] text-[#56627f]",
-                viewMode === "grid" && "bg-[#f4f6fb] text-[#182344]"
-              )}
-              aria-label="Visualizacao em grade"
-            >
-              <Grid2X2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "flex w-11 items-center justify-center text-[#56627f]",
-                viewMode === "list" && "bg-[#f4f6fb] text-[#182344]"
-              )}
-              aria-label="Visualizacao em lista"
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
-
           <select
             value={sortOrder}
             onChange={(event) => setSortOrder(event.target.value)}
@@ -336,8 +308,8 @@ function Projects() {
                 <tr className="bg-white text-left text-xs font-semibold text-[#667391]">
                   <th className="px-5 py-4">Projeto</th>
                   <th className="px-5 py-4">Progresso (PRISMA)</th>
-                  <th className="px-5 py-4">Ultima atualizacao</th>
-                  <th className="px-5 py-4 text-right">Acoes</th>
+                  <th className="px-5 py-4">Ultima atualização</th>
+                  <th className="px-5 py-4 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -368,7 +340,7 @@ function Projects() {
             description={
               searchTerm
                 ? "Tente ajustar os filtros de pesquisa"
-                : "Comece criando seu primeiro projeto de revisao literaria"
+                : "Começe criando seu primeiro projeto de revisao literaria"
             }
             actionLabel="Criar primeiro projeto"
             onAction={() => setShowNewProjectModal(true)}

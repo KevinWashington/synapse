@@ -13,7 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
+} from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState, LoadingState } from "@/components/layout";
 import {

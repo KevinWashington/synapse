@@ -74,7 +74,7 @@ class ProjectService {
         selectionReportNotes,
         // Excluir campos que não devem ser enviados
         articles: _articles,
-        stats: _stats,
+        prismaStats: _prismaStats,
         id: _projectId,
         owner: _owner,
         ownerId: _ownerId,

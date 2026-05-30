@@ -8,7 +8,7 @@ const INITIAL_EDIT_DATA = {
   objetivo: "",
   status: "",
 };
-const PROJECT_DETAIL_TABS = new Set(["overview", "planejamento", "artigos", "fluxo", "grafo"]);
+const PROJECT_DETAIL_TABS = new Set(["overview", "planejamento", "artigos", "fluxo", "grafo", "sintese"]);
 
 function useProjectDetailsPage() {
   const { id } = useParams();

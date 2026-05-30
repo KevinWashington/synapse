@@ -22,7 +22,7 @@ email-validator==2.2.0
 
 # AI
 langchain==0.3.14
-langchain-google-genai==2.0.0
+langchain-openai==0.3.0
 langchain-core==0.3.29
 
 # Vector DB

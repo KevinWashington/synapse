@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/Card";
 import { useAuth } from "@features/auth";
 import AuthErrorAlert from "@features/auth/components/AuthErrorAlert";
-import AuthSocialSection from "@features/auth/components/AuthSocialSection";
 import PasswordField from "@features/auth/components/PasswordField";
 
 function LoginScreen() {
@@ -89,25 +88,10 @@ function LoginScreen() {
               onToggleVisibility={() => setShowPassword((value) => !value)}
             />
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 text-sm">
-                <input type="checkbox" className="rounded border-gray-300" />
-                <span>Lembrar de mim</span>
-              </label>
-              <button
-                type="button"
-                className="text-sm text-primary hover:underline"
-              >
-                Esqueceu a senha?
-              </button>
-            </div>
-
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
-
-          <AuthSocialSection disabled={isLoading} />
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Não tem uma conta?{" "}

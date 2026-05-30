@@ -1539,7 +1539,11 @@ async def screening_decision(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    if article.reviewOutcome != "active" or article.currentPhase not in {"screening", "identification"}:
+
+    if article.reviewOutcome != "active":
+        article.reviewOutcome = "active"
+
+    if article.currentPhase not in {"screening", "identification"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"error": "Etapa inválida", "message": "O artigo não está disponível para screening."},

@@ -13,15 +13,15 @@ if str(BACKEND_ROOT) not in sys.path:
 
 def _install_optional_ai_stubs() -> None:
     """Provide lightweight stubs for optional AI SDK modules used by ai_service imports."""
-    if "langchain_google_genai" not in sys.modules:
-        mod = types.ModuleType("langchain_google_genai")
+    if "langchain_openai" not in sys.modules:
+        mod = types.ModuleType("langchain_openai")
 
-        class ChatGoogleGenerativeAI:  # pragma: no cover - import stub only
+        class ChatOpenAI:  # pragma: no cover - import stub only
             def __init__(self, *args, **kwargs):
                 pass
 
-        mod.ChatGoogleGenerativeAI = ChatGoogleGenerativeAI
-        sys.modules["langchain_google_genai"] = mod
+        mod.ChatOpenAI = ChatOpenAI
+        sys.modules["langchain_openai"] = mod
 
     if "langchain_core.prompts" not in sys.modules:
         prompts_mod = types.ModuleType("langchain_core.prompts")

@@ -1,5 +1,5 @@
 """
-Serviço de IA baseado em LangChain + Google Gemini.
+Serviço de IA baseado em LangChain + DeepSeek.
 
 Responsável pela geração de questões de pesquisa, strings de busca,
 critérios de inclusão/exclusão, avaliação de artigos e chat.
@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from typing import Any
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
@@ -34,20 +34,22 @@ logger = logging.getLogger(__name__)
 
 
 class AIService:
-    """LangChain-based AI service using Google Gemini."""
+    """LangChain-based AI service using DeepSeek."""
     
-    def __init__(self, api_key: str | None = None, model: str = "gemini-2.0-flash"):
-        self.api_key = api_key or settings.GOOGLE_API_KEY
-        self.model_name = model
+    def __init__(self, api_key: str | None = None, model: str | None = None):
+        self.api_key = api_key or settings.DEEPSEEK_API_KEY
+        self.base_url = settings.DEEPSEEK_BASE_URL
+        self.model_name = model or settings.DEEPSEEK_MODEL
         self._llm = None
     
     @property
-    def llm(self) -> ChatGoogleGenerativeAI:
+    def llm(self) -> ChatOpenAI:
         """Lazy loading of LLM."""
         if self._llm is None:
-            self._llm = ChatGoogleGenerativeAI(
+            self._llm = ChatOpenAI(
                 model=self.model_name,
-                google_api_key=self.api_key,
+                api_key=self.api_key,
+                base_url=self.base_url,
                 temperature=0.7,
             )
         return self._llm
@@ -669,6 +671,10 @@ REGRAS:
 
             options = item.get("options") if field_type in {"single_select", "multi_select"} else []
             metadata_by_index[index] = {
+                "label": self._truncate_schema_label(
+                    item.get("label") or item.get("name") or item.get("column") or "",
+                    limit=60,
+                ),
                 "type": field_type,
                 "options": options if isinstance(options, list) else [],
             }
@@ -680,10 +686,11 @@ REGRAS:
                 continue
 
             metadata = metadata_by_index.get(index, {})
+            label = metadata.get("label") or self._build_extraction_fallback_label(cleaned_question)
             fields.append(
                 {
                     "key": f"rq_{index}",
-                    "label": self._truncate_schema_label(cleaned_question),
+                    "label": label,
                     "type": metadata.get("type", "text"),
                     "options": metadata.get("options", []),
                 }
@@ -756,11 +763,27 @@ REGRAS:
             logger.warning("Falha ao extrair JSON estruturado da resposta do modelo.")
             return None
 
-    def _truncate_schema_label(self, value: str, limit: int = 120) -> str:
+    def _truncate_schema_label(self, value: str, limit: int = 90) -> str:
         normalized = str(value or "").strip()
         if len(normalized) <= limit:
             return normalized
         return f"{normalized[: limit - 3].rstrip()}..."
+
+    def _build_extraction_fallback_label(self, question: str) -> str:
+        normalized = re.sub(r"\s+", " ", str(question or "")).strip()
+        normalized = re.sub(r"^[\s\d.)-]+", "", normalized)
+        normalized = re.sub(
+            r"^(quais?\s+(s[aã]o|e|é|foram)?\s*(os|as|o|a)?\s*|como\s+|de que forma\s+|em que medida\s+)",
+            "",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        normalized = normalized.strip(" ?.")
+        normalized = re.split(r"\s*\(|\s+em rela[cç][aã]o\s+|\s+considerando\s+", normalized, maxsplit=1, flags=re.IGNORECASE)[0]
+        words = normalized.split()
+        if len(words) > 5:
+            normalized = " ".join(words[:5])
+        return self._truncate_schema_label(normalized or "Campo de extracao", limit=60)
 
     def validate_mcp_envelope(self, payload: dict) -> MCPRequestEnvelope | None:
         """Validate MCP JSON-RPC envelope shape before tool invocation."""
@@ -786,6 +809,6 @@ REGRAS:
         )
 
 
-def get_ai_service(api_key: str | None = None, model: str = "gemini-2.0-flash") -> AIService:
+def get_ai_service(api_key: str | None = None, model: str | None = None) -> AIService:
     """Factory function to get AI service instance."""
     return AIService(api_key=api_key, model=model)

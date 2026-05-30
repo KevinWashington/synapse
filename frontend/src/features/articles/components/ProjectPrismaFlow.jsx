@@ -46,7 +46,7 @@ function buildFlowSvg(metrics, projectTitle) {
 <svg width="1200" height="820" viewBox="0 0 1200 820" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="1200" height="820" rx="24" fill="#ffffff"/>
   <text x="60" y="64" fill="#111936" font-family="Arial" font-size="28" font-weight="700">${escapeXml(projectTitle)}</text>
-  <text x="60" y="96" fill="#56627f" font-family="Arial" font-size="16">Fluxo PRISMA 2020</text>
+  <text x="60" y="96" fill="#56627f" font-family="Arial" font-size="16">Fluxo PRISMA</text>
   <rect x="60" y="124" width="300" height="108" rx="12" fill="#ffffff" stroke="#9bb6ff"/>
   <text x="128" y="156" fill="#111936" font-family="Arial" font-size="16" font-weight="700">Registros identificados</text>
   <text x="128" y="180" fill="#111936" font-family="Arial" font-size="16" font-weight="700">(n = ${metrics.identified})</text>
@@ -292,8 +292,8 @@ function ProjectPrismaFlow({ project, onEditFlow }) {
       <section className="rounded-lg border border-[#edf0f7] bg-white p-6">
         <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-[#111936]">Fluxo PRISMA 2020</h2>
-            <p className="mt-2 text-sm text-[#56627f]">Acompanhe o fluxo de selecao dos estudos ao longo das etapas da revisao.</p>
+            <h2 className="text-lg font-semibold text-[#111936]">Fluxo PRISMA</h2>
+            <p className="mt-2 text-sm text-[#56627f]">Acompanhe o fluxo de selecao dos estudos ao longo das etapas da revisão.</p>
           </div>
           <Button variant="outline" className="h-10 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onEditFlow}>
             <PencilIcon className="h-4 w-4" />
@@ -393,10 +393,6 @@ function ProjectPrismaFlow({ project, onEditFlow }) {
             </div>
           </div>
         )}
-
-        <div className="mt-4 border-t border-[#edf0f7] pt-4 text-xs text-[#56627f]">
-          * Fluxo baseado no PRISMA 2020. Os numeros sao calculados a partir das decisoes reais dos artigos do projeto.
-        </div>
       </section>
 
       <aside className="space-y-5">
@@ -436,19 +432,6 @@ function ProjectPrismaFlow({ project, onEditFlow }) {
               Exportar relatorio (JSON)
             </Button>
           </div>
-        </section>
-
-        <section className="rounded-lg border border-[#edf0f7] bg-white p-6">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-base font-semibold text-[#111936]">Notas</h3>
-            <Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white">
-              <PlusIcon className="h-4 w-4" />
-              Adicionar nota
-            </Button>
-          </div>
-          <p className="mt-8 text-sm leading-6 text-[#667391]">
-            Nenhuma nota adicionada. Adicione observacoes sobre seu fluxo PRISMA.
-          </p>
         </section>
       </aside>
     </div>

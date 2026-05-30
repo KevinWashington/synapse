@@ -1,9 +1,15 @@
 from functools import lru_cache
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://synapse:synapse@localhost:5432/synapse"
     
@@ -12,8 +18,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 10080  # 7 days
     
-    # Google Gemini
-    GOOGLE_API_KEY: str = ""
+    # DeepSeek
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     HF_TOKEN: str = ""
     
     # Neo4j
@@ -54,8 +62,8 @@ class Settings(BaseSettings):
 
     def validate_runtime(self) -> None:
         missing = []
-        if not self.GOOGLE_API_KEY:
-            missing.append("GOOGLE_API_KEY")
+        if not self.DEEPSEEK_API_KEY:
+            missing.append("DEEPSEEK_API_KEY")
         if not self.HF_TOKEN:
             missing.append("HF_TOKEN")
 
@@ -66,11 +74,6 @@ class Settings(BaseSettings):
                 "Set them in backend/.env before starting the API."
             )
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-
-
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()

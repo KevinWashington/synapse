@@ -90,7 +90,7 @@ function useDashboardData() {
   const chartData = dailyReviews.map((day) => ({
     date: day.date,
     current: day.count,
-    previous: Math.max(0, day.count - Math.floor(Math.random() * 3)),
+    previous: 0,
   }));
 
   return {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import {
   AlertTriangleIcon,
   ArrowLeftIcon,
@@ -13,6 +13,7 @@ import {
   useProjectDetailsPage,
 } from "@/features/projects";
 import { usePageTitle } from "@hooks/usePageTitle";
+import { articleService } from "@features/articles/services/articleService";
 
 const ProjectArticles = lazy(() => import("@features/articles/components/ProjectArticles"));
 const ProjectPrismaFlow = lazy(() => import("@features/articles/components/ProjectPrismaFlow"));
@@ -21,6 +22,9 @@ const ProjectAnalytics = lazy(() =>
 );
 const ProjectPlanning = lazy(() =>
   import("@features/projects/components/ProjectPlanning")
+);
+const SynthesisReportPanel = lazy(() =>
+  import("@features/articles/components/SynthesisReportPanel")
 );
 
 function ProjectTabLoader() {
@@ -71,6 +75,30 @@ function ProjectDetails() {
       ),
     });
   }, [navigate, project?.title, updateTitle]);
+
+  const [synthesisData, setSynthesisData] = useState(null);
+  const [synthesisLoading, setSynthesisLoading] = useState(false);
+
+  const loadSynthesis = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+    try {
+      setSynthesisLoading(true);
+      const report = await articleService.getProjectSynthesisReport(project.id);
+      setSynthesisData(report);
+    } catch (err) {
+      console.error("Erro ao carregar sintese:", err);
+    } finally {
+      setSynthesisLoading(false);
+    }
+  }, [project?.id]);
+
+  useEffect(() => {
+    if (activeTab === "sintese") {
+      loadSynthesis();
+    }
+  }, [activeTab, loadSynthesis]);
 
   if (loading) {
     return <LoadingState message="Carregando projeto..." fullPage />;
@@ -142,6 +170,16 @@ function ProjectDetails() {
             <ProjectPrismaFlow
               project={project}
               onEditFlow={() => navigate(`/projetos/${project.id}?tab=artigos&flow=identification`)}
+            />
+          )}
+          {activeTab === "sintese" && (
+            <SynthesisReportPanel
+              data={synthesisData}
+              isLoading={synthesisLoading}
+              onRefresh={loadSynthesis}
+              onOpenArticle={(articleId) =>
+                navigate(`/projetos/${project.id}/artigos/${articleId}?flow=included&workspace=extracao`)
+              }
             />
           )}
           {activeTab === "grafo" && (

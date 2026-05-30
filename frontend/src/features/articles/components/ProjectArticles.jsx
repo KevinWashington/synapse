@@ -43,29 +43,29 @@ const STAGES = [
   {
     key: "identification",
     number: 1,
-    label: "Identificacao",
+    label: "Identificação",
     description: "Registros importados de diferentes bases de dados. Remova duplicatas antes de seguir para a triagem.",
     icon: FileTextIcon,
   },
   {
     key: "screening",
     number: 2,
-    label: "Triagem (titulo e resumo)",
+    label: "Triagem",
     description: "Classifique os estudos com base nos criterios de elegibilidade definidos.",
     icon: ShieldCheckIcon,
   },
   {
     key: "eligibility",
     number: 3,
-    label: "Elegibilidade (texto completo)",
+    label: "Elegibilidade",
     description: "Avalie o texto completo dos estudos quanto a elegibilidade.",
     icon: BookOpenIcon,
   },
   {
     key: "included",
     number: 4,
-    label: "Inclusao",
-    description: "Estudos que atendem a todos os criterios e serao incluidos na revisao.",
+    label: "Inclusão",
+    description: "Estudos que atendem a todos os criterios e serao incluidos na revisão.",
     icon: CheckCircle2Icon,
   },
 ];
@@ -158,13 +158,13 @@ function getFilterOptions(stageKey, summary, duplicateIds, articles) {
     return [
       { key: "all", label: "Todos", count: getStageCount(summary, stageKey) },
       { key: "duplicates", label: "Duplicatas", count: duplicates },
-      { key: "unique", label: "Unicos", count: Math.max((articles.length || 0) - duplicates, 0) },
+      { key: "unique", label: "Unicos", count: (articles.length - duplicates) },
     ];
   }
 
   if (stageKey === "screening") {
     return [
-      { key: "all", label: "Todos", count: articles.length },
+      { key: "all", label: "Todos", count: getStageCount(summary, stageKey) },
       { key: "include", label: "Incluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Incluir").length },
       { key: "exclude", label: "Excluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluir").length },
       { key: "maybe", label: "Talvez", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Talvez").length },
@@ -173,7 +173,7 @@ function getFilterOptions(stageKey, summary, duplicateIds, articles) {
 
   if (stageKey === "eligibility") {
     return [
-      { key: "all", label: "Todos", count: articles.length },
+      { key: "all", label: "Todos", count: getStageCount(summary, stageKey) },
       { key: "include", label: "Incluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Incluir").length },
       { key: "exclude", label: "Excluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluir").length },
       { key: "pending", label: "Aguardando", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Aguardando").length },
@@ -218,7 +218,7 @@ function StageStepper({ activeStage, onStageChange, summary }) {
     <section className="rounded-lg border border-[#edf0f7] bg-white p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-[#111936]">Etapas da revisao</h2>
+          <h2 className="text-base font-semibold text-[#111936]">Etapas da revisão</h2>
           <p className="mt-1 text-sm text-[#667391]">Acompanhe e gerencie cada etapa do fluxo PRISMA.</p>
         </div>
       </div>
@@ -637,9 +637,7 @@ function ArticleDetailPanel({
               </div>
             ) : null}
 
-            <div className="flex justify-end">
-              <span className="text-xs text-[#21945a]">Salvo automaticamente</span>
-            </div>
+
           </div>
         )}
       </div>

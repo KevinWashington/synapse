@@ -502,7 +502,7 @@ def build_data_extraction_schema_prompt(
         project_objective = project_context.get("objetivo") or project_context.get("objective") or "N\u00e3o especificado"
 
     system_prompt = f"""Voc\u00ea \u00e9 um especialista em extra\u00e7\u00e3o de dados para revis\u00f5es sistem\u00e1ticas.
-Sua tarefa \u00e9 analisar as perguntas de pesquisa e sugerir o formato mais adequado para as colunas de uma tabela de extra\u00e7\u00e3o.
+Sua tarefa \u00e9 analisar as perguntas de pesquisa e sugerir colunas curtas para uma tabela de extra\u00e7\u00e3o de dados.
 
 {semantic}
 
@@ -510,22 +510,30 @@ Regras obrigat\u00f3rias:
 1. Deve existir EXATAMENTE uma coluna para cada pergunta de pesquisa, na mesma ordem.
 2. Cada coluna armazenar\u00e1 a RESPOSTA do artigo para a respectiva pergunta de pesquisa.
 3. N\u00e3o crie colunas extras de metadados como autor, ano, pa\u00eds ou metodologia.
-4. Escolha o tipo da coluna usando apenas: "text", "number", "single_select", "multi_select", "boolean".
-5. Prefira "text" para perguntas anal\u00edticas, explicativas, comparativas ou abertas.
-6. Use "boolean" apenas quando a resposta natural for sim/n\u00e3o.
-7. Use "number" apenas quando a resposta esperada for claramente num\u00e9rica.
-8. Use "single_select" ou "multi_select" apenas quando houver categorias claras e est\u00e1veis.
-9. Se usar campos de sele\u00e7\u00e3o, forne\u00e7a no m\u00e1ximo 6 op\u00e7\u00f5es curtas e distintas.
-10. Responda APENAS em JSON v\u00e1lido, sem markdown, no formato:
-{{
+4. Para cada pergunta, crie um "label" com cara de nome de coluna do guia, n\u00e3o uma pergunta completa.
+5. O label deve ser nominal, curto e direto, com no m\u00e1ximo 5 palavras e 60 caracteres.
+6. N\u00e3o comece labels com "Quais", "Qual", "Como", "De que forma", "Em que medida" ou "O estudo".
+7. Exemplos de labels bons: "Tipo de interven\u00e7\u00e3o", "Desfecho avaliado", "Servi\u00e7o ecossist\u00eamico", "Contexto do estudo", "M\u00e9trica usada".
+8. Exemplos ruins: "Quais s\u00e3o os tipos de servi\u00e7os ecossist\u00eamicos...", "Como a interven\u00e7\u00e3o afeta o desfecho?".
+9. Escolha o tipo da coluna usando apenas: "text", "number", "single_select", "multi_select", "boolean".
+10. Prefira "text" para perguntas anal\u00edticas, explicativas, comparativas ou abertas.
+11. Use "boolean" apenas quando a resposta natural for sim/n\u00e3o.
+12. Use "number" apenas quando a resposta esperada for claramente num\u00e9rica.
+13. Use "single_select" ou "multi_select" apenas quando houver categorias claras e est\u00e1veis.
+14. Se usar campos de sele\u00e7\u00e3o, forne\u00e7a no m\u00e1ximo 5 op\u00e7\u00f5es curtas e distintas.
+15. Cada op\u00e7\u00e3o deve ter no m\u00e1ximo 3 palavras e 35 caracteres.
+16. N\u00e3o copie frases longas das perguntas para labels, op\u00e7\u00f5es ou tipos.
+17. Responda APENAS em JSON v\u00e1lido, sem markdown, no formato:
+{{{{
   "items": [
-    {{
+    {{{{
       "researchQuestionIndex": 1,
+      "label": "Desfecho avaliado",
       "type": "text",
       "options": []
-    }}
+    }}}}
   ]
-}}"""
+}}}}"""
 
     user_prompt = f"""Contexto do Projeto:
 T\u00edtulo: {project_title}
@@ -570,12 +578,15 @@ Regras obrigat\u00f3rias:
 3. Os crit\u00e9rios devem ajudar a julgar a confiabilidade metodol\u00f3gica dos estudos para responder \u00e0s perguntas de pesquisa.
 4. Evite crit\u00e9rios vagos como "artigo bom" ou "resultado relevante".
 5. Prefira formula\u00e7\u00f5es avali\u00e1veis como clareza de contexto, adequa\u00e7\u00e3o do desenho, descri\u00e7\u00e3o da coleta, rigor da an\u00e1lise, amea\u00e7as \u00e0 validade e alinhamento com a pergunta.
-6. Responda APENAS em JSON v\u00e1lido, sem markdown, no formato:
-{{
+6. Cada crit\u00e9rio deve ter no m\u00e1ximo 90 caracteres.
+7. Use uma frase curta por crit\u00e9rio; n\u00e3o inclua exemplos entre par\u00eanteses.
+8. Evite repetir detalhes longos do tema, bioma, popula\u00e7\u00e3o ou contexto em todos os crit\u00e9rios.
+9. Responda APENAS em JSON v\u00e1lido, sem markdown, no formato:
+{{{{
   "criteria": [
-    {{ "label": "Criterion text" }}
+    {{{{ "label": "Criterion text" }}}}
   ]
-}}"""
+}}}}"""
 
     user_prompt = f"""Contexto do Projeto:
 T\u00edtulo: {project_title}

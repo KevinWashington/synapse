@@ -89,3 +89,22 @@ def test_schema_sanitizers_dedupe_and_normalize():
         {"key": "risk_of_bias", "label": "Risk of Bias"},
         {"key": "risk_of_bias_2", "label": "Risk of Bias Duplicate"},
     ]
+
+
+def test_schema_sanitizers_limit_key_length_before_response_validation():
+    long_label = (
+        "O estudo declara claramente o contexto ecologico geografico e temporal "
+        "incluindo tipo de montanha regiao bioma e escala"
+    )
+
+    quality_schema = sanitize_quality_assessment_schema(
+        [
+            {"label": long_label},
+            {"label": long_label},
+        ]
+    )
+
+    assert len(quality_schema[0]["key"]) <= 80
+    assert len(quality_schema[1]["key"]) <= 80
+    assert quality_schema[0]["key"] != quality_schema[1]["key"]
+    assert quality_schema[1]["key"].endswith("_2")

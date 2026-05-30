@@ -12,25 +12,35 @@ QUALITY_RESPONSE_SCORES = {
     "no": 0.0,
 }
 QUALITY_RATING_ORDER = ("high", "medium", "low", "unrated")
+MAX_SCHEMA_KEY_LENGTH = 80
 
 _INVALID_SCHEMA_KEY = re.compile(r"[^a-z0-9]+")
 
 
+def _truncate_schema_key(value: str, limit: int = MAX_SCHEMA_KEY_LENGTH) -> str:
+    return value[:limit].rstrip("_")
+
+
 def _normalize_schema_key(value: str | None, *, prefix: str) -> str:
     candidate = _INVALID_SCHEMA_KEY.sub("_", (value or "").strip().lower()).strip("_")
-    return candidate or prefix
+    return _truncate_schema_key(candidate or prefix)
 
 
 def _ensure_unique_key(base_key: str, seen: set[str]) -> str:
+    base_key = _truncate_schema_key(base_key) or "field"
     if base_key not in seen:
         seen.add(base_key)
         return base_key
 
     suffix = 2
-    while f"{base_key}_{suffix}" in seen:
+    while True:
+        suffix_text = f"_{suffix}"
+        candidate_base = _truncate_schema_key(base_key, MAX_SCHEMA_KEY_LENGTH - len(suffix_text))
+        unique_key = f"{candidate_base}{suffix_text}"
+        if unique_key not in seen:
+            break
         suffix += 1
 
-    unique_key = f"{base_key}_{suffix}"
     seen.add(unique_key)
     return unique_key
 

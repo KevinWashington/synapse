@@ -8,7 +8,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
+} from "@/components/ui/select";
 import {
   LINK_COLORS,
   RELATIONSHIP_FILTER_OPTIONS,

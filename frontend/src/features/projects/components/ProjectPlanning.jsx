@@ -37,7 +37,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/Select";
+} from "@/components/ui/select";
 import { TARGET_DATABASES } from "@/lib/frameworkConfig";
 import useProjectPlanning from "@features/projects/hooks/useProjectPlanning";
 import { cn } from "@/lib/utils";
@@ -563,7 +563,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.55fr)]">
+      <div className="grid gap-5 xl:grid-cols-1">
         <PlanningCard
           title={framework}
           description="Defina a pergunta de pesquisa estruturada."
@@ -655,7 +655,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
         </PlanningCard>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <PlanningCard
           title="Criterios de elegibilidade"
           description="Defina os criterios para inclusao e exclusao de estudos."
@@ -690,7 +690,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
         </PlanningCard>
 
         <PlanningCard
-          title="Extracao de dados"
+          title="Extração de dados"
           description="Configure os campos que serao extraidos dos estudos."
           action={
             <div className="flex items-center gap-2">
@@ -747,24 +747,12 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
             ))}
           </div>
         </PlanningCard>
-
-        <PlanningCard title="Outras configuracoes" description="Defina outras opcoes da revisao.">
-          <div>
-            <IconLabel icon={LanguagesIcon} label="Idiomas" value="Defina nos criterios" />
-            <IconLabel icon={CalendarIcon} label="Periodo de publicacao" value="Defina nos criterios" />
-            <IconLabel icon={FileTextIcon} label="Tipos de documento" value={`${data.qualityAssessmentSchema?.length || 0} criterios de qualidade`} />
-            <IconLabel icon={UsersIcon} label="Revisores" value="Voce" />
-            <IconLabel icon={ShieldCheckIcon} label="Resolucao de conflitos" value="Por consenso" />
-            <IconLabel icon={DatabaseIcon} label="Armazenamento de arquivos" value="Banco de dados" />
-            <IconLabel icon={Globe2Icon} label="Framework" value={framework} />
-          </div>
-        </PlanningCard>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <PlanningCard
           title="Guia para screening"
-          description="Oriente a triagem por titulo e resumo sem misturar com as configuracoes gerais."
+          description="Oriente a triagem por titulo e resumo."
         >
           <Textarea
             value={data.screeningGuidance}
@@ -826,18 +814,18 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
         </PlanningCard>
       </div>
 
-      <PlanningCard title="Resumo do planejamento" description="Visao geral do seu planejamento atual.">
+      <PlanningCard title="Resumo do planejamento" description="Visão geral do seu planejamento atual.">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_140px] lg:items-center">
-          <div className="grid gap-4 md:grid-cols-6">
+          <div className="grid gap-0 md:grid-cols-6">
             {[
               { label: framework, detail: "Framework", done: completion.checks[0], icon: Globe2Icon },
               { label: "Perguntas", detail: `${data.researchQuestions?.length || 0} perguntas`, done: completion.checks[1], icon: BookOpenIcon },
               { label: "Estrategia de busca", detail: `${data.searchStrings?.length || 0} strings`, done: completion.checks[2], icon: DatabaseIcon },
               { label: "Criterios", detail: `${(data.criteriosInclusao?.length || 0) + (data.criteriosExclusao?.length || 0)} definidos`, done: completion.checks[3], icon: ShieldCheckIcon },
-              { label: "Extracao de dados", detail: `${data.dataExtractionSchema?.length || 0} campos`, done: completion.checks[4], icon: FileTextIcon },
+              { label: "Extração de dados", detail: `${data.dataExtractionSchema?.length || 0} campos`, done: completion.checks[4], icon: FileTextIcon },
               { label: "Configuracoes", detail: `${data.qualityAssessmentSchema?.length || 0} qualidade`, done: completion.checks[5], icon: UsersIcon },
             ].map((item, index, items) => (
-              <div key={item.label} className="relative flex items-center gap-3">
+              <div key={item.label} className="relative flex-col items-center gap-3">
                 <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", item.done ? "bg-[#e8f8ef] text-[#2fa060]" : "bg-[#f4f6fb] text-[#9aa4b8]")}>
                   {item.done ? <CheckCircle2Icon className="h-5 w-5" /> : <CircleIcon className="h-5 w-5" />}
                 </span>
@@ -846,7 +834,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
                   <span className="block text-xs text-[#667391]">{item.detail}</span>
                 </span>
                 {index < items.length - 1 ? (
-                  <span className="pointer-events-none absolute left-[calc(100%-28px)] top-4 hidden h-px w-14 bg-[#cfd6e6] md:block" />
+                  <span className="pointer-events-none absolute left-[calc(100%-188px)] top-4 hidden h-px w-48 bg-[#cfd6e6] md:block" />
                 ) : null}
               </div>
             ))}
@@ -864,21 +852,21 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
       </PlanningCard>
 
       <Dialog open={criteriaDialogOpen} onOpenChange={setCriteriaDialogOpen}>
-        <DialogContent className="max-h-[86vh] max-w-4xl overflow-y-auto">
+        <DialogContent className="max-h-[86vh] max-w-6xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Criterios de elegibilidade</DialogTitle>
             <DialogDescription>
-              Edite os criterios de inclusao e exclusao usados na selecao dos estudos.
+              Edite os criterios de inclusão e exclusão usados na seleção dos estudos.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-1">
             <ArrayEditor
               addArrayItem={addArrayItem}
               fieldKey="criteriosInclusao"
               items={data.criteriosInclusao}
-              label="Inclusao"
-              placeholder="Novo criterio de inclusao..."
+              label="Inclusão"
+              placeholder="Novo criterio de inclusão..."
               removeArrayItem={removeArrayItem}
               tone="green"
               updateArrayItem={updateArrayItem}
@@ -887,10 +875,20 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
               addArrayItem={addArrayItem}
               fieldKey="criteriosExclusao"
               items={data.criteriosExclusao}
-              label="Exclusao"
-              placeholder="Novo criterio de exclusao..."
+              label="Exclusão"
+              placeholder="Novo criterio de exclusão..."
               removeArrayItem={removeArrayItem}
               tone="red"
+              updateArrayItem={updateArrayItem}
+            />
+            <ArrayEditor
+              addArrayItem={addArrayItem}
+              fieldKey="eligibilityChecklist"
+              items={data.eligibilityChecklist}
+              label="Checklist de elegibilidade"
+              placeholder="Novo item do checklist..."
+              removeArrayItem={removeArrayItem}
+              tone="neutral"
               updateArrayItem={updateArrayItem}
             />
           </div>

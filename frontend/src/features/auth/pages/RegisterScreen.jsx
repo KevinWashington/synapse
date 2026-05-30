@@ -14,7 +14,6 @@ import {
 import { toast } from "@/lib/toast";
 import { useAuth } from "@features/auth";
 import AuthErrorAlert from "@features/auth/components/AuthErrorAlert";
-import AuthSocialSection from "@features/auth/components/AuthSocialSection";
 import PasswordField from "@features/auth/components/PasswordField";
 
 function RegisterScreen() {
@@ -153,8 +152,6 @@ function RegisterScreen() {
               {isLoading ? "Criando conta..." : "Criar conta"}
             </Button>
           </form>
-
-          <AuthSocialSection disabled={isLoading} />
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Já tem uma conta?{" "}

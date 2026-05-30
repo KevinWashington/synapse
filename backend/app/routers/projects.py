@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.database import get_db
 from app.models.user import User
@@ -277,19 +277,35 @@ async def get_frameworks():
 
 @router.get("", response_model=ProjectListResponse)
 async def get_all_projects(
+    search: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Listar projetos do usuário logado."""
+    """Listar projetos do usuário logado com busca, filtro e paginação."""
+    query = select(Project).where(Project.ownerId == current_user.id)
+
+    if search:
+        query = query.where(Project.title.ilike(f"%{search}%"))
+
+    if status:
+        query = query.where(Project.status == status)
+
+    count_result = await db.execute(
+        select(func.count()).select_from(query.subquery())
+    )
+    total = count_result.scalar() or 0
+
+    offset = max(0, (page - 1) * limit)
     result = await db.execute(
-        select(Project)
-        .where(Project.ownerId == current_user.id)
-        .order_by(Project.createdAt.desc())
+        query.order_by(Project.createdAt.desc()).offset(offset).limit(limit)
     )
     projects = result.scalars().all()
 
     if not projects:
-        return ProjectListResponse(projects=[], total=0)
+        return ProjectListResponse(projects=[], total=total)
 
     articles_result = await db.execute(
         select(Article).where(Article.projectId.in_([project.id for project in projects]))
@@ -303,7 +319,7 @@ async def get_all_projects(
         for project in projects
     ]
     
-    return ProjectListResponse(projects=projectsWithCount, total=len(projectsWithCount))
+    return ProjectListResponse(projects=projectsWithCount, total=total)
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
