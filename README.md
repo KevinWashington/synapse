@@ -118,12 +118,16 @@ O repositório inclui um seed com os dados utilizados nos experimentos do TCC em
 
 Após subir os serviços com `docker-compose up -d`, execute:
 
+**Linux/Mac:**
 ```bash
-# 1. Descompacte o arquivo
 unzip seeds/seed_avaliador.sql.zip -d seeds/
-
-# 2. Importe no banco
 docker exec -i synapse-postgres psql -U synapse -d synapse < seeds/seed_avaliador.sql
+```
+
+**Windows (PowerShell):**
+```powershell
+Expand-Archive seeds/seed_avaliador.sql.zip -DestinationPath seeds/
+Get-Content seeds/seed_avaliador.sql | docker exec -i synapse-postgres psql -U synapse -d synapse
 ```
 
 > O seed usa `ON CONFLICT DO NOTHING`, então pode ser aplicado em um banco que já tenha outros dados sem conflito.
