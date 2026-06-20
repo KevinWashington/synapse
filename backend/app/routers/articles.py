@@ -132,12 +132,13 @@ def _normalize_paper_id(paper_id: str | None) -> str | None:
 def _generate_paper_id(doi: str | None, title: str | None, year: int | None) -> str:
     doi_normalized = _normalize_paper_id(doi)
     if doi_normalized:
-        return doi_normalized
+        return doi_normalized[:120]
 
     title_base = _normalize_paper_id(title or "paper") or "paper"
     year_base = str(year) if year is not None else "unknown"
     digest = hashlib.sha1(f"{title_base}|{year_base}".encode("utf-8")).hexdigest()[:10]
-    return f"{title_base}-{year_base}-{digest}"
+    suffix = f"-{year_base}-{digest}"
+    return f"{title_base[:120 - len(suffix)]}{suffix}"
 
 
 def _resolve_paper_id(
@@ -773,22 +774,24 @@ async def _sync_article_vector_payload(article: Article) -> None:
     from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
 
     qdrant = get_qdrant_retrieval_service()
+    embedding = getattr(article, "_embedding_cache", None)
 
-    if not _should_be_indexed(article) or article.embedding is None or not article.paperId:
+    if not _should_be_indexed(article) or embedding is None or not article.paperId:
         await qdrant.delete_article(article.id)
         return
 
     payload = _build_vector_payload(article, qdrant)
-    await qdrant.upsert_payload(payload=payload, embedding=list(article.embedding))
+    await qdrant.upsert_payload(payload=payload, embedding=embedding)
 
 
 async def _sync_article_graph_state(article: Article, db: AsyncSession) -> None:
     from app.services.graph_sync_service import get_graph_sync_service
 
     graph_sync = get_graph_sync_service()
+    embedding = getattr(article, "_embedding_cache", None)
     try:
         if _should_be_indexed(article):
-            await graph_sync.sync_article_to_graph(article, db)
+            await graph_sync.sync_article_to_graph(article, db, embedding=embedding)
         else:
             await graph_sync.delete_article_from_graph(article.id)
     except Exception as exc:
@@ -1048,7 +1051,7 @@ async def _evaluate_article_if_possible(article: Article, project: Project) -> N
         embedding_service = get_embedding_service()
         embedding = embedding_service.generate_embedding(article.abstract)
         if embedding:
-            article.embedding = embedding
+            article._embedding_cache = embedding
     except Exception:  # pragma: no cover - external service
         logger.exception("Erro ao gerar embedding do artigo %s", article.title)
 
@@ -1357,6 +1360,7 @@ async def create_article(
 async def import_bibtex_entries(
     projectId: int,
     data: ImportBibTeXRequest,
+    evaluate_ai: bool = True,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1375,7 +1379,8 @@ async def import_bibtex_entries(
             import_batch_label=batch_label,
             study_type=data.studyType,
         )
-        await _evaluate_article_if_possible(article, project)
+        if evaluate_ai:
+            await _evaluate_article_if_possible(article, project)
         db.add(article)
         await db.flush()
         article_ids.append(article.id)
@@ -1576,6 +1581,21 @@ async def screening_decision(
     await db.commit()
     await db.refresh(article)
     await _sync_article_indexes(article, db)
+    return _build_article_response(article)
+
+
+@router.post("/{projectId}/artigos/{articleId}/evaluate", response_model=ArticleResponse)
+async def evaluate_single_article(
+    projectId: int,
+    articleId: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    project = await get_project_or_404(projectId, current_user.id, db)
+    await _evaluate_article_if_possible(article, project)
+    await db.commit()
+    await db.refresh(article)
     return _build_article_response(article)
 
 
@@ -1868,7 +1888,7 @@ async def update_article(
             year=article.year,
         )
 
-    if abstract_changed or (article.abstract and article.embedding is None):
+    if abstract_changed:
         await _evaluate_article_if_possible(article, project)
 
     _set_legacy_state_from_workflow(article)
@@ -2153,8 +2173,6 @@ async def reprocess_project_graph(
     processed = 0
     for article in all_articles:
         if not article.abstract:
-            continue
-        if only_missing_embeddings and article.embedding is not None:
             continue
         await _evaluate_article_if_possible(article, project)
         processed += 1

@@ -19,6 +19,15 @@ class EmbeddingService:
 
         return self._client
 
+    # SPECTER2 has a 512-token limit; truncate by word count as a safe proxy
+    _MAX_WORDS = 250
+
+    def _truncate(self, text: str) -> str:
+        words = text.split()
+        if len(words) > self._MAX_WORDS:
+            return " ".join(words[: self._MAX_WORDS])
+        return text
+
     def generate_embedding(self, text: str) -> list[float]:
         """Generate embedding using HF API."""
         if not text or not text.strip():
@@ -27,7 +36,7 @@ class EmbeddingService:
         client = self._get_client()
 
         embedding = client.feature_extraction(
-            text,
+            self._truncate(text),
             model=self.model_name,
         )
 

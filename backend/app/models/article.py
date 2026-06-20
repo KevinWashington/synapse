@@ -2,7 +2,6 @@ from datetime import datetime
 from sqlalchemy import String, Text, Integer, ForeignKey, DateTime, LargeBinary, Table, Column, Index, JSON, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import ARRAY
-from pgvector.sqlalchemy import Vector
 
 from app.database import Base
 
@@ -96,9 +95,6 @@ class Article(Base):
     aiDatabase: Mapped[str | None] = mapped_column(String(100), nullable=True)
     aiDomain: Mapped[str | None] = mapped_column(String(100), nullable=True)
     aiKeywords: Mapped[list[str] | None] = mapped_column(ARRAY(String(50)), nullable=True)
-    
-    # Semantic Embedding (768 dimensions for SPECTER2)
-    embedding = mapped_column(Vector(768), nullable=True)
     
     # Foreign keys
     projectId: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)

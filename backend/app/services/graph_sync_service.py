@@ -8,7 +8,6 @@ from sqlalchemy import select
 
 from app.models.article import Article
 from app.services.neo4j_service import get_neo4j_service
-from app.services.embedding_service import get_embedding_service
 
 
 logger = logging.getLogger(__name__)
@@ -19,12 +18,12 @@ class GraphSyncService:
     
     def __init__(self):
         self.neo4j = get_neo4j_service()
-        self.embedding = get_embedding_service()
     
     async def sync_article_to_graph(
         self,
         article: Article,
-        db: AsyncSession
+        db: AsyncSession,
+        embedding: list[float] | None = None,
     ) -> None:
         """Sync a single article to Neo4j and create relationships with existing articles."""
         if getattr(article, "reviewOutcome", None) != "included":
@@ -74,40 +73,32 @@ class GraphSyncService:
         
         logger.debug("[GRAPH] Comparing with %s other articles...", len(other_articles))
         
+        # Semantic similarity via Qdrant vector search
+        if embedding is not None:
+            from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
+            qdrant = get_qdrant_retrieval_service()
+            try:
+                result = await qdrant.search(
+                    query_embedding=embedding,
+                    project_id=article.projectId,
+                    top_k=20,
+                )
+                for hit in result.get("papers", []):
+                    other_id = hit.get("id")
+                    score = hit.get("distance", 0)
+                    if other_id and other_id != article.id and score >= 0.92:
+                        await self.neo4j.create_semantic_relationship(
+                            article.id, other_id, round(score, 4)
+                        )
+                        logger.info(
+                            "[GRAPH] Created SIMILAR_TO: %s -> %s (score=%.4f)",
+                            article.id, other_id, score,
+                        )
+            except Exception as exc:
+                logger.warning("[GRAPH] Qdrant similarity search failed: %s", exc)
+
         # Create relationships based on various criteria
         for other in other_articles:
-            # Semantic similarity (if both have embeddings)
-            if article.embedding is not None and other.embedding is not None:
-                similarity = self.embedding.calculate_similarity(
-                    list(article.embedding),
-                    list(other.embedding)
-                )
-                logger.debug(
-                    "[GRAPH] Similarity(%s <-> %s): %.4f",
-                    article.id,
-                    other.id,
-                    similarity,
-                )
-                if similarity >= 0.92:  # High threshold - papers in same domain score 0.85+
-                    await self.neo4j.create_semantic_relationship(
-                        article.id, other.id, round(similarity, 4)
-                    )
-                    logger.info(
-                        "[GRAPH] Created SIMILAR_TO relationship: %s -> %s (score=%.4f)",
-                        article.id,
-                        other.id,
-                        similarity,
-                    )
-            else:
-                has_emb = article.embedding is not None
-                other_has_emb = other.embedding is not None
-                logger.debug(
-                    "[GRAPH] Skipping similarity: article.embedding=%s, other(%s).embedding=%s",
-                    has_emb,
-                    other.id,
-                    other_has_emb,
-                )
-            
             # Same methodology (exclude 'other' since it's meaningless)
             if (article.aiMethodology and other.aiMethodology and 
                 article.aiMethodology == other.aiMethodology and

@@ -50,7 +50,7 @@ class AIService:
                 model=self.model_name,
                 api_key=self.api_key,
                 base_url=self.base_url,
-                temperature=0.7,
+                temperature=0,
             )
         return self._llm
     
@@ -242,7 +242,25 @@ class AIService:
         inclusion = "\n".join([f"- {c}" for c in project_data.get("criteriosInclusao", [])])
         exclusion = "\n".join([f"- {c}" for c in project_data.get("criteriosExclusao", [])])
         rq_block = "\n".join([f"{idx + 1}. {rq}" for idx, rq in enumerate(research_questions)])
-        
+
+        # Escapar chaves para não conflitar com o parser de template do LangChain
+        def _esc(s: str) -> str:
+            return s.replace("{", "{{").replace("}", "}}")
+
+        user_content = (
+            "\nDados do Projeto:\n"
+            "Critérios de Inclusão:\n"
+            f"{_esc(inclusion)}\n\n"
+            "Critérios de Exclusão:\n"
+            f"{_esc(exclusion)}\n\n"
+            "Perguntas de Pesquisa (RQs):\n"
+            f"{_esc(rq_block) if rq_block else 'Projeto sem RQs definidas'}\n\n"
+            "Dados do Artigo:\n"
+            f"Título: {_esc(title)}\n"
+            f"Resumo: {_esc(abstract)}\n\n"
+            "Avalie o artigo e extraia os metadados agora:"
+        )
+
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Você é um especialista em triagem de literatura científica.
 Sua tarefa é avaliar se um artigo deve ser incluído ou excluído de uma revisão sistemática e extrair metadados do artigo.
@@ -268,22 +286,7 @@ Responda APENAS no formato JSON:
     "keywords": ["palavra1", "palavra2", "palavra3", "palavra4", "palavra5"],
     "suggestedRQs": [1, 2]
 }}"""),
-            ("user", f"""
-Dados do Projeto:
-Critérios de Inclusão:
-{inclusion}
-
-Critérios de Exclusão:
-{exclusion}
-
-Perguntas de Pesquisa (RQs):
-{rq_block if rq_block else "Projeto sem RQs definidas"}
-
-Dados do Artigo:
-Título: {title}
-Resumo: {abstract}
-
-Avalie o artigo e extraia os metadados agora:""")
+            ("user", user_content),
         ])
         
         chain = prompt | self.llm | StrOutputParser()

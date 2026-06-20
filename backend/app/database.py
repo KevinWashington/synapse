@@ -13,6 +13,8 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     pool_pre_ping=True,
+    pool_size=25,
+    max_overflow=30,
 )
 
 async_session_maker = async_sessionmaker(
@@ -25,8 +27,6 @@ async_session_maker = async_sessionmaker(
 async def init_db():
     """Create all tables on startup and run migrations."""
     async with engine.begin() as conn:
-        # Enable pgvector extension for embedding support
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
         
         # Migration: add framework column to existing projects
@@ -125,20 +125,10 @@ async def get_db() -> AsyncSession:
 
 
 async def db_health_check() -> dict:
-    """Return DB connectivity and pgvector extension status."""
+    """Return DB connectivity status."""
     try:
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
-            vector_enabled = await conn.scalar(
-                text("SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname='vector')")
-            )
-        return {
-            "connected": True,
-            "vectorExtension": bool(vector_enabled),
-        }
+        return {"connected": True}
     except Exception as exc:
-        return {
-            "connected": False,
-            "vectorExtension": False,
-            "error": str(exc),
-        }
+        return {"connected": False, "error": str(exc)}

@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     MCP_REGISTERED_SERVERS: str = "qdrant,neo4j,postgres"
 
     # Retrieval backend
-    RETRIEVAL_BACKEND: str = "pgvector"
+    RETRIEVAL_BACKEND: str = "qdrant"
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_COLLECTION: str = "articles"
 

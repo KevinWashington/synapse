@@ -6,7 +6,6 @@ python-multipart==0.0.9
 # Database - PostgreSQL
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
-pgvector>=0.3,<0.5
 
 # Neo4j
 neo4j==5.27.0
