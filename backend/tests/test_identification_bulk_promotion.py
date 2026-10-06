@@ -82,3 +82,18 @@ def test_bulk_promotion_accepts_an_empty_identification_queue():
         "unresolvedDuplicateGroups": 0,
         "unresolvedDuplicateRecords": 0,
     }
+
+
+def test_distinct_dois_are_not_grouped_only_because_metadata_is_similar():
+    first = make_article(1, "Registro único de escala 100", doi="10.5555/registro-100")
+    second = make_article(2, "Registro único de escala 101", doi="10.5555/registro-101")
+
+    result = articles._promote_unique_identification_articles([first, second])
+
+    assert result == {
+        "movedCount": 2,
+        "unresolvedDuplicateGroups": 0,
+        "unresolvedDuplicateRecords": 0,
+    }
+    assert first.duplicateGroupKey is None
+    assert second.duplicateGroupKey is None

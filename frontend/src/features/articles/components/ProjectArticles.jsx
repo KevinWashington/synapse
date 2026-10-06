@@ -830,8 +830,9 @@ function SummaryDonut({ rows, total }) {
   );
 }
 
-function StageSidebar({
+export function StageSidebar({
   activeStage,
+  articleTotal,
   articles,
   duplicateCandidates,
   onBatchEvaluate,
@@ -840,13 +841,19 @@ function StageSidebar({
   onViewFlow,
   summary,
 }) {
-  const count = getStageCount(summary, activeStage);
+  const duplicateIds = new Set(
+    duplicateCandidates.flatMap((candidate) => candidate.candidateIds || [])
+  );
+  const identificationCount = articleTotal ?? articles.length;
+  const count = activeStage === "identification"
+    ? identificationCount
+    : getStageCount(summary, activeStage);
   const extractionPending = articles.filter((article) => !Object.keys(article.extractionData || {}).length).length;
 
   const rows = {
     identification: [
-      { label: "Duplicatas", value: summary?.duplicatesRemoved || 0, dot: "bg-[#ff920f]" },
-      { label: "Unicos", value: Math.max((summary?.identification?.total || 0) - (summary?.duplicatesRemoved || 0), 0), dot: "bg-[#14a365]" },
+      { label: "Únicos na fila", value: Math.max(identificationCount - duplicateIds.size, 0), dot: "bg-[#14a365]" },
+      { label: "Possíveis duplicatas", value: duplicateIds.size, dot: "bg-[#ff920f]" },
     ],
     screening: [
       { label: "Encaminhados", value: Math.max((summary?.screening?.total || 0) - (summary?.screening?.excluded || 0) - (summary?.screening?.active || 0), 0), dot: "bg-[#14a365]" },
@@ -1215,6 +1222,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
 
         <StageSidebar
           activeStage={activeStage}
+          articleTotal={articleTotal}
           articles={stageArticles}
           duplicateCandidates={duplicateCandidates}
           onBatchEvaluate={runBatchEvaluate}

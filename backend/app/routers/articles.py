@@ -1147,10 +1147,14 @@ def _build_duplicate_candidates_from_articles(articles: list[Article]) -> list[D
         visited.add(article.id)
         article_title = _normalize_text(article.title)
         article_authors = _shared_author_signature(article.authors)
+        article_doi = _normalize_doi(article.doi)
         for other in remaining:
             if other.id in visited or other.id == article.id:
                 continue
             if article.year != other.year:
+                continue
+            other_doi = _normalize_doi(other.doi)
+            if article_doi and other_doi and article_doi != other_doi:
                 continue
             other_title = _normalize_text(other.title)
             if not article_title or not other_title:

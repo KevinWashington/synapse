@@ -160,3 +160,31 @@ describe("duplicate review", () => {
     expect(onApply).toHaveBeenCalledOnce();
   });
 });
+
+describe("identification stage summary", () => {
+  it("summarizes the active queue and suspected duplicates instead of the historical total", () => {
+    const StageSidebar = ProjectArticlesComponents.StageSidebar;
+    render(StageSidebar ? (
+      <StageSidebar
+        activeStage="identification"
+        articleTotal={2}
+        articles={[]}
+        duplicateCandidates={[{ candidateIds: [11, 12] }]}
+        onBatchEvaluate={vi.fn()}
+        onExportStage={vi.fn()}
+        onRunDedup={vi.fn()}
+        onViewFlow={vi.fn()}
+        summary={{ identification: { total: 105 }, duplicatesRemoved: 0, bySource: [] }}
+      />
+    ) : <div />);
+
+    expect(screen.getByText("Possíveis duplicatas")).toBeInTheDocument();
+    expect(screen.getByText("Únicos na fila")).toBeInTheDocument();
+    expect(screen.getByText("2 (100%)")).toBeInTheDocument();
+    expect(screen.getByText("0 (0%)")).toBeInTheDocument();
+    expect(screen.queryByText("105")).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Possíveis duplicatas|Únicos na fila/).map((node) => node.textContent)
+    ).toEqual(["Únicos na fila", "Possíveis duplicatas"]);
+  });
+});
