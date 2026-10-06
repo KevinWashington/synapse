@@ -79,7 +79,7 @@ function HeaderBar({ navigate, logout, user }) {
               className="flex h-10 items-center gap-2 rounded-full px-1.5 text-[#182344] hover:bg-[#f6f7fb]"
             >
               <Avatar className="h-9 w-9">
-                <AvatarImage src="/avatar.png" alt="Perfil" />
+                <AvatarImage src={user?.avatar || undefined} alt={user?.name || "Perfil"} />
                 <AvatarFallback className="bg-[#eef1ff] text-[10px] text-[#6259ff]">
                   <UserIcon className="h-4 w-4" />
                 </AvatarFallback>
@@ -88,12 +88,15 @@ function HeaderBar({ navigate, logout, user }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+            <DropdownMenuLabel className="max-w-56">
+              <span className="block truncate">{user?.name || "Minha conta"}</span>
+              <span className="block truncate text-xs font-normal text-muted-foreground">{user?.email}</span>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => {
-                logout();
-                navigate("/login");
+              onClick={async () => {
+                const result = await logout();
+                if (result.success) navigate("/login");
               }}
             >
               <LogOut size={16} />

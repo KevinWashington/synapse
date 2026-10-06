@@ -15,7 +15,6 @@ const LayoutPage = lazy(() => import("@/pages/Layout"));
 const LoginPage = lazy(() => import("@/pages/Login"));
 const ProjectDetailsPage = lazy(() => import("@/pages/ProjectDetails"));
 const ProjectsPage = lazy(() => import("@/pages/Projects"));
-const RegisterPage = lazy(() => import("@/pages/Register"));
 
 function RouteLoader() {
   return <LoadingState message="Carregando página..." fullPage />;
@@ -30,7 +29,7 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={withSuspense(<LoginPage />)} />
-        <Route path="/register" element={withSuspense(<RegisterPage />)} />
+        <Route path="/register" element={<Navigate to="/login" replace />} />
 
         <Route
           path="/"

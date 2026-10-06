@@ -1,6 +1,5 @@
 // Auth Feature - Pages
 export { default as LoginScreen } from "./pages/LoginScreen";
-export { default as RegisterScreen } from "./pages/RegisterScreen";
 
 // Auth Feature - Context & Provider
 export { default as AuthProvider, AuthContext } from "./context/AuthContext";

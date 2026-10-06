@@ -5,14 +5,11 @@ class ApiService {
     this.baseURL = API_BASE_URL;
   }
 
-  getAuthToken() {
-    return localStorage.getItem("token");
-  }
-
   buildRequestConfig(options = {}) {
     const { ...fetchOptions } = options;
 
     const config = {
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...fetchOptions.headers,
@@ -20,9 +17,17 @@ class ApiService {
       ...fetchOptions,
     };
 
-    const token = this.getAuthToken();
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const method = (config.method || "GET").toUpperCase();
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+      const csrfToken = document.cookie
+        .split("; ")
+        .find((cookie) => cookie.startsWith("synapse_session_csrf="))
+        ?.split("=")
+        .slice(1)
+        .join("=");
+      if (csrfToken && !config.headers["X-CSRF-Token"]) {
+        config.headers["X-CSRF-Token"] = decodeURIComponent(csrfToken);
+      }
     }
 
     if (config.body && !(config.body instanceof FormData)) {
@@ -51,15 +56,11 @@ class ApiService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
-        if (response.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-        }
-
+        const detail = errorData.detail || errorData;
         throw new ApiError(
-          errorData.error || "Erro na requisicao",
+          detail.message || detail.error || "Erro na requisição",
           response.status,
-          errorData
+          detail
         );
       }
 
