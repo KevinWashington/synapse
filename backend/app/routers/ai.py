@@ -20,10 +20,10 @@ from app.schemas.ai import (
     ProjectChatResponse,
     ArticleSource,
 )
-from app.services.ai_service import get_ai_service
+from app.services.ai_service import AIService
 from app.services.graph_query_agent_service import get_graph_query_agent_service
 from app.services.rag_service import get_rag_service
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_user_ai_service
 from app.database import get_db
 
 
@@ -123,12 +123,11 @@ def _extract_graph_sources(result: dict, project_id: int) -> list[dict]:
 @router.post("/generate-research-questions", response_model=ResearchQuestionsResponse)
 async def generate_research_questions(
     data: ResearchQuestionsRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     """Gerar perguntas de pesquisa baseadas no framework selecionado."""
     try:
-        ai_service = get_ai_service()
-        
         framework = data.framework or "PICOC"
         components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
@@ -152,12 +151,11 @@ async def generate_research_questions(
 @router.post("/generate-search-strings", response_model=SearchStringsResponse)
 async def generate_search_strings(
     data: SearchStringsRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     """Gerar strings de busca baseadas nas perguntas de pesquisa."""
     try:
-        ai_service = get_ai_service()
-        
         framework = data.framework or "PICOC"
         components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
@@ -185,12 +183,11 @@ async def generate_search_strings(
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     data: ChatRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     """Chat com IA para análise de artigos."""
     try:
-        ai_service = get_ai_service()
-        
         # Get last user message
         last_message = ""
         for msg in reversed(data.messages):
@@ -227,12 +224,11 @@ async def chat(
 @router.post("/generate-criteria", response_model=CriteriaResponse)
 async def generate_criteria(
     data: CriteriaRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     """Gerar critérios de inclusão e exclusão baseados no framework e perguntas de pesquisa."""
     try:
-        ai_service = get_ai_service()
-        
         framework = data.framework or "PICOC"
         components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
@@ -262,12 +258,11 @@ async def generate_criteria(
 @router.post("/generate-data-extraction-schema", response_model=DataExtractionSchemaResponse)
 async def generate_data_extraction_schema(
     data: DataExtractionSchemaRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     """Generate extraction schema so each column stores the answer to one research question."""
     try:
-        ai_service = get_ai_service()
-
         framework = data.framework or "PICOC"
         components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
@@ -294,12 +289,11 @@ async def generate_data_extraction_schema(
 @router.post("/generate-quality-assessment-schema", response_model=QualityAssessmentSchemaResponse)
 async def generate_quality_assessment_schema(
     data: QualityAssessmentSchemaRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     """Generate quality assessment criteria tailored to the review protocol."""
     try:
-        ai_service = get_ai_service()
-
         framework = data.framework or "PICOC"
         components = data.picocData.model_dump(exclude_none=True)
         project_ctx = data.projeto.model_dump() if data.projeto else None
@@ -327,11 +321,11 @@ async def generate_quality_assessment_schema(
 async def project_chat(
     data: ProjectChatRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     """Chat com IA usando RAG sobre os artigos do projeto."""
     try:
-        ai_service = get_ai_service()
         rag_service = get_rag_service()
         graph_agent = get_graph_query_agent_service()
 

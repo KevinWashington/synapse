@@ -13,11 +13,16 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import (
+    get_current_user,
+    get_optional_user_ai_service,
+    get_user_ai_service,
+)
 from app.database import get_db
 from app.models.article import Article
 from app.models.project import Project
 from app.models.user import User
+from app.services.ai_service import AIService
 from app.schemas.article import (
     ArticleCreate,
     ArticleEvidenceUpdate,
@@ -1029,19 +1034,19 @@ def _create_article_entity(
     return article
 
 
-async def _evaluate_article_if_possible(article: Article, project: Project) -> None:
+async def _evaluate_article_if_possible(
+    article: Article, project: Project, ai_service: AIService | None
+) -> None:
     if not article.abstract:
         return
 
     try:
-        from app.services.ai_service import get_ai_service
-
-        ai_service = get_ai_service()
-        eval_result = await ai_service.evaluate_article(
-            {"title": article.title, "abstract": article.abstract},
-            _build_project_ai_context(project),
-        )
-        _apply_ai_evaluation(article, eval_result)
+        if ai_service is not None:
+            eval_result = await ai_service.evaluate_article(
+                {"title": article.title, "abstract": article.abstract},
+                _build_project_ai_context(project),
+            )
+            _apply_ai_evaluation(article, eval_result)
     except Exception:  # pragma: no cover - external service
         logger.exception("Erro ao avaliar artigo %s com IA", article.title)
 
@@ -1335,6 +1340,7 @@ async def create_article(
     data: ArticleCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     article = _create_article_entity(
@@ -1348,7 +1354,7 @@ async def create_article(
         study_type=data.studyType,
     )
 
-    await _evaluate_article_if_possible(article, project)
+    await _evaluate_article_if_possible(article, project, ai_service)
 
     db.add(article)
     await db.commit()
@@ -1363,6 +1369,7 @@ async def import_bibtex_entries(
     evaluate_ai: bool = True,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     batch_label = data.importBatchLabel or f"bibtex-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
@@ -1380,7 +1387,7 @@ async def import_bibtex_entries(
             study_type=data.studyType,
         )
         if evaluate_ai:
-            await _evaluate_article_if_possible(article, project)
+            await _evaluate_article_if_possible(article, project, ai_service)
         db.add(article)
         await db.flush()
         article_ids.append(article.id)
@@ -1590,10 +1597,11 @@ async def evaluate_single_article(
     articleId: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     project = await get_project_or_404(projectId, current_user.id, db)
-    await _evaluate_article_if_possible(article, project)
+    await _evaluate_article_if_possible(article, project, ai_service)
     await db.commit()
     await db.refresh(article)
     return _build_article_response(article)
@@ -1606,6 +1614,7 @@ async def batch_evaluate_screening(
     data: BatchEvaluateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     query = (
@@ -1638,9 +1647,6 @@ async def batch_evaluate_screening(
     if not candidates:
         return BatchEvaluateResponse(projectId=projectId, summary=BatchEvaluateSummary(**summary))
 
-    from app.services.ai_service import get_ai_service
-
-    ai_service = get_ai_service()
     project_data = _build_project_ai_context(project)
 
     for article in candidates:
@@ -1869,6 +1875,7 @@ async def update_article(
     data: ArticleUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     project = await get_project_or_404(projectId, current_user.id, db)
@@ -1889,7 +1896,7 @@ async def update_article(
         )
 
     if abstract_changed:
-        await _evaluate_article_if_possible(article, project)
+        await _evaluate_article_if_possible(article, project, ai_service)
 
     _set_legacy_state_from_workflow(article)
     await db.commit()
@@ -2161,6 +2168,7 @@ async def reprocess_project_graph(
     only_missing_embeddings: bool = False,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    ai_service: AIService = Depends(get_user_ai_service),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     result = await db.execute(
@@ -2174,7 +2182,7 @@ async def reprocess_project_graph(
     for article in all_articles:
         if not article.abstract:
             continue
-        await _evaluate_article_if_possible(article, project)
+        await _evaluate_article_if_possible(article, project, ai_service)
         processed += 1
 
     await db.commit()

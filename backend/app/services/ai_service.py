@@ -36,8 +36,10 @@ logger = logging.getLogger(__name__)
 class AIService:
     """LangChain-based AI service using DeepSeek."""
     
-    def __init__(self, api_key: str | None = None, model: str | None = None):
-        self.api_key = api_key or settings.DEEPSEEK_API_KEY
+    def __init__(self, api_key: str, model: str | None = None):
+        if not api_key:
+            raise ValueError("An explicit DeepSeek API key is required")
+        self.api_key = api_key
         self.base_url = settings.DEEPSEEK_BASE_URL
         self.model_name = model or settings.DEEPSEEK_MODEL
         self._llm = None
@@ -812,6 +814,6 @@ REGRAS:
         )
 
 
-def get_ai_service(api_key: str | None = None, model: str | None = None) -> AIService:
+def get_ai_service(api_key: str, model: str | None = None) -> AIService:
     """Factory function to get AI service instance."""
     return AIService(api_key=api_key, model=model)

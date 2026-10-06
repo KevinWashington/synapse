@@ -7,6 +7,12 @@ from app.database import get_db
 from app.config import settings
 from app.core.security import decode_session_token
 from app.models.user import User
+from app.services.ai_service import AIService
+from app.services.credential_vault import (
+    CredentialVault,
+    CredentialVaultError,
+    get_credential_vault,
+)
 from app.services.mcp_host_service import MCPHostService
 from app.services.neo4j_service import Neo4jService, get_neo4j_service
 from app.services.postgres_mcp_service import PostgresMCPService, get_postgres_mcp_service
@@ -66,6 +72,44 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
             }
         )
     return current_user
+
+
+class DeepSeekKeyRequiredError(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+            detail={
+                "code": "DEEPSEEK_KEY_REQUIRED",
+                "message": "Configure sua chave DeepSeek nas configurações para usar recursos de IA.",
+            },
+        )
+
+
+async def get_user_ai_service(
+    current_user: User = Depends(get_current_user),
+    vault: CredentialVault = Depends(get_credential_vault),
+) -> AIService:
+    if not current_user.deepseekKeyCiphertext or not current_user.deepseekKeyVersion:
+        raise DeepSeekKeyRequiredError()
+    try:
+        api_key = vault.decrypt(
+            current_user.id,
+            current_user.deepseekKeyCiphertext,
+            current_user.deepseekKeyVersion,
+        )
+    except CredentialVaultError as exc:
+        raise DeepSeekKeyRequiredError() from exc
+    return AIService(api_key=api_key)
+
+
+async def get_optional_user_ai_service(
+    current_user: User = Depends(get_current_user),
+    vault: CredentialVault = Depends(get_credential_vault),
+) -> AIService | None:
+    try:
+        return await get_user_ai_service(current_user, vault)
+    except DeepSeekKeyRequiredError:
+        return None
 
 
 @lru_cache()
