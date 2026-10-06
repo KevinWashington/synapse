@@ -57,6 +57,19 @@ def _config() -> Config:
     return config
 
 
+def _run_migration_runner() -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    environment["DATABASE_URL"] = TEST_DATABASE_URL
+    return subprocess.run(
+        [sys.executable, "migrate_database.py"],
+        cwd=BACKEND_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 async def _schema_snapshot() -> tuple[set[str], dict[str, set[str]]]:
     engine = create_async_engine(TEST_DATABASE_URL)
     try:
@@ -177,3 +190,54 @@ def test_database_revision_mismatch_is_reported():
             await engine.dispose()
 
     asyncio.run(corrupt_and_check())
+
+
+def test_migration_runner_stamps_compatible_legacy_schema():
+    command.upgrade(_config(), "head")
+
+    async def make_schema_legacy() -> None:
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(
+                    text(
+                        'INSERT INTO users (name, email, "passwordHash", role, "isActive", "createdAt", "updatedAt") '
+                        "VALUES ('Preserved', 'preserved@example.com', 'hash', 'user', true, now(), now())"
+                    )
+                )
+                await connection.execute(text("DROP TABLE alembic_version"))
+        finally:
+            await engine.dispose()
+
+    asyncio.run(make_schema_legacy())
+    result = _run_migration_runner()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    async def preserved_state() -> tuple[str | None, int]:
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with engine.connect() as connection:
+                revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
+                users = await connection.scalar(text("SELECT count(*) FROM users"))
+                return revision, int(users)
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(preserved_state()) == ("0001_existing_schema", 1)
+
+
+def test_migration_runner_rejects_partial_legacy_schema():
+    async def create_partial_schema() -> None:
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with engine.begin() as connection:
+                await connection.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY)"))
+        finally:
+            await engine.dispose()
+
+    asyncio.run(create_partial_schema())
+    result = _run_migration_runner()
+
+    assert result.returncode != 0
+    assert "incompatible legacy schema" in (result.stdout + result.stderr).lower()

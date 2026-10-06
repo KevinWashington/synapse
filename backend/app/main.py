@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import init_db, engine
+from app.database import assert_database_revision, db_health_check, init_db, engine
 from app.routers import auth, projects, articles, ai, stats
 from app.core.dependencies import get_mcp_host, get_graph_mcp_service, get_sql_mcp_service
 from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
@@ -14,7 +15,7 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     settings.validate_runtime()
 
-    # Startup: create database tables
+    # Deployment applies migrations before startup; the API only validates them.
     await init_db()
 
     # Bootstrap MCP host registry for local tools.
@@ -63,12 +64,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://0.0.0.0:3000",
-        "http://localhost:5173",  # Porta padrão do Vite se mudar
-    ],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -92,6 +88,7 @@ async def root():
             "auth": "/api/auth",
             "projetos": "/api/projetos",
             "health": "/health",
+            "ready": "/ready",
             "docs": "/docs",
         }
     }
@@ -99,12 +96,43 @@ async def root():
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
+    """Report process liveness without probing external dependencies."""
     return {
-        "status": "OK",
-        "database": "PostgreSQL",
+        "status": "ok",
         "version": "2.0.0"
     }
+
+
+@app.get("/ready")
+async def ready():
+    """Report sanitized configuration, database, and schema readiness."""
+    checks = {
+        "configuration": "pending",
+        "database": "pending",
+        "migration": "pending",
+    }
+
+    try:
+        settings.validate_runtime()
+        checks["configuration"] = "ok"
+    except Exception:
+        checks["configuration"] = "error"
+        return JSONResponse(status_code=503, content={"status": "not_ready", "checks": checks})
+
+    database = await db_health_check()
+    if not database.get("connected", False):
+        checks["database"] = "error"
+        return JSONResponse(status_code=503, content={"status": "not_ready", "checks": checks})
+    checks["database"] = "ok"
+
+    try:
+        await assert_database_revision()
+        checks["migration"] = "ok"
+    except Exception:
+        checks["migration"] = "error"
+        return JSONResponse(status_code=503, content={"status": "not_ready", "checks": checks})
+
+    return {"status": "ready", "checks": checks}
 
 
 if __name__ == "__main__":
