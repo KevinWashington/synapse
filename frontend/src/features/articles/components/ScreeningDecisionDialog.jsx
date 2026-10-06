@@ -76,8 +76,9 @@ function ScreeningDecisionDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Justificativa</Label>
+            <Label htmlFor="screening-reason">Justificativa</Label>
             <Textarea
+              id="screening-reason"
               value={reasonText}
               onChange={(event) => setReasonText(event.target.value)}
               rows={4}

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import { articleService } from "@features/articles/services/articleService";
 import { useProjectArticles } from "@features/articles/hooks/useProjectArticles";
+import { resolveSelectedArticle } from "@features/articles/utils/reviewFlow";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import EligibilityDecisionDialog from "./EligibilityDecisionDialog";
@@ -130,33 +131,30 @@ function getArticleBadge(article, stageKey, duplicateIds) {
   }
 
   if (stageKey === "screening") {
-    if (article.aiSuggestedStatus === "excluido" || article.screeningDecision === "excluded") {
-      return { label: "Excluir", className: "bg-[#ffecef] text-[#d94343]", dot: "bg-[#f04444]" };
+    if (article.screeningDecision === "excluded") {
+      return { label: "Excluido", className: "bg-[#ffecef] text-[#d94343]", dot: "bg-[#f04444]" };
     }
-    if (article.aiSuggestedStatus === "incluido" || article.screeningDecision === "included" || article.currentPhase === "eligibility") {
-      return { label: "Incluir", className: "bg-[#e8f8ef] text-[#258c55]", dot: "bg-[#22b66f]" };
-    }
-    return { label: "Talvez", className: "bg-[#fff6e5] text-[#d48700]", dot: "bg-[#ff9f1c]" };
+    return { label: "Pendente", className: "bg-[#fff6e5] text-[#d48700]", dot: "bg-[#ff9f1c]" };
   }
 
   if (stageKey === "eligibility") {
     if (article.reviewOutcome === "excluded_eligibility" || article.reviewOutcome === "full_text_unavailable" || article.eligibilityDecision === "excluded") {
-      return { label: "Excluir", className: "bg-[#ffecef] text-[#d94343]", dot: "bg-[#f04444]" };
+      return { label: "Excluido", className: "bg-[#ffecef] text-[#d94343]", dot: "bg-[#f04444]" };
     }
     if (article.reviewOutcome === "included") {
       return { label: "Incluir", className: "bg-[#e8f8ef] text-[#258c55]", dot: "bg-[#22b66f]" };
     }
-    return { label: "Aguardando", className: "bg-[#edf1f7] text-[#667391]", dot: "bg-[#a4adc2]" };
+    return { label: "Pendente", className: "bg-[#edf1f7] text-[#667391]", dot: "bg-[#a4adc2]" };
   }
 
   return { label: "Incluido", className: "bg-[#e8f8ef] text-[#258c55]", dot: "bg-[#22b66f]" };
 }
 
-function getFilterOptions(stageKey, summary, duplicateIds, articles) {
+function getFilterOptions(stageKey, duplicateIds, articles) {
   if (stageKey === "identification") {
     const duplicates = articles.filter((article) => duplicateIds.has(article.id) || article.duplicateGroupKey).length;
     return [
-      { key: "all", label: "Todos", count: getStageCount(summary, stageKey) },
+      { key: "all", label: "Na fila", count: articles.length },
       { key: "duplicates", label: "Duplicatas", count: duplicates },
       { key: "unique", label: "Unicos", count: (articles.length - duplicates) },
     ];
@@ -164,19 +162,17 @@ function getFilterOptions(stageKey, summary, duplicateIds, articles) {
 
   if (stageKey === "screening") {
     return [
-      { key: "all", label: "Todos", count: getStageCount(summary, stageKey) },
-      { key: "include", label: "Incluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Incluir").length },
-      { key: "exclude", label: "Excluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluir").length },
-      { key: "maybe", label: "Talvez", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Talvez").length },
+      { key: "all", label: "Na fila", count: articles.length },
+      { key: "pending", label: "Pendentes", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Pendente").length },
+      { key: "exclude", label: "Excluidos", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluido").length },
     ];
   }
 
   if (stageKey === "eligibility") {
     return [
-      { key: "all", label: "Todos", count: getStageCount(summary, stageKey) },
-      { key: "include", label: "Incluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Incluir").length },
-      { key: "exclude", label: "Excluir", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluir").length },
-      { key: "pending", label: "Aguardando", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Aguardando").length },
+      { key: "all", label: "Na fila", count: articles.length },
+      { key: "pending", label: "Pendentes", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Pendente").length },
+      { key: "exclude", label: "Excluidos", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluido").length },
     ];
   }
 
@@ -202,10 +198,8 @@ function filterArticles({ articles, duplicateIds, filter, searchTerm, stageKey }
     const badge = getArticleBadge(article, stageKey, duplicateIds).label;
     if (filter === "duplicates") return duplicateIds.has(article.id) || Boolean(article.duplicateGroupKey);
     if (filter === "unique") return !duplicateIds.has(article.id) && !article.duplicateGroupKey;
-    if (filter === "include") return badge === "Incluir";
-    if (filter === "exclude") return badge === "Excluir";
-    if (filter === "maybe") return badge === "Talvez";
-    if (filter === "pending") return badge === "Aguardando";
+    if (filter === "exclude") return badge === "Excluido";
+    if (filter === "pending") return badge === "Pendente";
     if (filter === "pending_extraction") return !Object.keys(article.extractionData || {}).length;
     return true;
   });
@@ -279,7 +273,7 @@ function SourceBadge({ article }) {
   );
 }
 
-function StageListPanel({
+export function StageListPanel({
   activeFilter,
   activeStage,
   articles,
@@ -290,6 +284,7 @@ function StageListPanel({
   onFilterChange,
   onOpenArticle,
   onPromoteSelected,
+  onToggleAllIdentification,
   onToggleIdentification,
   searchTerm,
   selectedArticle,
@@ -298,6 +293,10 @@ function StageListPanel({
   summary,
 }) {
   const stage = getStageConfig(activeStage);
+  const visibleIds = articles.map((article) => article.id);
+  const allVisibleSelected = visibleIds.length > 0
+    && visibleIds.every((id) => selectedIdentificationIds.includes(id));
+  const reachedStageCount = getStageCount(summary, activeStage);
 
   return (
     <section className="min-w-0 rounded-lg border border-[#edf0f7] bg-white">
@@ -307,7 +306,7 @@ function StageListPanel({
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-[#111936]">{stage.label}</h2>
               <span className="rounded-full bg-[#f0edff] px-3 py-1 text-xs font-semibold text-[#6259ff]">
-                {formatNumber(getStageCount(summary, activeStage))} artigos
+                {formatNumber(articles.length)} na fila
               </span>
             </div>
             <p className="mt-2 text-sm leading-6 text-[#56627f]">{stage.description}</p>
@@ -349,17 +348,32 @@ function StageListPanel({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[#56627f]">
-          <span>
-            {activeStage === "identification" ? `${selectedIdentificationIds.length} selecionados` : selectedArticle ? "1 selecionado" : "Nenhum selecionado"}
-          </span>
-          <div className="flex items-center gap-2">
-            {activeStage === "identification" ? (
-              <Button size="sm" className="h-8 gap-2 rounded-lg bg-[#6259ff] text-xs text-white hover:bg-[#5148ee]" onClick={onPromoteSelected}>
-                <CheckIcon className="h-3.5 w-3.5" />
-                Enviar para triagem
-              </Button>
-            ) : null}
-          </div>
+          {activeStage === "identification" ? (
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                aria-label="Selecionar todos os artigos visiveis"
+                checked={allVisibleSelected}
+                disabled={!visibleIds.length}
+                onChange={() => onToggleAllIdentification(visibleIds)}
+                className="h-4 w-4 rounded border-[#c6cede] accent-[#6259ff]"
+              />
+              <span>{allVisibleSelected ? "Limpar artigos visiveis" : "Selecionar artigos visiveis"} · {selectedIdentificationIds.length} selecionados</span>
+            </label>
+          ) : (
+            <span>{selectedArticle ? "Artigo aberto no painel" : "Selecione um artigo para avaliar"}</span>
+          )}
+          {activeStage === "identification" ? (
+            <Button
+              size="sm"
+              className="h-8 gap-2 rounded-lg bg-[#6259ff] text-xs text-white hover:bg-[#5148ee]"
+              disabled={!selectedIdentificationIds.length}
+              onClick={onPromoteSelected}
+            >
+              <CheckIcon className="h-3.5 w-3.5" />
+              Enviar {selectedIdentificationIds.length} para triagem
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -373,58 +387,58 @@ function StageListPanel({
           articles.map((article) => {
             const badge = getArticleBadge(article, activeStage, duplicateIds);
             const selected = selectedArticle?.id === article.id;
-            const checked = activeStage === "identification"
-              ? selectedIdentificationIds.includes(article.id)
-              : selected;
+            const checked = selectedIdentificationIds.includes(article.id);
 
             return (
-              <button
+              <div
                 key={article.id}
-                type="button"
-                onClick={() => onArticleSelect(article)}
+                data-testid="stage-article-row"
+                data-article-title={article.title}
                 className={cn(
                   "flex w-full items-start gap-4 border-b border-[#edf0f7] px-5 py-4 text-left last:border-b-0 hover:bg-[#fbfcff]",
                   selected && "bg-[#fbfaff] ring-1 ring-inset ring-[#c9c3ff]"
                 )}
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(event) => {
-                    event.stopPropagation();
-                    if (activeStage === "identification") {
-                      onToggleIdentification(article.id);
-                    } else {
-                      onArticleSelect(article);
-                    }
-                  }}
-                  onClick={(event) => event.stopPropagation()}
-                  className="mt-2 h-4 w-4 rounded border-[#c6cede] accent-[#6259ff]"
-                />
-                <span className={cn("mt-3 h-2 w-2 shrink-0 rounded-full", badge.dot)} />
-                <SourceBadge article={article} />
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-semibold leading-6 text-[#111936]">{article.title}</p>
-                  <p className="mt-1 line-clamp-1 text-xs text-[#56627f]">{article.authors}</p>
-                  <p className="mt-1 line-clamp-1 text-xs text-[#56627f]">
-                    {article.year} · {article.journal}
-                  </p>
-                </div>
+                {activeStage === "identification" ? (
+                  <input
+                    type="checkbox"
+                    aria-label={`Selecionar ${article.title}`}
+                    checked={checked}
+                    onChange={() => onToggleIdentification(article.id)}
+                    className="mt-2 h-4 w-4 rounded border-[#c6cede] accent-[#6259ff]"
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  aria-current={selected ? "true" : undefined}
+                  onClick={() => onArticleSelect(article)}
+                  className="flex min-w-0 flex-1 items-start gap-4 text-left"
+                >
+                  <span className={cn("mt-3 h-2 w-2 shrink-0 rounded-full", badge.dot)} />
+                  <SourceBadge article={article} />
+                  <span className="min-w-0 flex-1">
+                    <span className="line-clamp-2 text-sm font-semibold leading-6 text-[#111936]">{article.title}</span>
+                    <span className="mt-1 block line-clamp-1 text-xs text-[#56627f]">{article.authors}</span>
+                    <span className="mt-1 block line-clamp-1 text-xs text-[#56627f]">
+                      {article.year} · {article.journal}
+                    </span>
+                  </span>
+                </button>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", badge.className)}>{badge.label}</span>
                   <span className="text-xs text-[#56627f]">{formatDate(article.updatedAt || article.createdAt)}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <span className="grid h-7 w-7 place-items-center rounded-full text-[#667391] hover:bg-[#eef1ff]">
+                      <button type="button" aria-label={`Mais acoes para ${article.title}`} className="grid h-7 w-7 place-items-center rounded-full text-[#667391] hover:bg-[#eef1ff]">
                         <MoreVerticalIcon className="h-4 w-4" />
-                      </span>
+                      </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => onOpenArticle(article.id)}>Abrir artigo</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </button>
+              </div>
             );
           })
         ) : (
@@ -435,18 +449,21 @@ function StageListPanel({
       </div>
 
       <div className="flex items-center border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
-        <span>Mostrando {formatNumber(articles.length)} de {formatNumber(getStageCount(summary, activeStage))} artigos</span>
+        <span>
+          {formatNumber(articles.length)} nesta fila
+          {reachedStageCount !== articles.length ? ` · ${formatNumber(reachedStageCount)} chegaram a esta etapa` : ""}
+        </span>
       </div>
     </section>
   );
 }
 
-function ArticleDetailPanel({
+export function ArticleDetailPanel({
   activeStage,
   article,
   currentIndex,
   onClose,
-  onMaybe,
+  onSkip,
   onNext,
   onOpenArticle,
   onOpenEligibility,
@@ -604,9 +621,9 @@ function ArticleDetailPanel({
                     <XCircleIcon className="h-5 w-5" />
                     Excluir
                   </Button>
-                  <Button variant="outline" className="h-12 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onMaybe}>
+                  <Button variant="outline" className="h-12 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onSkip}>
                     <HelpCircleIcon className="h-5 w-5" />
-                    Talvez
+                    Pular por agora
                   </Button>
                 </div>
               </div>
@@ -616,7 +633,11 @@ function ArticleDetailPanel({
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[#111936]">Sua decisao</h3>
                 <div className="grid gap-3 md:grid-cols-3">
-                  <Button className="h-12 gap-2 rounded-lg border border-[#27a363] bg-[#eefaf3] text-[#19884f] hover:bg-[#e3f6eb]" onClick={() => onOpenEligibility(article, "included")}>
+                  <Button
+                    className="h-12 gap-2 rounded-lg border border-[#27a363] bg-[#eefaf3] text-[#19884f] hover:bg-[#e3f6eb]"
+                    disabled={!article.hasPdf && article.fullTextStatus !== "uploaded"}
+                    onClick={() => onOpenEligibility(article, "included")}
+                  >
                     <CheckCircle2Icon className="h-5 w-5" />
                     Incluir
                   </Button>
@@ -624,11 +645,14 @@ function ArticleDetailPanel({
                     <XCircleIcon className="h-5 w-5" />
                     Excluir
                   </Button>
-                  <Button variant="outline" className="h-12 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onMaybe}>
+                  <Button variant="outline" className="h-12 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onSkip}>
                     <HelpCircleIcon className="h-5 w-5" />
-                    Aguardando
+                    Pular por agora
                   </Button>
                 </div>
+                {!article.hasPdf && article.fullTextStatus !== "uploaded" ? (
+                  <p className="mt-3 text-xs text-[#d48700]">Envie o PDF para liberar a decisao de inclusao.</p>
+                ) : null}
                 {!article.hasPdf ? (
                   <Button variant="outline" className="mt-3 h-10 rounded-lg border-[#dfe4ef] bg-white" onClick={() => onOpenEligibility(article, "full_text_unavailable")}>
                     Marcar texto completo indisponivel
@@ -693,14 +717,14 @@ function StageSidebar({
       { label: "Unicos", value: Math.max((summary?.identification?.total || 0) - (summary?.duplicatesRemoved || 0), 0), dot: "bg-[#14a365]" },
     ],
     screening: [
-      { label: "Incluir", value: Math.max((summary?.screening?.total || 0) - (summary?.screening?.excluded || 0) - (summary?.screening?.active || 0), 0), dot: "bg-[#14a365]" },
-      { label: "Excluir", value: summary?.screening?.excluded || 0, dot: "bg-[#f04444]" },
-      { label: "Talvez", value: summary?.screening?.active || 0, dot: "bg-[#ff920f]" },
+      { label: "Encaminhados", value: Math.max((summary?.screening?.total || 0) - (summary?.screening?.excluded || 0) - (summary?.screening?.active || 0), 0), dot: "bg-[#14a365]" },
+      { label: "Excluidos", value: summary?.screening?.excluded || 0, dot: "bg-[#f04444]" },
+      { label: "Pendentes", value: summary?.screening?.active || 0, dot: "bg-[#ff920f]" },
     ],
     eligibility: [
-      { label: "Excluir", value: summary?.eligibility?.excluded || 0, dot: "bg-[#f04444]" },
-      { label: "Incluir", value: summary?.included || 0, dot: "bg-[#14a365]" },
-      { label: "Aguardando", value: summary?.eligibility?.active || 0, dot: "bg-[#a4adc2]" },
+      { label: "Excluidos", value: summary?.eligibility?.excluded || 0, dot: "bg-[#f04444]" },
+      { label: "Incluidos", value: summary?.included || 0, dot: "bg-[#14a365]" },
+      { label: "Pendentes", value: summary?.eligibility?.active || 0, dot: "bg-[#a4adc2]" },
     ],
     included: [
       { label: "Incluidos", value: summary?.included || 0, dot: "bg-[#14a365]" },
@@ -709,7 +733,7 @@ function StageSidebar({
   }[activeStage];
 
   return (
-    <aside className="space-y-4">
+    <aside className="space-y-4 xl:col-span-2 2xl:col-span-1">
       <section className="rounded-lg border border-[#edf0f7] bg-white p-5">
         <h3 className="text-sm font-semibold text-[#111936]">Resumo da etapa</h3>
         <div className="mt-5">
@@ -807,7 +831,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
   const [screeningInitialDecision, setScreeningInitialDecision] = useState("included");
   const [eligibilityInitialDecision, setEligibilityInitialDecision] = useState("included");
   const [activeFilter, setActiveFilter] = useState("all");
-  const [selectedArticle, setSelectedArticle] = useState(null);
+  const [selectedArticleId, setSelectedArticleId] = useState(null);
+  const [isDetailClosed, setIsDetailClosed] = useState(false);
 
   const {
     activeFlowTab,
@@ -833,6 +858,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     submitEligibilityDecision,
     submitScreeningDecision,
     summary,
+    toggleAllIdentificationSelection,
     toggleIdentificationSelection,
   } = useProjectArticles(project, onGraphNeedsRefresh);
 
@@ -861,7 +887,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
 
   useEffect(() => {
     setActiveFilter("all");
-    setSelectedArticle(null);
+    setSelectedArticleId(null);
+    setIsDetailClosed(false);
   }, [activeStage]);
 
   const duplicateIds = useMemo(() => {
@@ -875,8 +902,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
   const stageArticles = activeStage === "identification" ? identificationArticles : articles;
 
   const filterOptions = useMemo(
-    () => getFilterOptions(activeStage, summary, duplicateIds, stageArticles),
-    [activeStage, duplicateIds, stageArticles, summary]
+    () => getFilterOptions(activeStage, duplicateIds, stageArticles),
+    [activeStage, duplicateIds, stageArticles]
   );
 
   const filteredArticles = useMemo(
@@ -890,14 +917,16 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     [activeFilter, activeStage, duplicateIds, searchTerm, stageArticles]
   );
 
+  const selectedArticle = useMemo(
+    () => isDetailClosed ? null : resolveSelectedArticle(filteredArticles, selectedArticleId),
+    [filteredArticles, isDetailClosed, selectedArticleId]
+  );
+
   useEffect(() => {
-    setSelectedArticle((current) => {
-      if (current && filteredArticles.some((article) => article.id === current.id)) {
-        return current;
-      }
-      return filteredArticles[0] || null;
-    });
-  }, [filteredArticles]);
+    if (!isDetailClosed) {
+      setSelectedArticleId((currentId) => resolveSelectedArticle(filteredArticles, currentId)?.id ?? null);
+    }
+  }, [filteredArticles, isDetailClosed]);
 
   const selectedIndex = selectedArticle
     ? filteredArticles.findIndex((article) => article.id === selectedArticle.id)
@@ -919,7 +948,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     }
     const currentIndex = selectedIndex >= 0 ? selectedIndex : 0;
     const nextIndex = (currentIndex + direction + filteredArticles.length) % filteredArticles.length;
-    setSelectedArticle(filteredArticles[nextIndex]);
+    setIsDetailClosed(false);
+    setSelectedArticleId(filteredArticles[nextIndex].id);
   }
 
   async function handleExportStage() {
@@ -935,8 +965,12 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     await runDedupAnalysis();
   }
 
-  function handleMaybe() {
-    toast.info("O artigo permanece pendente para decisao posterior.");
+  function handleSkip() {
+    if (!selectedArticle) {
+      return;
+    }
+    selectAdjacent(1);
+    toast.info("Artigo mantido pendente. Proximo item aberto.");
   }
 
   return (
@@ -962,7 +996,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
         summary={summary}
       />
 
-      <div className="grid gap-4 2xl:grid-cols-[minmax(0,1.08fr)_minmax(430px,0.88fr)_300px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)] 2xl:grid-cols-[minmax(0,1.08fr)_minmax(430px,0.88fr)_300px]">
         <StageListPanel
           activeFilter={activeFilter}
           activeStage={activeStage}
@@ -970,7 +1004,10 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
           duplicateIds={duplicateIds}
           filterOptions={filterOptions}
           isLoading={isLoadingArticles}
-          onArticleSelect={setSelectedArticle}
+          onArticleSelect={(article) => {
+            setIsDetailClosed(false);
+            setSelectedArticleId(article.id);
+          }}
           onFilterChange={setActiveFilter}
           onOpenArticle={(articleId) => {
             const params = new URLSearchParams({ flow: activeStage });
@@ -980,6 +1017,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
             onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
           }}
           onPromoteSelected={promoteSelectedToScreening}
+          onToggleAllIdentification={toggleAllIdentificationSelection}
           onToggleIdentification={toggleIdentificationSelection}
           searchTerm={searchTerm}
           selectedArticle={selectedArticle}
@@ -992,8 +1030,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
           activeStage={activeStage}
           article={selectedArticle}
           currentIndex={selectedIndex >= 0 ? selectedIndex : 0}
-          onClose={() => setSelectedArticle(null)}
-          onMaybe={handleMaybe}
+          onClose={() => setIsDetailClosed(true)}
+          onSkip={handleSkip}
           onNext={() => selectAdjacent(1)}
           onOpenArticle={(articleId, workspace) => {
             const params = new URLSearchParams({ flow: activeStage });

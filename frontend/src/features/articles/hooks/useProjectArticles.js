@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
+import { toggleVisibleSelection } from "@features/articles/utils/reviewFlow";
 import { toast } from "@/lib/toast";
 
 const PHASE_FILTERS = {
@@ -216,6 +217,10 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         ? current.filter((value) => value !== articleId)
         : [...current, articleId]
     );
+  }, []);
+
+  const toggleAllIdentificationSelection = useCallback((articleIds) => {
+    setSelectedIdentificationIds((current) => toggleVisibleSelection(current, articleIds));
   }, []);
 
   const runDedupAnalysis = useCallback(async () => {
@@ -437,6 +442,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     submitScreeningDecision,
     summary,
     toggleIdentificationSelection,
+    toggleAllIdentificationSelection,
     updateFullTextStatus,
   };
 };

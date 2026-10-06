@@ -607,8 +607,9 @@ function EligibilityDecisionDialog({
           ) : null}
 
           <div className="space-y-2">
-            <Label>Justificativa</Label>
+            <Label htmlFor="eligibility-reason">Justificativa</Label>
             <Textarea
+              id="eligibility-reason"
               value={reasonText}
               onChange={(event) => setReasonText(event.target.value)}
               rows={4}

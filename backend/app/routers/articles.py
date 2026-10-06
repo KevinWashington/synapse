@@ -804,7 +804,10 @@ async def _sync_article_graph_state(article: Article, db: AsyncSession) -> None:
 
 
 async def _sync_article_indexes(article: Article, db: AsyncSession) -> None:
-    await _sync_article_graph_state(article, db)
+    try:
+        await _sync_article_graph_state(article, db)
+    except Exception as exc:  # pragma: no cover - best effort log
+        logger.warning("Falha ao sincronizar grafo do artigo %s: %s", article.id, exc)
     try:
         await _sync_article_vector_payload(article)
     except Exception as exc:  # pragma: no cover - best effort log
