@@ -57,6 +57,9 @@ class ApiService {
         const errorData = await response.json().catch(() => ({}));
 
         const detail = errorData.detail || errorData;
+        if (detail.code === "DEEPSEEK_KEY_REQUIRED") {
+          window.dispatchEvent(new CustomEvent("synapse:deepseek-key-required"));
+        }
         throw new ApiError(
           detail.message || detail.error || "Erro na requisição",
           response.status,

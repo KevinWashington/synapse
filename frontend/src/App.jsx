@@ -1,10 +1,11 @@
-import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 
 import { LoadingState } from "@components/layout";
 import ProtectedRoute from "@components/ProtectedRoute";
 import { Toaster } from "@components/ui/Sonner";
 import { AuthProvider } from "@features/auth";
+import { toast } from "@/lib/toast";
 
 const ArticleDetailsPage = lazy(() => import("@/pages/ArticleDetails"));
 const ArticlesPage = lazy(() => import("@/pages/Articles"));
@@ -25,6 +26,19 @@ function withSuspense(children) {
 }
 
 function App() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleMissingKey = () => {
+      toast.warning("Configure sua chave DeepSeek para usar recursos de IA.", {
+        id: "deepseek-key-required",
+        action: { label: "Configurar", onClick: () => navigate("/settings") },
+      });
+    };
+    window.addEventListener("synapse:deepseek-key-required", handleMissingKey);
+    return () => window.removeEventListener("synapse:deepseek-key-required", handleMissingKey);
+  }, [navigate]);
+
   return (
     <AuthProvider>
       <Routes>
