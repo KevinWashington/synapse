@@ -6,3 +6,5 @@ Pre-flight: Task 1 produces the bulk endpoint consumed by Task 2; response names
 
 Task 1: complete (commit `5743361`, tests: `python -m pytest -q -p no:cacheprovider tests/test_identification_bulk_promotion.py tests/test_article_index_sync.py` → 4 passed).
 Task 2: complete pending commit (tests: `npm run test:ci` → 8 files, 20 tests passed; synthesis export 3 passed).
+Task 2: committed as `02e50ae`.
+Task 3: complete pending commit (tests: `npm run test:ci` → 8 files, 22 tests passed; synthesis export 3 passed).

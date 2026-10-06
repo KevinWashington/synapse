@@ -4,6 +4,7 @@ import {
   ArticleDetailPanel,
   StageListPanel,
 } from "./ProjectArticles";
+import * as ProjectArticlesComponents from "./ProjectArticles";
 
 const article = {
   id: 1,
@@ -108,5 +109,54 @@ describe("ProjectArticles work queue", () => {
     expect(screen.getByRole("button", { name: "Incluir" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Pular por agora" })).toBeInTheDocument();
     expect(screen.getByText(/Envie o PDF para liberar a decisao de inclusao/)).toBeInTheDocument();
+  });
+});
+
+describe("duplicate review", () => {
+  const candidates = [
+    {
+      groupKey: "doi:duplicado",
+      reasonCode: "same_doi",
+      reasonText: "DOI idêntico detectado automaticamente.",
+      candidateIds: [11, 12],
+      articles: [
+        { ...article, id: 11, title: "Estudo na Scopus", doi: "10.1/teste", sourceName: "Scopus" },
+        { ...article, id: 12, title: "Estudo na Web of Science", doi: "10.1/teste", sourceName: "Web of Science" },
+      ],
+    },
+  ];
+
+  function renderDuplicateReview(overrides = {}) {
+    const DuplicateReviewPanel = ProjectArticlesComponents.DuplicateReviewPanel;
+    render(DuplicateReviewPanel ? (
+      <DuplicateReviewPanel
+        candidates={candidates}
+        onApply={vi.fn()}
+        onSelectCanonical={vi.fn()}
+        selectedDuplicateMap={{ "doi:duplicado": 11 }}
+        {...overrides}
+      />
+    ) : <div />);
+  }
+
+  it("shows every candidate and explains that one record must be kept", () => {
+    renderDuplicateReview();
+
+    expect(screen.getByRole("heading", { name: "Revisar duplicatas" })).toBeInTheDocument();
+    expect(screen.getByText("Estudo na Scopus")).toBeInTheDocument();
+    expect(screen.getByText("Estudo na Web of Science")).toBeInTheDocument();
+    expect(screen.getByText(/Escolha o registro que será mantido/)).toBeInTheDocument();
+  });
+
+  it("selects the canonical record and applies the review", () => {
+    const onApply = vi.fn();
+    const onSelectCanonical = vi.fn();
+    renderDuplicateReview({ onApply, onSelectCanonical });
+
+    screen.getByRole("radio", { name: "Manter Estudo na Web of Science" }).click();
+    screen.getByRole("button", { name: "Confirmar revisão de duplicatas" }).click();
+
+    expect(onSelectCanonical).toHaveBeenCalledWith("doi:duplicado", 12);
+    expect(onApply).toHaveBeenCalledOnce();
   });
 });

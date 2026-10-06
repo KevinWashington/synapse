@@ -5,7 +5,7 @@ import { toggleVisibleSelection } from "@features/articles/utils/reviewFlow";
 import { toast } from "@/lib/toast";
 
 const PHASE_FILTERS = {
-  identification: { phase: "identification" },
+  identification: { phase: "identification", outcome: "active" },
   screening: { phase: "screening" },
   eligibility: { phase: "eligibility" },
   included: { outcome: "included" },
@@ -261,6 +261,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       return;
     }
     try {
+      setIsLoadingDuplicates(true);
       const decisions = duplicateCandidates
         .map((group) => {
           const canonicalArticleId = selectedDuplicateMap[group.groupKey];
@@ -287,6 +288,8 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       await refreshAll();
     } catch (error) {
       toast.error("Erro ao aplicar revisao de duplicatas: " + error.message);
+    } finally {
+      setIsLoadingDuplicates(false);
     }
   }, [duplicateCandidates, project?.id, refreshAll, selectedDuplicateMap]);
 
