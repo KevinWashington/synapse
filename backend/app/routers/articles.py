@@ -46,6 +46,7 @@ from app.schemas.article import (
     LegacyArticleStatusUpdate,
     PromoteToScreeningRequest,
     PromoteToScreeningResponse,
+    PromoteUniqueToScreeningResponse,
     RelationshipCreate,
     ScreeningDecisionRequest,
     SelectionReportCounts,
@@ -1207,6 +1208,36 @@ def _assign_duplicate_markers(articles: list[Article], candidates: list[Duplicat
             article.duplicateReasonText = candidate.reasonText
 
 
+def _promote_unique_identification_articles(articles: list[Article]) -> dict[str, int]:
+    identification_articles = [
+        article
+        for article in articles
+        if article.reviewOutcome == "active" and article.currentPhase == "identification"
+    ]
+    candidates = _build_duplicate_candidates_from_articles(identification_articles)
+    _assign_duplicate_markers(identification_articles, candidates)
+
+    unresolved_ids = {
+        article_id
+        for candidate in candidates
+        for article_id in candidate.candidateIds
+    }
+    moved_count = 0
+    for article in identification_articles:
+        if article.id in unresolved_ids:
+            continue
+        article.currentPhase = "screening"
+        article.screeningDecision = "pending"
+        _set_legacy_state_from_workflow(article)
+        moved_count += 1
+
+    return {
+        "movedCount": moved_count,
+        "unresolvedDuplicateGroups": len(candidates),
+        "unresolvedDuplicateRecords": len(unresolved_ids),
+    }
+
+
 @router.get("/source-options")
 async def get_source_options():
     return {
@@ -1543,6 +1574,29 @@ async def promote_articles_to_screening(
 
     await db.commit()
     return PromoteToScreeningResponse(projectId=projectId, movedCount=moved_count)
+
+
+@router.post(
+    "/{projectId}/artigos/promote-unique-to-screening",
+    response_model=PromoteUniqueToScreeningResponse,
+)
+async def promote_unique_articles_to_screening(
+    projectId: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await get_project_or_404(projectId, current_user.id, db)
+    result = await db.execute(
+        select(Article).where(
+            Article.projectId == projectId,
+            Article.ownerId == current_user.id,
+            Article.currentPhase == "identification",
+            Article.reviewOutcome == "active",
+        )
+    )
+    counts = _promote_unique_identification_articles(list(result.scalars().all()))
+    await db.commit()
+    return PromoteUniqueToScreeningResponse(projectId=projectId, **counts)
 
 
 @router.post("/{projectId}/artigos/{articleId}/screening-decision", response_model=ArticleResponse)

@@ -176,6 +176,13 @@ class PromoteToScreeningResponse(BaseModel):
     movedCount: int
 
 
+class PromoteUniqueToScreeningResponse(BaseModel):
+    projectId: int
+    movedCount: int
+    unresolvedDuplicateGroups: int
+    unresolvedDuplicateRecords: int
+
+
 class ScreeningDecisionRequest(BaseModel):
     decision: Literal["included", "excluded"]
     reasonText: str | None = Field(None, max_length=2000)
