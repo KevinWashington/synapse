@@ -85,11 +85,21 @@ def test_clear_session_cookies_expires_both_cookies():
 
 def test_csrf_accepts_match_and_rejects_missing_or_mismatch():
     name = csrf_cookie_name()
-    require_csrf(_request("POST", cookie=f"{name}=same", csrf_header="same"))
+    require_csrf(
+        _request(
+            "POST",
+            cookie=f"synapse_session=present; {name}=same",
+            csrf_header="same",
+        )
+    )
 
     for request in (
-        _request("POST"),
-        _request("DELETE", cookie=f"{name}=one", csrf_header="two"),
+        _request("POST", cookie="synapse_session=present"),
+        _request(
+            "DELETE",
+            cookie=f"synapse_session=present; {name}=one",
+            csrf_header="two",
+        ),
     ):
         with pytest.raises(HTTPException) as error:
             require_csrf(request)

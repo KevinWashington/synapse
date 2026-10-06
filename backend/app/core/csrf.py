@@ -18,6 +18,8 @@ def csrf_cookie_name() -> str:
 def require_csrf(request: Request) -> None:
     if request.method.upper() in SAFE_METHODS or request.url.path in EXEMPT_PATHS:
         return
+    if not request.cookies.get(settings.SESSION_COOKIE_NAME):
+        return
 
     cookie_value = request.cookies.get(csrf_cookie_name())
     header_value = request.headers.get("X-CSRF-Token")

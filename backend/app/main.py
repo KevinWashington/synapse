@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.core.csrf import require_csrf
 from app.database import assert_database_revision, db_health_check, init_db, engine
 from app.routers import auth, projects, articles, ai, stats
 from app.core.dependencies import get_mcp_host, get_graph_mcp_service, get_sql_mcp_service
@@ -61,6 +62,19 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def csrf_protection(request, call_next):
+    try:
+        require_csrf(request)
+    except Exception as exc:
+        if hasattr(exc, "status_code") and hasattr(exc, "detail"):
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        raise
+    return await call_next(request)
+
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,

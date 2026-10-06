@@ -1,174 +1,129 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import get_current_user
+from app.core.security import clear_session_cookies, set_session_cookies
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import (
-    UserRegister, 
-    UserLogin, 
-    UserUpdate, 
-    PasswordChange,
-    UserResponse, 
-    AuthResponse
+from app.schemas.auth import AuthResponse, GoogleCredentialRequest, UserResponse, UserUpdate
+from app.services.google_identity_service import (
+    GoogleIdentityError,
+    GoogleIdentityService,
+    get_google_identity_service,
 )
-from app.core.security import hash_password, verify_password, create_access_token
-from app.core.dependencies import get_current_user
 
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
-    """Registrar novo usuário."""
-    # Check if email already exists
-    result = await db.execute(select(User).where(User.email == data.email))
-    if result.scalar_one_or_none():
+def _account_disabled() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"code": "ACCOUNT_DISABLED", "message": "Sua conta foi desativada."},
+    )
+
+
+def _new_user(identity) -> User:
+    return User(
+        name=identity.name,
+        email=identity.email,
+        passwordHash=None,
+        googleSub=identity.sub,
+        role="user",
+        isActive=True,
+        avatar=identity.avatar,
+    )
+
+
+@router.post("/google", response_model=AuthResponse)
+async def google_login(
+    data: GoogleCredentialRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    identity_service: GoogleIdentityService = Depends(get_google_identity_service),
+):
+    try:
+        identity = identity_service.verify(data.credential)
+    except GoogleIdentityError as exc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "Email já cadastrado",
-                "message": "Este email já está sendo usado por outro usuário"
-            }
-        )
-    
-    # Create user
-    user = User(
-        name=data.name,
-        email=data.email,
-        passwordHash=hash_password(data.password),
-        lastLogin=datetime.now(timezone.utc)
-    )
-    
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    
-    token = create_access_token(user.id)
-    
-    return AuthResponse(
-        success=True,
-        message="Usuário criado com sucesso",
-        user=UserResponse.model_validate(user),
-        token=token
-    )
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": exc.code, "message": exc.public_message},
+        ) from exc
 
-
-@router.post("/login", response_model=AuthResponse)
-async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
-    """Fazer login."""
-    result = await db.execute(select(User).where(User.email == data.email))
+    result = await db.execute(select(User).where(User.googleSub == identity.sub))
     user = result.scalar_one_or_none()
-    
-    if not user or not verify_password(data.password, user.passwordHash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "Credenciais inválidas",
-                "message": "Email ou senha incorretos"
-            }
+
+    if user is None:
+        result = await db.execute(
+            select(User).where(func.lower(func.trim(User.email)) == identity.email)
         )
-    
+        user = result.scalar_one_or_none()
+        if user is not None and user.googleSub and user.googleSub != identity.sub:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "IDENTITY_CONFLICT",
+                    "message": "Este e-mail já está vinculado a outra identidade Google.",
+                },
+            )
+        if user is None:
+            user = _new_user(identity)
+            db.add(user)
+        else:
+            user.googleSub = identity.sub
+
     if not user.isActive:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "Conta desativada",
-                "message": "Sua conta foi desativada"
-            }
-        )
-    
-    # Update last login
+        raise _account_disabled()
+
+    user.name = identity.name
+    user.email = identity.email
+    user.avatar = identity.avatar
     user.lastLogin = datetime.now(timezone.utc)
-    await db.commit()
-    
-    token = create_access_token(user.id)
-    
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "IDENTITY_CONFLICT", "message": "Não foi possível vincular esta identidade."},
+        ) from exc
+
+    set_session_cookies(response, user.id)
     return AuthResponse(
         success=True,
-        message="Login realizado com sucesso",
+        message="Login com Google realizado com sucesso.",
         user=UserResponse.model_validate(user),
-        token=token
     )
 
 
 @router.get("/profile", response_model=dict)
-async def get_profile(current_user: User = Depends(get_current_user)):
-    """Obter perfil do usuário."""
-    return {
-        "success": True,
-        "user": UserResponse.model_validate(current_user)
-    }
+def get_profile(current_user: User = Depends(get_current_user)):
+    return {"success": True, "user": UserResponse.model_validate(current_user)}
 
 
 @router.put("/profile", response_model=dict)
 async def update_profile(
     data: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    """Atualizar perfil do usuário."""
-    # Check if new email already exists
-    if data.email and data.email != current_user.email:
-        result = await db.execute(
-            select(User).where(User.email == data.email, User.id != current_user.id)
-        )
-        if result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "error": "Email já cadastrado",
-                    "message": "Este email já está sendo usado por outro usuário"
-                }
-            )
-    
-    # Update fields
     if data.name:
         current_user.name = data.name
-    if data.email:
-        current_user.email = data.email
-    
     await db.commit()
     await db.refresh(current_user)
-    
     return {
         "success": True,
-        "message": "Perfil atualizado com sucesso",
-        "user": UserResponse.model_validate(current_user)
-    }
-
-
-@router.put("/change-password", response_model=dict)
-async def change_password(
-    data: PasswordChange,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Alterar senha do usuário."""
-    if not verify_password(data.current_password, current_user.passwordHash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "Senha atual incorreta",
-                "message": "A senha atual informada está incorreta"
-            }
-        )
-    
-    current_user.passwordHash = hash_password(data.newPassword)
-    await db.commit()
-    
-    return {
-        "success": True,
-        "message": "Senha alterada com sucesso"
+        "message": "Perfil atualizado com sucesso.",
+        "user": UserResponse.model_validate(current_user),
     }
 
 
 @router.post("/logout", response_model=dict)
-async def logout(current_user: User = Depends(get_current_user)):
-    """Fazer logout."""
-    return {
-        "success": True,
-        "message": "Logout realizado com sucesso"
-    }
+def logout(response: Response, current_user: User = Depends(get_current_user)):
+    clear_session_cookies(response)
+    return {"success": True, "message": "Logout realizado com sucesso."}
