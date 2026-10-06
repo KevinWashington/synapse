@@ -17,8 +17,6 @@ function useProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [detailOpen, setDetailOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editProject, setEditProject] = useState(null);
   const [editData, setEditData] = useState(INITIAL_EDIT_DATA);
@@ -75,12 +73,6 @@ function useProjectsPage() {
     navigate(`/projetos/${project.id}`);
   }, [navigate]);
 
-  const handleExpandProject = useCallback(() => {
-    if (selectedProject?.id) {
-      navigate(`/projetos/${selectedProject.id}`);
-    }
-  }, [navigate, selectedProject?.id]);
-
   const handleEditProject = useCallback((project) => {
     setEditProject(project);
     setEditData({
@@ -110,22 +102,18 @@ function useProjectsPage() {
   }, [editData, editProject, loadProjects]);
 
   return {
-    detailOpen,
     editData,
     editLoading,
     editOpen,
     error,
     handleDeleteProject,
     handleEditProject,
-    handleExpandProject,
     handleProjectClick,
     handleSaveEdit,
     loadProjects,
     loading,
     projects,
     searchTerm,
-    selectedProject,
-    setDetailOpen,
     setEditData,
     setEditOpen,
     setSearchTerm,

@@ -204,7 +204,7 @@ function Menu() {
       <div className="fixed left-4 top-4 z-50 md:hidden">
         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="rounded-full bg-white">
+            <Button variant="outline" size="icon" className="rounded-full bg-white" aria-label="Abrir menu">
               <MenuIcon size={20} />
             </Button>
           </SheetTrigger>

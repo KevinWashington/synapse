@@ -257,10 +257,9 @@ function EligibilityDecisionDialog({
   const [assistantSuggestedDecision, setAssistantSuggestedDecision] = useState("");
   const [isAssisting, setIsAssisting] = useState(false);
 
-  const checklistKey = useMemo(() => JSON.stringify(checklist || []), [checklist]);
   const checklistEntries = useMemo(
     () => checklist.map((item, index) => ({ key: `item-${index + 1}`, label: item })),
-    [checklistKey]
+    [checklist]
   );
   const checklistSummary = useMemo(() => summarizeChecklist(answerStatuses), [answerStatuses]);
   const checklistSuggestion = useMemo(

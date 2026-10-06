@@ -26,7 +26,7 @@ const Layout = () => {
     <div className="flex min-h-screen bg-[#fbfcff] text-[#0f1734]">
       {!isArticleWorkspace ? <Menu /> : null}
 
-      <div className={`flex min-h-screen flex-1 flex-col ${isArticleWorkspace ? "" : "md:ml-[240px]"}`}>
+      <div className={`flex min-h-screen min-w-0 flex-1 flex-col ${isArticleWorkspace ? "" : "md:ml-[240px]"}`}>
         <PageTitleProvider>
           {!isArticleWorkspace ? (
             <HeaderBar navigate={navigate} logout={logout} user={user} />
@@ -36,7 +36,7 @@ const Layout = () => {
             className={
               isArticleWorkspace
                 ? "h-screen flex-1 overflow-hidden p-0"
-                : "flex-1 overflow-y-auto px-5 pb-8 pt-4 md:px-10 lg:px-14"
+                : "min-w-0 flex-1 overflow-y-auto px-5 pb-8 pt-4 md:px-10 lg:px-14"
             }
           >
             <Outlet />
@@ -51,7 +51,7 @@ function HeaderBar({ navigate, logout, user }) {
   const { title, backUrl, actions, badge } = usePageTitleValue();
 
   return (
-    <header className="flex h-[72px] items-center justify-between bg-[#fbfcff] px-5 pt-3 md:px-10 lg:px-14">
+    <header className="flex h-[72px] items-center justify-between bg-[#fbfcff] pb-1 pl-16 pr-5 pt-3 md:px-10 lg:px-14">
       <div className="flex min-w-0 items-center gap-3">
         {backUrl && (
           <button
@@ -76,6 +76,7 @@ function HeaderBar({ navigate, logout, user }) {
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
+              aria-label="Abrir menu da conta"
               className="flex h-10 items-center gap-2 rounded-full px-1.5 text-[#182344] hover:bg-[#f6f7fb]"
             >
               <Avatar className="h-9 w-9">

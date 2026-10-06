@@ -53,7 +53,7 @@ function compactObservation(observation) {
 function ChatAgentTracePanel({ provenance, isLoading = false, selectedProjectId }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const trace = provenance?.agentTrace || [];
+  const trace = useMemo(() => provenance?.agentTrace || [], [provenance?.agentTrace]);
   const plannedTools = provenance?.agentTools || [];
 
   const executedTools = useMemo(() => {

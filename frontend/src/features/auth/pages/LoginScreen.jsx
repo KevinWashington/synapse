@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { BrainCircuit, ShieldCheck } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/Card";
 import { useAuth } from "@features/auth";
 import AuthErrorAlert from "@features/auth/components/AuthErrorAlert";
 import GoogleSignInButton from "@features/auth/components/GoogleSignInButton";
@@ -33,7 +33,7 @@ function LoginScreen() {
             <BrainCircuit className="h-6 w-6" />
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-[#111936]">Entre no Synapse</CardTitle>
+            <h1 className="text-2xl font-bold text-[#111936]">Entre no Synapse</h1>
             <CardDescription className="text-sm leading-6">
               Organize sua revisão sistemática e trabalhe com IA usando sua própria chave.
             </CardDescription>

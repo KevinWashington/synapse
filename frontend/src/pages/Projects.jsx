@@ -26,7 +26,6 @@ import {
 import {
   EditProjectPanel,
   NewProjectModal,
-  ProjectQuickViewPanel,
   useProjectsPage,
 } from "@/features/projects";
 import { usePageTitle } from "@hooks/usePageTitle";
@@ -112,7 +111,7 @@ function PrismaProgress({ stats }) {
 
 function PrismaMetric({ color, label, value }) {
   return (
-    <div className="min-w-[96px]">
+    <div className="min-w-0">
       <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#667391]">
         <span className={cn("h-2 w-2 rounded-full", color)} />
         <span>{label}</span>
@@ -135,8 +134,14 @@ function ProjectRow({ project, index, onClick, onEdit, onDelete }) {
 
   return (
     <tr
+      data-testid="project-open"
+      role="link"
+      tabIndex={0}
       className="cursor-pointer border-t border-[#edf0f7] bg-white transition-colors hover:bg-[#fbfcff]"
       onClick={() => onClick(project)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onClick(project);
+      }}
     >
       <td className="px-5 py-5">
         <div className="flex items-center gap-4">
@@ -158,7 +163,7 @@ function ProjectRow({ project, index, onClick, onEdit, onDelete }) {
         </div>
       </td>
 
-      <td className="w-[44%] px-5 py-5">
+      <td className="w-[32%] px-5 py-5">
         <div className="grid grid-cols-4 gap-4">
           <PrismaMetric color="bg-[#7167ff]" label="Identificados" value={stats.identified} />
           <PrismaMetric color="bg-[#60c889]" label="Triagem" value={stats.screening} />
@@ -198,22 +203,18 @@ function ProjectRow({ project, index, onClick, onEdit, onDelete }) {
 
 function Projects() {
   const {
-    detailOpen,
     editData,
     editLoading,
     editOpen,
     error,
     handleDeleteProject,
     handleEditProject,
-    handleExpandProject,
     handleProjectClick,
     handleSaveEdit,
     loadProjects,
     loading,
     projects,
     searchTerm,
-    selectedProject,
-    setDetailOpen,
     setEditData,
     setEditOpen,
     setSearchTerm,
@@ -301,9 +302,48 @@ function Projects() {
       )}
 
       {visibleProjects.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-[#edf0f7] bg-white">
-          <div className="overflow-x-auto flex">
-            <table className="w-100 flex-1">
+        <>
+        <div className="space-y-3 md:hidden">
+          {visibleProjects.map((project, index) => {
+            const Icon = PROJECT_ICONS[index % PROJECT_ICONS.length];
+            const iconStyle = PROJECT_ICON_STYLES[index % PROJECT_ICON_STYLES.length];
+            return (
+              <article key={project.id} className="rounded-xl border border-[#edf0f7] bg-white p-4 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", iconStyle)}>
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm font-semibold leading-5 text-[#111936]">{project.title}</h2>
+                    <div className="mt-2"><ProjectStatus status={project.status} /></div>
+                  </div>
+                </div>
+                <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#56627f]">{project.objetivo}</p>
+                <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-[#f7f8fc] p-3">
+                  <PrismaMetric color="bg-[#7167ff]" label="Identificados" value={project.prismaStats.identified} />
+                  <PrismaMetric color="bg-[#60c889]" label="Triagem" value={project.prismaStats.screening} />
+                  <PrismaMetric color="bg-[#ffc96f]" label="Elegíveis" value={project.prismaStats.eligible} />
+                  <PrismaMetric color="bg-[#8fd2a8]" label="Incluídos" value={project.prismaStats.included} />
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <span className="text-xs text-[#667391]">Atualizado {formatUpdatedAt(project)}</span>
+                  <Button data-testid="project-open" size="sm" variant="outline" onClick={() => handleProjectClick(project)}>
+                    Abrir projeto
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden overflow-hidden rounded-lg border border-[#edf0f7] bg-white md:block">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] table-fixed">
+              <colgroup>
+                <col className="w-[48%]" />
+                <col className="w-[32%]" />
+                <col className="w-[14%]" />
+                <col className="w-[6%]" />
+              </colgroup>
               <thead>
                 <tr className="bg-white text-left text-xs font-semibold text-[#667391]">
                   <th className="px-5 py-4">Projeto</th>
@@ -332,6 +372,7 @@ function Projects() {
             </span>
           </div>
         </div>
+        </>
       ) : (
         !loading && (
           <EmptyState
@@ -347,13 +388,6 @@ function Projects() {
           />
         )
       )}
-
-      <ProjectQuickViewPanel
-        isOpen={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        onExpand={handleExpandProject}
-        project={selectedProject}
-      />
 
       <EditProjectPanel
         isOpen={editOpen}
