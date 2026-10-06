@@ -25,6 +25,9 @@ function renderList(overrides = {}) {
     <StageListPanel
       activeFilter="all"
       activeStage="identification"
+      articlePage={1}
+      articlePageSize={100}
+      articleTotal={1093}
       articles={[article]}
       duplicateIds={new Set()}
       filterOptions={[{ key: "all", label: "Todos", count: 1 }]}
@@ -32,6 +35,8 @@ function renderList(overrides = {}) {
       onArticleSelect={vi.fn()}
       onFilterChange={vi.fn()}
       onOpenArticle={vi.fn()}
+      onPageChange={vi.fn()}
+      onPromoteAllUnique={vi.fn()}
       onPromoteSelected={vi.fn()}
       onToggleAllIdentification={vi.fn()}
       onToggleIdentification={vi.fn()}
@@ -46,11 +51,29 @@ function renderList(overrides = {}) {
 }
 
 describe("ProjectArticles work queue", () => {
-  it("disables promotion without selection and exposes select all", () => {
+  it("shows the server total separately from the loaded page", () => {
     renderList();
 
+    expect(screen.getByText("1.093 na fila")).toBeInTheDocument();
+    expect(screen.getByText("1 exibido de 1.093")).toBeInTheDocument();
+  });
+
+  it("makes bulk unique promotion primary and keeps visible selection secondary", () => {
+    renderList();
+
+    expect(screen.getByRole("button", { name: "Enviar todos os únicos para triagem" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Enviar 0 para triagem" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Selecionar todos os artigos visiveis" })).toBeInTheDocument();
+  });
+
+  it("navigates pages without pretending the first 100 are the whole queue", () => {
+    const onPageChange = vi.fn();
+    renderList({ onPageChange });
+
+    screen.getByRole("button", { name: "Próxima página" }).click();
+
+    expect(onPageChange).toHaveBeenCalledWith(2);
+    expect(screen.getByText("Página 1 de 11")).toBeInTheDocument();
   });
 
   it("does not render selection checkboxes outside identification", () => {
@@ -87,4 +110,3 @@ describe("ProjectArticles work queue", () => {
     expect(screen.getByText(/Envie o PDF para liberar a decisao de inclusao/)).toBeInTheDocument();
   });
 });
-

@@ -276,13 +276,19 @@ function SourceBadge({ article }) {
 export function StageListPanel({
   activeFilter,
   activeStage,
+  articlePage = 1,
+  articlePageSize = 100,
+  articleTotal,
   articles,
   duplicateIds,
   filterOptions,
   isLoading,
+  isPromotingUnique = false,
   onArticleSelect,
   onFilterChange,
   onOpenArticle,
+  onPageChange,
+  onPromoteAllUnique,
   onPromoteSelected,
   onToggleAllIdentification,
   onToggleIdentification,
@@ -297,20 +303,33 @@ export function StageListPanel({
   const allVisibleSelected = visibleIds.length > 0
     && visibleIds.every((id) => selectedIdentificationIds.includes(id));
   const reachedStageCount = getStageCount(summary, activeStage);
+  const resolvedTotal = articleTotal ?? articles.length;
+  const pageCount = Math.max(1, Math.ceil(resolvedTotal / articlePageSize));
 
   return (
     <section className="min-w-0 rounded-lg border border-[#edf0f7] bg-white">
       <div className="border-b border-[#edf0f7] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold text-[#111936]">{stage.label}</h2>
               <span className="rounded-full bg-[#f0edff] px-3 py-1 text-xs font-semibold text-[#6259ff]">
-                {formatNumber(articles.length)} na fila
+                {formatNumber(resolvedTotal)} na fila
               </span>
             </div>
             <p className="mt-2 text-sm leading-6 text-[#56627f]">{stage.description}</p>
           </div>
+          {activeStage === "identification" ? (
+            <Button
+              size="sm"
+              className="h-9 gap-2 rounded-lg bg-[#6259ff] text-xs text-white hover:bg-[#5148ee]"
+              disabled={!resolvedTotal || isPromotingUnique}
+              onClick={onPromoteAllUnique}
+            >
+              {isPromotingUnique ? <LoaderIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
+              Enviar todos os únicos para triagem
+            </Button>
+          ) : null}
         </div>
 
         <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -366,7 +385,8 @@ export function StageListPanel({
           {activeStage === "identification" ? (
             <Button
               size="sm"
-              className="h-8 gap-2 rounded-lg bg-[#6259ff] text-xs text-white hover:bg-[#5148ee]"
+              variant="outline"
+              className="h-8 gap-2 rounded-lg border-[#dfe4ef] bg-white text-xs text-[#253252]"
               disabled={!selectedIdentificationIds.length}
               onClick={onPromoteSelected}
             >
@@ -448,11 +468,38 @@ export function StageListPanel({
         )}
       </div>
 
-      <div className="flex items-center border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
-        <span>
-          {formatNumber(articles.length)} nesta fila
-          {reachedStageCount !== articles.length ? ` · ${formatNumber(reachedStageCount)} chegaram a esta etapa` : ""}
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
+        <div className="flex flex-wrap items-center gap-2">
+          <span>{formatNumber(articles.length)} {articles.length === 1 ? "exibido" : "exibidos"} de {formatNumber(resolvedTotal)}</span>
+          {reachedStageCount !== resolvedTotal ? (
+            <span className="text-xs text-[#8b96ad]">{formatNumber(reachedStageCount)} chegaram a esta etapa</span>
+          ) : null}
+        </div>
+        {pageCount > 1 ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label="Página anterior"
+              className="h-8 w-8 rounded-lg border-[#dfe4ef] p-0"
+              disabled={articlePage <= 1}
+              onClick={() => onPageChange(articlePage - 1)}
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+            </Button>
+            <span className="min-w-24 text-center text-xs">Página {articlePage} de {pageCount}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label="Próxima página"
+              className="h-8 w-8 rounded-lg border-[#dfe4ef] p-0"
+              disabled={articlePage >= pageCount}
+              onClick={() => onPageChange(articlePage + 1)}
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : null}
       </div>
     </section>
   );
@@ -836,14 +883,20 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
 
   const {
     activeFlowTab,
+    articlePage,
+    articlePageSize,
+    articleTotal,
     articles,
+    changeArticlePage,
     duplicateCandidates,
     eligibilityArticle,
     identificationArticles,
     isBatchEvaluating,
     isLoadingArticles,
     isLoadingDuplicates,
+    isPromotingUnique,
     isSavingDecision,
+    promoteAllUniqueToScreening,
     promoteSelectedToScreening,
     refreshAll,
     runBatchEvaluate,
@@ -1000,10 +1053,14 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
         <StageListPanel
           activeFilter={activeFilter}
           activeStage={activeStage}
+          articlePage={articlePage}
+          articlePageSize={articlePageSize}
+          articleTotal={articleTotal}
           articles={filteredArticles}
           duplicateIds={duplicateIds}
           filterOptions={filterOptions}
           isLoading={isLoadingArticles}
+          isPromotingUnique={isPromotingUnique}
           onArticleSelect={(article) => {
             setIsDetailClosed(false);
             setSelectedArticleId(article.id);
@@ -1016,6 +1073,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
             }
             onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
           }}
+          onPageChange={changeArticlePage}
+          onPromoteAllUnique={promoteAllUniqueToScreening}
           onPromoteSelected={promoteSelectedToScreening}
           onToggleAllIdentification={toggleAllIdentificationSelection}
           onToggleIdentification={toggleIdentificationSelection}

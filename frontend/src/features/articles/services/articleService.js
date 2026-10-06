@@ -125,6 +125,10 @@ class ArtigosService {
     });
   }
 
+  async promoteAllUniqueToScreening(projectId) {
+    return apiService.post(`${this.getProjectEndpoint(projectId)}/promote-unique-to-screening`, {});
+  }
+
   async submitScreeningDecision(projectId, articleId, decisionData) {
     return apiService.post(
       `${this.getProjectEndpoint(projectId)}/${articleId}/screening-decision`,

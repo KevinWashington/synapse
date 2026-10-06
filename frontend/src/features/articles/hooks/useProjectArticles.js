@@ -18,6 +18,7 @@ const FLOW_TABS = new Set([
   "included",
   "report",
 ]);
+const ARTICLE_PAGE_SIZE = 100;
 
 export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,6 +27,8 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     return FLOW_TABS.has(requestedFlow) ? requestedFlow : "overview";
   });
   const [articles, setArticles] = useState([]);
+  const [articlePage, setArticlePage] = useState(1);
+  const [articleTotal, setArticleTotal] = useState(0);
   const [searchTermsByFlow, setSearchTermsByFlow] = useState({});
   const [summary, setSummary] = useState(null);
   const [report, setReport] = useState(null);
@@ -36,6 +39,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   const [isLoadingDuplicates, setIsLoadingDuplicates] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
+  const [isPromotingUnique, setIsPromotingUnique] = useState(false);
   const [isLoadingSynthesisReport, setIsLoadingSynthesisReport] = useState(false);
   const [synthesisReportData, setSynthesisReportData] = useState(null);
   const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
@@ -56,6 +60,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       const resolvedFlowTab = FLOW_TABS.has(nextFlowTab) ? nextFlowTab : "overview";
 
       setActiveFlowTabState(resolvedFlowTab);
+      setArticlePage(1);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
 
@@ -73,6 +78,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
 
   const setSearchTerm = useCallback(
     (value) => {
+      setArticlePage(1);
       setSearchTermsByFlow((current) => ({
         ...current,
         [activeFlowTab]: value,
@@ -134,7 +140,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     }
   }, [project?.id]);
 
-  const loadArticles = useCallback(async (flowOverride = activeFlowTab) => {
+  const loadArticles = useCallback(async (flowOverride = activeFlowTab, pageOverride = articlePage) => {
     if (!project?.id) {
       return;
     }
@@ -143,6 +149,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
 
     if (!PHASE_FILTERS[resolvedFlowTab]) {
       setArticles([]);
+      setArticleTotal(0);
       return;
     }
 
@@ -151,19 +158,22 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       const response = await articleService.getArticlesByProject(project.id, {
         ...PHASE_FILTERS[resolvedFlowTab],
         search: currentSearchTerm || undefined,
-        limit: 100,
+        page: pageOverride,
+        limit: ARTICLE_PAGE_SIZE,
       });
       setArticles(response.articles || []);
+      setArticleTotal(response.total || 0);
       if (resolvedFlowTab !== "identification") {
         setSelectedIdentificationIds([]);
       }
     } catch (error) {
       console.error("Erro ao carregar artigos:", error);
       setArticles([]);
+      setArticleTotal(0);
     } finally {
       setIsLoadingArticles(false);
     }
-  }, [activeFlowTab, project?.id, searchTermsByFlow]);
+  }, [activeFlowTab, articlePage, project?.id, searchTermsByFlow]);
 
   useEffect(() => {
     loadSummary();
@@ -187,7 +197,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         loadSummary(),
         loadReport(),
         loadDuplicateCandidates(),
-        loadArticles(flowToLoad),
+        loadArticles(flowToLoad, targetFlowTab ? 1 : articlePage),
       ]);
       if (refreshSynthesisReport && synthesisReportData) {
         const synthesis = await articleService.getProjectSynthesisReport(project.id);
@@ -196,6 +206,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     },
     [
       activeFlowTab,
+      articlePage,
       loadArticles,
       loadDuplicateCandidates,
       loadReport,
@@ -221,6 +232,11 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
 
   const toggleAllIdentificationSelection = useCallback((articleIds) => {
     setSelectedIdentificationIds((current) => toggleVisibleSelection(current, articleIds));
+  }, []);
+
+  const changeArticlePage = useCallback((nextPage) => {
+    setArticlePage(Math.max(1, nextPage));
+    setSelectedIdentificationIds([]);
   }, []);
 
   const runDedupAnalysis = useCallback(async () => {
@@ -289,6 +305,34 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       toast.error("Erro ao enviar registros para triagem: " + error.message);
     }
   }, [project?.id, refreshAll, selectedIdentificationIds]);
+
+  const promoteAllUniqueToScreening = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+
+    try {
+      setIsPromotingUnique(true);
+      const response = await articleService.promoteAllUniqueToScreening(project.id);
+      const movedCount = response.movedCount || 0;
+      const unresolvedRecords = response.unresolvedDuplicateRecords || 0;
+      const unresolvedGroups = response.unresolvedDuplicateGroups || 0;
+      if (unresolvedRecords) {
+        toast.success(
+          `${movedCount} registro(s) único(s) enviados. ${unresolvedRecords} registro(s) em ${unresolvedGroups} grupo(s) ficaram para revisão.`
+        );
+      } else {
+        toast.success(`${movedCount} registro(s) único(s) enviados para triagem.`);
+      }
+      setSelectedIdentificationIds([]);
+      setArticlePage(1);
+      await refreshAll({ targetFlowTab: "identification" });
+    } catch (error) {
+      toast.error("Erro ao enviar registros únicos para triagem: " + error.message);
+    } finally {
+      setIsPromotingUnique(false);
+    }
+  }, [project?.id, refreshAll]);
 
   const submitScreeningDecision = useCallback(
     async (payload) => {
@@ -410,7 +454,11 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   return {
     activeFlowTab,
     applyDuplicateReview,
+    articlePage,
+    articlePageSize: ARTICLE_PAGE_SIZE,
+    articleTotal,
     articles,
+    changeArticlePage,
     duplicateCandidates,
     eligibilityArticle,
     handleDeleteArticle,
@@ -421,8 +469,10 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     isLoadingReport,
     isLoadingSynthesisReport,
     isLoadingSummary,
+    isPromotingUnique,
     isSavingDecision,
     loadSynthesisReport,
+    promoteAllUniqueToScreening,
     promoteSelectedToScreening,
     report,
     refreshAll,
