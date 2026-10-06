@@ -69,7 +69,7 @@ function totalFromStats(stats) {
 
 function MetricCard({ icon: Icon, label, value, description, colorClass, className }) {
   return (
-    <div className={cn("flex min-h-[112px] rounded-lg border border-[#edf0f7] bg-white p-5", className)}>
+    <div className={cn("flex min-h-[132px] rounded-lg border border-[#edf0f7] bg-white p-6", className)}>
       <div className="flex items-start gap-4">
         <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", colorClass)}>
           <Icon className="h-6 w-6" />
@@ -134,7 +134,7 @@ function FunnelChart({ stats }) {
 
 function DataSourcesCard({ sources }) {
   return (
-    <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
+    <div data-testid="overview-data-sources" className="min-h-[280px] rounded-lg border border-[#edf0f7] bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-semibold text-[#111936]">Fontes de dados</p>
         <span className="text-xs font-semibold text-[#6259ff]">Ver todas</span>
@@ -160,7 +160,7 @@ function DataSourcesCard({ sources }) {
 
 function EvolutionCard({ evolution }) {
   return (
-    <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
+    <div data-testid="overview-evolution" className="min-h-[280px] rounded-lg border border-[#edf0f7] bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-semibold text-[#111936]">Evolucao das etapas</p>
         <span className="rounded-lg border border-[#edf0f7] px-3 py-1 text-xs text-[#56627f]">Ultimos 10 dias</span>
@@ -269,7 +269,7 @@ function PlanningSummaryCard({ summary, onOpenPlanning }) {
 
 function RecentActivitiesCard({ activities, onOpenArticle }) {
   return (
-    <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
+    <div data-testid="overview-activities" className="min-h-[280px] rounded-lg border border-[#edf0f7] bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-semibold text-[#111936]">Atividades recentes</p>
         <span className="text-xs font-semibold text-[#6259ff]">Ver todas</span>
@@ -451,13 +451,13 @@ function ProjectOverview({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1.15fr_0.9fr]">
+      <div data-testid="overview-supporting-grid" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <DataSourcesCard sources={overview.sources} />
         <EvolutionCard evolution={overview.evolution} />
         <RecentActivitiesCard activities={overview.recentActivities} onOpenArticle={onOpenArticle} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr_0.9fr]">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <StudyTypeCard studyTypes={overview.studyTypes} included={stats.included} />
         <PlanningSummaryCard summary={overview.planningSummary} onOpenPlanning={onOpenPlanning} />
         <QuickActionsCard

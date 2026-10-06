@@ -27,42 +27,25 @@ const TABS = [
   { key: "grafo", label: "Gráficos" },
 ];
 
-const TAB_COPY = {
-  planejamento: {
-    title: null,
-    description: "Planeje todos os aspectos da sua revisao sistematica.",
-  },
-  fluxo: {
-    title: null,
-    description: "Acompanhe o fluxograma PRISMA da sua revisão.",
-  },
-  sintese: {
-    title: "Sintese e relatorio",
-    description: "Visualize a sintese completa: RQs, matriz de extracao, distribuicoes e qualidade dos estudos.",
-  },
-  grafo: {
-    title: "Graficos e analises",
-    description: "Explore os dados da sua revisao sistematica com visualizações e insights.",
-  },
-};
-
 function ProjectDetailsHeader({
   activeTab,
   onEditProject,
   onTabChange,
   project,
 }) {
-  const title = TAB_COPY[activeTab]?.title || project?.title;
-  const description = TAB_COPY[activeTab]?.description || project?.objetivo;
-
   return (
     <header className="mb-5 border-b border-[#edf0f7]">
       <div className="mb-5 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-[#0f1734]">{title}</h1>
+            <h1 className="text-2xl font-semibold text-[#0f1734]">{project?.title}</h1>
           </div>
-          <p className=" max-w-3xl text-sm leading-6 text-[#56627f]">{description}</p>
+          <p
+            data-testid="project-objective"
+            className="mt-1 min-h-12 max-w-4xl line-clamp-2 text-sm leading-6 text-[#56627f]"
+          >
+            {project?.objetivo}
+          </p>
         </div>
 
         <Button

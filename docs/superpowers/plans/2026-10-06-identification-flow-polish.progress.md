@@ -8,3 +8,5 @@ Task 1: complete (commit `5743361`, tests: `python -m pytest -q -p no:cacheprovi
 Task 2: complete pending commit (tests: `npm run test:ci` → 8 files, 20 tests passed; synthesis export 3 passed).
 Task 2: committed as `02e50ae`.
 Task 3: complete pending commit (tests: `npm run test:ci` → 8 files, 22 tests passed; synthesis export 3 passed).
+Task 3: committed as `152a043`.
+Task 4: complete pending commit (tests: `npm run test:ci` → 10 files, 30 tests passed; synthesis export 3 passed).
