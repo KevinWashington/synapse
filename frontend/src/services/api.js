@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const SESSION_COOKIE_NAME = import.meta.env.VITE_SESSION_COOKIE_NAME || "synapse_session";
 
 class ApiService {
   constructor() {
@@ -21,7 +22,7 @@ class ApiService {
     if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
       const csrfToken = document.cookie
         .split("; ")
-        .find((cookie) => cookie.startsWith("synapse_session_csrf="))
+        .find((cookie) => cookie.startsWith(`${SESSION_COOKIE_NAME}_csrf=`))
         ?.split("=")
         .slice(1)
         .join("=");

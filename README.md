@@ -1,203 +1,83 @@
 # Synapse
 
-Sistema de apoio à revisão sistemática de literatura científica com IA, grafos de conhecimento e busca semântica vetorial.
+Aplicação web para apoiar revisões sistemáticas de literatura com IA, busca semântica e grafo de conhecimento.
 
-## Visão Geral
+## Stack
 
-O Synapse é uma aplicação web desenvolvida como TCC que auxilia pesquisadores no processo de revisão sistemática de literatura. A plataforma permite importar artigos (PDF ou BibTeX), analisar o conteúdo com LLM, construir um grafo de conhecimento entre autores e conceitos, e realizar buscas semânticas utilizando RAG (Retrieval-Augmented Generation) com múltiplos backends (vetorial, grafo e SQL).
+- React 19, Vite e Tailwind CSS
+- FastAPI, SQLAlchemy assíncrono e Alembic
+- PostgreSQL/pgvector, Neo4j e Qdrant
+- Google Identity Services para autenticação
+- DeepSeek com uma chave opcional e exclusiva por usuário
 
-## Stack Tecnológica
+## Requisitos
 
-| Camada | Tecnologia |
-|--------|-----------|
-| Frontend | React 19, Vite, Tailwind CSS, Radix UI |
-| Backend | FastAPI (Python 3.12), SQLAlchemy async |
-| Banco relacional | PostgreSQL 16 + extensão pgvector |
-| Banco de grafos | Neo4j 5 Community |
-| Banco vetorial | Qdrant |
-| LLM | DeepSeek via API compatível com OpenAI |
-| Embeddings | HuggingFace Hub |
-| Orquestração | Docker + Docker Compose |
+- Docker e Docker Compose
+- Um OAuth Client ID do tipo Web no Google Cloud
+- Token do Hugging Face quando os recursos de embeddings forem usados
+- Chave DeepSeek apenas para cada usuário que quiser usar funções de IA
 
-## Pré-requisitos
+O backend não aceita uma chave DeepSeek compartilhada. Cada usuário pode cadastrar, substituir ou excluir sua própria chave em **Configurações**; ela é armazenada criptografada e nunca volta em texto puro pela API.
 
-- [Docker](https://docs.docker.com/get-docker/) e [Docker Compose](https://docs.docker.com/compose/install/) instalados
-- Chave de API do [DeepSeek](https://platform.deepseek.com/)
-- Token do [HuggingFace](https://huggingface.co/settings/tokens)
+## Configuração local
 
-## Configuração
+Copie os exemplos de ambiente:
 
-### 1. Clone o repositório
-
-```bash
-git clone <url-do-repositorio>
-cd synapse
-```
-
-### 2. Configure as variáveis de ambiente
-
-Copie o arquivo de exemplo e preencha com suas credenciais:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Edite `backend/.env`:
-
-```env
-# Banco de dados PostgreSQL — não alterar se usar Docker Compose
-DATABASE_URL=postgresql+asyncpg://synapse:synapse@postgres:5432/synapse
-
-# JWT — gere uma chave aleatória segura (mínimo 32 caracteres)
-JWT_SECRET=troque_por_uma_chave_secreta_longa_e_aleatoria
-JWT_ALGORITHM=HS256
-JWT_EXPIRE_MINUTES=10080
-
-# DeepSeek — obtenha em https://platform.deepseek.com/
-DEEPSEEK_API_KEY=sua_chave_deepseek_aqui
-DEEPSEEK_MODEL=deepseek-chat
-DEEPSEEK_BASE_URL=https://api.deepseek.com
-
-# HuggingFace — obtenha em https://huggingface.co/settings/tokens
-HF_TOKEN=seu_token_huggingface_aqui
-
-# Neo4j — não alterar se usar Docker Compose
-NEO4J_URI=bolt://neo4j:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=synapse123
-
-# Qdrant — não alterar se usar Docker Compose
-QDRANT_URL=http://qdrant:6333
-QDRANT_COLLECTION=articles
-
-# Servidor
-PORT=5000
-DEBUG=false
-```
-
-> **Atenção:** As variáveis de banco de dados (`DATABASE_URL`, `NEO4J_*`, `QDRANT_*`) já estão pré-configuradas para funcionar com o Docker Compose. Só altere se subir os bancos manualmente.
-
-### 3. Suba os serviços
-
-```bash
-docker-compose up -d
-```
-
-A primeira execução pode demorar alguns minutos para baixar as imagens e construir os containers.
-
-Acompanhe os logs:
-
-```bash
-docker-compose logs -f
-```
-
-### 4. Acesse a aplicação
-
-| Serviço | URL |
-|---------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:5000 |
-| Swagger (docs da API) | http://localhost:5000/docs |
-| Neo4j Browser | http://localhost:7474 |
-| Qdrant Dashboard | http://localhost:6333/dashboard |
-
-Crie uma conta diretamente pela interface do frontend.
-
-## Dados de Teste
-
-O repositório inclui um seed com os dados utilizados nos experimentos do TCC em `seeds/seed_avaliador.sql.zip`. Ele contém o usuário **Avaliador PA1**, seus 10 projetos de revisão sistemática e ~15.300 artigos importados.
-
-### Credenciais do usuário de teste
-
-| Campo | Valor |
-|-------|-------|
-| Email | avaliador.pa1@gmail.com |
-| Senha | synapse123 |
-
-### Como carregar o seed
-
-Após subir os serviços com `docker-compose up -d`, execute:
-
-**Linux/Mac:**
-```bash
-unzip seeds/seed_avaliador.sql.zip -d seeds/
-docker exec -i synapse-postgres psql -U synapse -d synapse < seeds/seed_avaliador.sql
-```
-
-**Windows (PowerShell):**
 ```powershell
-Expand-Archive seeds/seed_avaliador.sql.zip -DestinationPath seeds/
-Get-Content seeds/seed_avaliador.sql | docker exec -i synapse-postgres psql -U synapse -d synapse
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
 ```
 
-> O seed usa `ON CONFLICT DO NOTHING`, então pode ser aplicado em um banco que já tenha outros dados sem conflito.
+Configure o mesmo Google Client ID em `GOOGLE_CLIENT_ID`, no backend, e `VITE_GOOGLE_CLIENT_ID`, no frontend. No Google Cloud, autorize as origens locais usadas no desenvolvimento, normalmente `http://localhost:3000` e `http://localhost:5173`.
 
-## Estrutura do Projeto
+Gere segredos próprios para a sessão e para o cofre de credenciais:
 
-```
-synapse/
-├── backend/
-│   ├── app/
-│   │   ├── main.py           # Ponto de entrada FastAPI
-│   │   ├── config.py         # Configurações via pydantic-settings
-│   │   ├── database.py       # Conexão com PostgreSQL
-│   │   ├── models/           # Modelos SQLAlchemy (User, Project, Article)
-│   │   ├── routers/          # Rotas da API (auth, projetos, artigos, AI)
-│   │   ├── schemas/          # Schemas Pydantic de request/response
-│   │   └── services/         # Lógica de negócio (AI, Neo4j, Qdrant, RAG)
-│   ├── init_qdrant.py        # Script de inicialização da coleção Qdrant
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── features/         # Módulos por funcionalidade (auth, articles, projects, ai…)
-│   │   ├── components/       # Componentes reutilizáveis
-│   │   ├── pages/            # Páginas da aplicação
-│   │   ├── hooks/            # Custom hooks React
-│   │   └── services/         # Chamadas à API do backend
-│   ├── package.json
-│   ├── vite.config.js
-│   └── Dockerfile.dev
-└── docker-compose.yml
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-## Parar os serviços
+Use os valores em `SESSION_SECRET` e `CREDENTIAL_ENCRYPTION_KEY`, respectivamente. Consulte [o checklist de produção](docs/deployment/production-checklist.md) para a configuração completa.
 
-```bash
-# Parar sem remover os volumes (dados preservados)
-docker-compose down
+## Executar com Docker
 
-# Parar e remover todos os dados
-docker-compose down -v
+```powershell
+docker compose up -d --build
 ```
 
-## Desenvolvimento local (sem Docker)
+| Serviço | URL local |
+|---|---|
+| Frontend | http://localhost:3000 |
+| API | http://localhost:5000 |
+| Swagger | http://localhost:5000/docs |
+| Neo4j | http://localhost:7474 |
+| Qdrant | http://localhost:6333/dashboard |
 
-### Backend
+Qualquer conta Google válida pode entrar. Se o e-mail já existir na base legada, o primeiro login Google vincula essa conta e preserva projetos e artigos.
 
-```bash
+## Desenvolvimento e validação
+
+```powershell
+# Backend
 cd backend
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
+..\.venv\Scripts\python.exe -m pytest
 
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
+# Frontend
+cd ..\frontend
+npm run lint
+npm run test:ci
+npm run build
+npm run test:e2e
 ```
 
-> Os bancos de dados (PostgreSQL, Neo4j, Qdrant) ainda precisam estar rodando. Você pode subir apenas os bancos via Docker: `docker-compose up -d postgres neo4j qdrant qdrant-init`
+O E2E local usa uma sessão de teste gerada pelo backend para validar as áreas autenticadas sem criar um atalho de autenticação na aplicação. O login Google real precisa de um Client ID válido.
 
-### Frontend
+## Produção
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+O domínio planejado é `https://synapse.labit.dev.br`. Antes de liberar tráfego, ainda é necessário configurar DNS, TLS e o OAuth Client no Google Cloud. Siga:
 
-O frontend ficará disponível em http://localhost:5173 (porta padrão do Vite em modo dev).
-
+- [Checklist de produção](docs/deployment/production-checklist.md)
+- [Auditoria Playwright e UX](docs/audits/2026-10-06-playwright-product-audit.md)
+- [Relatório do backup e restauração](docs/audits/2026-10-05-backup-restore-report.md)
+- [Procedimento de backup](docs/deployment/data-backup.md)
 

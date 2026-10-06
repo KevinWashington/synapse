@@ -9,6 +9,7 @@ def test_deepseek_key_is_not_required_at_startup():
     settings = Settings(_env_file=None, APP_ENV="development")
 
     settings.validate_runtime()
+    assert not hasattr(settings, "DEEPSEEK_API_KEY")
 
 
 def test_production_requires_google_session_and_encryption_settings():
