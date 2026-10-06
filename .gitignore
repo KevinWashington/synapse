@@ -29,3 +29,10 @@ dist-ssr
 *.sln
 *.sw?
 *.pyc
+
+# Local database and service backups
+backups/
+*.dump
+*.snapshot.tar
+*.backup-manifest.json
+*.restore-report.json
