@@ -19,13 +19,14 @@ function GoogleSignInButton({ onCredential, disabled = false }) {
       client_id: clientId,
       callback: ({ credential }) => credential && onCredential(credential),
     });
+    const availableWidth = containerRef.current.clientWidth || 360;
     window.google.accounts.id.renderButton(containerRef.current, {
       type: "standard",
       theme: "outline",
       size: "large",
       text: "continue_with",
       shape: "rectangular",
-      width: 360,
+      width: Math.min(400, availableWidth),
     });
     setState("ready");
   }, [clientId, onCredential]);
@@ -63,10 +64,10 @@ function GoogleSignInButton({ onCredential, disabled = false }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="w-full max-w-[400px] space-y-3">
       <div
         ref={containerRef}
-        className={disabled ? "pointer-events-none opacity-60" : "flex min-h-11 justify-center"}
+        className={disabled ? "pointer-events-none flex min-h-11 w-full justify-center opacity-60" : "flex min-h-11 w-full justify-center"}
         aria-busy={state === "loading"}
       />
       {state === "loading" ? <p className="text-center text-sm text-muted-foreground">Carregando login seguro...</p> : null}

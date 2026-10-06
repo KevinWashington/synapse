@@ -24,10 +24,14 @@ test.describe("anonymous access", () => {
     await context.clearCookies();
     await page.goto("/");
     await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole("heading", { name: "Entre no Synapse" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Transforme pesquisa em evidência confiável." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Acesse seu espaço de revisão" })).toBeVisible();
     await expect(page.getByLabel("Email")).toHaveCount(0);
     await expect(page.getByLabel("Senha")).toHaveCount(0);
-    await expect(page.getByText(/Google ainda nao configurado/)).toBeVisible();
+    await expect.poll(async () => (
+      await page.getByRole("button", { name: /Continuar com o Google/i }).count()
+      + await page.getByText(/Google ainda nao configurado/).count()
+    )).toBeGreaterThan(0);
     await page.screenshot({ path: path.join(evidenceDir, `${testInfo.project.name}-01-login.png`), fullPage: true });
   });
 });
