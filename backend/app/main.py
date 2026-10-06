@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.core.csrf import require_csrf
 from app.database import assert_database_revision, db_health_check, init_db, engine
-from app.routers import auth, projects, articles, ai, stats
+from app.routers import auth, projects, articles, ai, settings as settings_router, stats
 from app.core.dependencies import get_mcp_host, get_graph_mcp_service, get_sql_mcp_service
 from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
 
@@ -90,6 +90,7 @@ app.include_router(projects.router, prefix="/api/projetos", tags=["Projetos"])
 app.include_router(articles.router, prefix="/api/projetos", tags=["Artigos"])
 app.include_router(ai.router, prefix="/api", tags=["IA"])
 app.include_router(stats.router, prefix="/api", tags=["Estatísticas"])
+app.include_router(settings_router.router, prefix="/api/settings", tags=["Configurações"])
 
 
 @app.get("/")
