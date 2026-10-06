@@ -193,7 +193,7 @@ def test_database_revision_mismatch_is_reported():
 
 
 def test_migration_runner_stamps_compatible_legacy_schema():
-    command.upgrade(_config(), "head")
+    command.upgrade(_config(), "0001_existing_schema")
 
     async def make_schema_legacy() -> None:
         engine = create_async_engine(TEST_DATABASE_URL)
@@ -224,7 +224,7 @@ def test_migration_runner_stamps_compatible_legacy_schema():
         finally:
             await engine.dispose()
 
-    assert asyncio.run(preserved_state()) == ("0001_existing_schema", 1)
+    assert asyncio.run(preserved_state()) == ("0002_google_identity_credentials", 1)
 
 
 def test_migration_runner_rejects_partial_legacy_schema():

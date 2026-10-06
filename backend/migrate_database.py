@@ -17,6 +17,15 @@ from app.models.user import User  # noqa: F401
 
 BASELINE_REVISION = "0001_existing_schema"
 BACKEND_ROOT = Path(__file__).resolve().parent
+POST_BASELINE_COLUMNS = {
+    "users": {
+        "googleSub",
+        "deepseekKeyCiphertext",
+        "deepseekKeyVersion",
+        "deepseekKeyLastFour",
+        "deepseekKeyUpdatedAt",
+    }
+}
 
 
 def _alembic_config(database_url: str) -> Config:
@@ -33,7 +42,10 @@ def _inspect_schema(sync_connection) -> tuple[str, list[str]]:
         return "versioned", []
 
     expected = {
-        table.name: {column.name for column in table.columns}
+        table.name: (
+            {column.name for column in table.columns}
+            - POST_BASELINE_COLUMNS.get(table.name, set())
+        )
         for table in Base.metadata.sorted_tables
     }
     present_managed_tables = existing_tables.intersection(expected)
