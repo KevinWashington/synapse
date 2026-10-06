@@ -1,46 +1,35 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from functools import lru_cache
 
 from app.database import get_db
-from app.core.security import decode_token
+from app.config import settings
+from app.core.security import decode_session_token
 from app.models.user import User
 from app.services.mcp_host_service import MCPHostService
 from app.services.neo4j_service import Neo4jService, get_neo4j_service
 from app.services.postgres_mcp_service import PostgresMCPService, get_postgres_mcp_service
 
 
-security = HTTPBearer()
-
-
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """Dependency to get the current authenticated user."""
-    token = credentials.credentials
-    payload = decode_token(token)
+    token = request.cookies.get(settings.SESSION_COOKIE_NAME)
+    payload = decode_session_token(token) if token else None
     
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "error": "Token inválido",
-                "message": "Token malformado ou expirado"
+                "code": "SESSION_INVALID",
+                "message": "Sessão ausente, inválida ou expirada."
             }
         )
     
-    userId = payload.get("userId")
-    if userId is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "Token inválido",
-                "message": "Token não contém ID do usuário"
-            }
-        )
+    userId = int(payload["sub"])
     
     result = await db.execute(select(User).where(User.id == userId))
     user = result.scalar_one_or_none()
@@ -49,8 +38,8 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "error": "Token inválido",
-                "message": "Usuário não encontrado"
+                "code": "SESSION_INVALID",
+                "message": "Usuário da sessão não foi encontrado."
             }
         )
     
@@ -58,8 +47,8 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "error": "Conta desativada",
-                "message": "Sua conta foi desativada"
+                "code": "ACCOUNT_DISABLED",
+                "message": "Sua conta foi desativada."
             }
         )
     
