@@ -39,6 +39,15 @@ class User(Base):
     # Relationships
     projects: Mapped[list["Project"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
     articles: Mapped[list["Article"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    projectMemberships: Mapped[list["ProjectMember"]] = relationship(
+        foreign_keys="ProjectMember.userId"
+    )
+    reviewAssignments: Mapped[list["ReviewAssignment"]] = relationship(
+        foreign_keys="ReviewAssignment.reviewerUserId"
+    )
+    projectNotifications: Mapped[list["ProjectNotification"]] = relationship(
+        foreign_keys="ProjectNotification.recipientUserId", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User {self.email}>"

@@ -91,9 +91,9 @@ class Article(Base):
     decisionUpdatedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     
     # AI Extracted Metadata (for graph relationships)
-    aiMethodology: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    aiDatabase: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    aiDomain: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    aiMethodology: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    aiDatabase: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    aiDomain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     aiKeywords: Mapped[list[str] | None] = mapped_column(ARRAY(String(50)), nullable=True)
     
     # Foreign keys
@@ -111,6 +111,15 @@ class Article(Base):
     # Relationships
     project: Mapped["Project"] = relationship(back_populates="articles")
     owner: Mapped["User"] = relationship(back_populates="articles")
+    reviewAssignments: Mapped[list["ReviewAssignment"]] = relationship(
+        foreign_keys="ReviewAssignment.articleId", cascade="all, delete-orphan"
+    )
+    reviewDecisions: Mapped[list["ReviewDecision"]] = relationship(
+        foreign_keys="ReviewDecision.articleId", cascade="all, delete-orphan"
+    )
+    reviewConflicts: Mapped[list["ReviewConflict"]] = relationship(
+        foreign_keys="ReviewConflict.articleId", cascade="all, delete-orphan"
+    )
     
     # Self-referential many-to-many for related articles
     relatedArticles: Mapped[list["Article"]] = relationship(

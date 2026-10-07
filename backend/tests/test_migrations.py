@@ -13,6 +13,15 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.database import Base, assert_database_revision
 from app.models.article import Article  # noqa: F401
+from app.models.collaboration import (  # noqa: F401
+    ProjectAuditEvent,
+    ProjectInvitation,
+    ProjectMember,
+    ProjectNotification,
+    ReviewAssignment,
+    ReviewConflict,
+    ReviewDecision,
+)
 from app.models.project import Project  # noqa: F401
 from app.models.user import User  # noqa: F401
 
@@ -82,7 +91,18 @@ async def _schema_snapshot() -> tuple[set[str], dict[str, set[str]]]:
                             column["name"]
                             for column in inspect(sync_connection).get_columns(table)
                         }
-                        for table in ("users", "projects", "articles")
+                        for table in (
+                            "users",
+                            "projects",
+                            "articles",
+                            "project_members",
+                            "project_invitations",
+                            "review_assignments",
+                            "review_decisions",
+                            "review_conflicts",
+                            "project_notifications",
+                            "project_audit_events",
+                        )
                     },
                 )
             )
@@ -101,6 +121,13 @@ def test_empty_database_upgrades_to_baseline_schema():
         "projects",
         "articles",
         "articleRelationships",
+        "project_members",
+        "project_invitations",
+        "review_assignments",
+        "review_decisions",
+        "review_conflicts",
+        "project_notifications",
+        "project_audit_events",
     } <= tables
     assert {"id", "email", "passwordHash", "isActive"} <= columns["users"]
     assert {
@@ -118,6 +145,46 @@ def test_empty_database_upgrades_to_baseline_schema():
         "projectId",
         "ownerId",
     } <= columns["articles"]
+    assert {"projectId", "userId", "role", "status", "participatesInReview"} <= columns["project_members"]
+    assert {"projectId", "emailNormalized", "role", "status", "expiresAt"} <= columns["project_invitations"]
+    assert {"articleId", "phase", "reviewerUserId", "slot", "status"} <= columns["review_assignments"]
+    assert {"assignmentId", "decision", "status", "submittedAt"} <= columns["review_decisions"]
+    assert {"articleId", "phase", "status", "resolvedDecision"} <= columns["review_conflicts"]
+    assert {"recipientUserId", "type", "readAt", "payload"} <= columns["project_notifications"]
+    assert {"actorUserId", "action", "entityType", "reason", "payload"} <= columns["project_audit_events"]
+
+
+def test_collaboration_constraints_and_partial_indexes():
+    command.upgrade(_config(), "head")
+
+    async def inspect_constraints():
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with engine.connect() as connection:
+                return await connection.run_sync(
+                    lambda sync_connection: {
+                        "member_unique": inspect(sync_connection).get_unique_constraints("project_members"),
+                        "assignment_checks": inspect(sync_connection).get_check_constraints("review_assignments"),
+                        "invitation_indexes": inspect(sync_connection).get_indexes("project_invitations"),
+                        "assignment_indexes": inspect(sync_connection).get_indexes("review_assignments"),
+                        "decision_indexes": inspect(sync_connection).get_indexes("review_decisions"),
+                        "conflict_indexes": inspect(sync_connection).get_indexes("review_conflicts"),
+                    }
+                )
+        finally:
+            await engine.dispose()
+
+    state = asyncio.run(inspect_constraints())
+    assert any(set(item["column_names"]) == {"projectId", "userId"} for item in state["member_unique"])
+    assert {item["name"] for item in state["assignment_checks"]} >= {
+        "ck_review_assignments_phase",
+        "ck_review_assignments_slot",
+        "ck_review_assignments_status",
+    }
+    assert any(item["name"] == "uq_project_invitations_pending" and item["unique"] for item in state["invitation_indexes"])
+    assert any(item["name"] == "uq_review_assignments_active_slot" and item["unique"] for item in state["assignment_indexes"])
+    assert any(item["name"] == "uq_review_decisions_current" and item["unique"] for item in state["decision_indexes"])
+    assert any(item["name"] == "uq_review_conflicts_open" and item["unique"] for item in state["conflict_indexes"])
 
 
 def test_baseline_matches_application_model_metadata():
@@ -224,7 +291,7 @@ def test_migration_runner_stamps_compatible_legacy_schema():
         finally:
             await engine.dispose()
 
-    assert asyncio.run(preserved_state()) == ("0002_google_identity_credentials", 1)
+    assert asyncio.run(preserved_state()) == ("0003_project_collaboration", 1)
 
 
 def test_migration_runner_rejects_partial_legacy_schema():

@@ -11,6 +11,15 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.config import settings
 from app.database import Base
 from app.models.article import Article  # noqa: F401
+from app.models.collaboration import (  # noqa: F401
+    ProjectAuditEvent,
+    ProjectInvitation,
+    ProjectMember,
+    ProjectNotification,
+    ReviewAssignment,
+    ReviewConflict,
+    ReviewDecision,
+)
 from app.models.project import Project  # noqa: F401
 from app.models.user import User  # noqa: F401
 
@@ -24,7 +33,16 @@ POST_BASELINE_COLUMNS = {
         "deepseekKeyVersion",
         "deepseekKeyLastFour",
         "deepseekKeyUpdatedAt",
-    }
+    },
+}
+POST_BASELINE_TABLES = {
+    "project_members",
+    "project_invitations",
+    "review_assignments",
+    "review_decisions",
+    "review_conflicts",
+    "project_notifications",
+    "project_audit_events",
 }
 
 
@@ -47,6 +65,7 @@ def _inspect_schema(sync_connection) -> tuple[str, list[str]]:
             - POST_BASELINE_COLUMNS.get(table.name, set())
         )
         for table in Base.metadata.sorted_tables
+        if table.name not in POST_BASELINE_TABLES
     }
     present_managed_tables = existing_tables.intersection(expected)
     if not present_managed_tables:

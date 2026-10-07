@@ -46,6 +46,24 @@ class Project(Base):
     # Relationships
     owner: Mapped["User"] = relationship(back_populates="projects")
     articles: Mapped[list["Article"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    members: Mapped[list["ProjectMember"]] = relationship(
+        foreign_keys="ProjectMember.projectId", cascade="all, delete-orphan"
+    )
+    invitations: Mapped[list["ProjectInvitation"]] = relationship(
+        foreign_keys="ProjectInvitation.projectId", cascade="all, delete-orphan"
+    )
+    reviewAssignments: Mapped[list["ReviewAssignment"]] = relationship(
+        foreign_keys="ReviewAssignment.projectId", cascade="all, delete-orphan"
+    )
+    reviewConflicts: Mapped[list["ReviewConflict"]] = relationship(
+        foreign_keys="ReviewConflict.projectId", cascade="all, delete-orphan"
+    )
+    notifications: Mapped[list["ProjectNotification"]] = relationship(
+        foreign_keys="ProjectNotification.projectId", cascade="all, delete-orphan"
+    )
+    auditEvents: Mapped[list["ProjectAuditEvent"]] = relationship(
+        foreign_keys="ProjectAuditEvent.projectId", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Project {self.title}>"

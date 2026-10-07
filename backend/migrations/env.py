@@ -8,6 +8,15 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.config import settings
 from app.database import Base
 from app.models.article import Article  # noqa: F401
+from app.models.collaboration import (  # noqa: F401
+    ProjectAuditEvent,
+    ProjectInvitation,
+    ProjectMember,
+    ProjectNotification,
+    ReviewAssignment,
+    ReviewConflict,
+    ReviewDecision,
+)
 from app.models.project import Project  # noqa: F401
 from app.models.user import User  # noqa: F401
 
