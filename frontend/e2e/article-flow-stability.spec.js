@@ -196,6 +196,13 @@ test.describe("stable article workflow", () => {
       await openArticleFromRow(page, primaryTitle);
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
       const eligibilityDialog = page.getByRole("dialog", { name: "Decisão de elegibilidade" });
+      await expect(eligibilityDialog.getByText("Checklist assistido", { exact: true })).toBeVisible();
+      await expect(eligibilityDialog.getByText("RQs respondidas", { exact: true })).toBeVisible();
+      await eligibilityDialog.getByRole("button", { name: "Texto completo indisponível" }).click();
+      await expect(eligibilityDialog.getByText("Checklist assistido", { exact: true })).toHaveCount(0);
+      await expect(eligibilityDialog.getByText("RQs respondidas", { exact: true })).toHaveCount(0);
+      await expect(eligibilityDialog.getByRole("textbox", { name: "Motivo da indisponibilidade" })).toBeVisible();
+      await eligibilityDialog.getByRole("button", { name: "Incluir no corpus" }).click();
       await eligibilityDialog.getByRole("button", { name: "Sim" }).click();
       await eligibilityDialog.getByRole("button", { name: "RQ 1" }).click();
       await eligibilityDialog.getByRole("button", { name: "Salvar decisão" }).click();

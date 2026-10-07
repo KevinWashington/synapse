@@ -95,6 +95,16 @@ test.describe("authenticated product flow", () => {
     await expect(page.getByRole("heading", { name: "Projetos", exact: true })).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Ordenar projetos" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Lixeira" })).toHaveCount(0);
+    if (testInfo.project.name === "mobile-chromium") {
+      await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
+    }
+    const homeLink = page.getByRole("link", { name: "Início", exact: true });
+    await expect(homeLink).toBeVisible();
+    await homeLink.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText("Total de Projetos")).toBeVisible();
+    await page.goto("/projetos");
+    await settle(page);
     const auditProject = testInfo.project.name === "mobile-chromium"
       ? page.locator("article").filter({ has: page.getByRole("heading", { name: project.title, exact: true }) }).getByRole("button", { name: "Abrir projeto" })
       : page.getByTestId("project-open").filter({ hasText: project.title });
