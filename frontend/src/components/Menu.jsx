@@ -6,7 +6,6 @@ import {
   Menu as MenuIcon,
   Plus,
   Sparkles,
-  Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -31,11 +30,6 @@ const NAV_ITEMS = [
     path: "/artigos",
     label: "Biblioteca",
     icon: BookOpen,
-  },
-  {
-    path: "/artigos?status=excluido",
-    label: "Lixeira",
-    icon: Trash2,
   },
 ];
 
@@ -65,7 +59,7 @@ function NavItem({ item, onItemClick }) {
       to={item.path}
       onClick={onItemClick}
       className={cn(
-        "flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+        "flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
         active
           ? "bg-[#eeefff] text-[#0f1734]"
           : "text-[#56627f] hover:bg-[#f5f7fc] hover:text-[#0f1734]"
@@ -87,7 +81,7 @@ function ProjectNavItem({ project, index, onItemClick }) {
       to={`/projetos/${project.id}`}
       onClick={onItemClick}
       className={cn(
-        "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors",
+        "group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
         active ? "bg-[#f5f6ff]" : "hover:bg-[#f7f8fc]"
       )}
     >
@@ -140,7 +134,7 @@ function SidebarContent({ onItemClick }) {
         <Link
           to="/projetos"
           onClick={onItemClick}
-          className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.22)]"
+          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
           aria-label="Synapse"
         >
           <FileText className="h-5 w-5" />
@@ -164,7 +158,7 @@ function SidebarContent({ onItemClick }) {
               onItemClick?.();
               navigate("/projetos");
             }}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-[#edf0f7] bg-white text-[#253252] transition-colors hover:bg-[#f5f7fc]"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[#edf0f7] bg-white text-[#253252] transition-colors hover:bg-[#f5f7fc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
             aria-label="Novo projeto"
           >
             <Plus className="h-4 w-4" />
@@ -210,7 +204,7 @@ function Menu() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[240px] border-0 bg-[#fbfcff] p-0">
             <SheetHeader className="sr-only">
-              <SheetTitle>Menu de navegacao</SheetTitle>
+              <SheetTitle>Menu de navegação</SheetTitle>
             </SheetHeader>
             <SidebarContent onItemClick={() => setIsMobileOpen(false)} />
           </SheetContent>
