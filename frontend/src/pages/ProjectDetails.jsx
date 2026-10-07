@@ -27,6 +27,15 @@ const SynthesisReportPanel = lazy(() =>
   import("@features/articles/components/SynthesisReportPanel")
 );
 
+const PROJECT_TAB_LABELS = {
+  overview: "Visão Geral",
+  planejamento: "Planejamento",
+  artigos: "Artigos",
+  fluxo: "Fluxo",
+  sintese: "Síntese",
+  grafo: "Gráficos",
+};
+
 function ProjectTabLoader() {
   return <LoadingState message="Carregando conteúdo..." />;
 }
@@ -59,21 +68,14 @@ function ProjectDetails() {
 
     updateTitle({
       title: "",
-      badge: (
-        <div className="flex min-w-0 items-center gap-2 text-xs font-medium">
-          <button
-            type="button"
-            onClick={() => navigate("/projetos")}
-            className="text-[#6259ff] hover:text-[#5148ee]"
-          >
-            Projetos
-          </button>
-          <span className="text-[#a4adc2]">/</span>
-          <span className="truncate text-[#667391]">{project.title}</span>
-        </div>
-      ),
+      badge: null,
+      breadcrumbs: [
+        { label: "Projetos", href: "/projetos" },
+        { label: project.title, href: `/projetos/${project.id}` },
+        { label: PROJECT_TAB_LABELS[activeTab] || "Visão Geral" },
+      ],
     });
-  }, [navigate, project?.title, updateTitle]);
+  }, [activeTab, project?.id, project?.title, updateTitle]);
 
   const [synthesisData, setSynthesisData] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);

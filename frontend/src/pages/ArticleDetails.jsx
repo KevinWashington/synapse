@@ -3,7 +3,6 @@ import {
   AlertTriangleIcon,
   ArrowLeftIcon,
   CheckCircle2Icon,
-  ChevronDownIcon,
   ExternalLinkIcon,
   FileIcon,
   FileTextIcon,
@@ -18,13 +17,12 @@ import { Button } from "@/components/ui/Button";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { LoadingState } from "@/components/layout";
+import { AppHeader, LoadingState } from "@/components/layout";
 import { useArticleDetailsPage } from "@/features/articles";
 import ArticleAIBanner from "@/features/articles/components/ArticleAIBanner";
 import EligibilityDecisionDialog from "@/features/articles/components/EligibilityDecisionDialog";
 import ScreeningDecisionDialog from "@/features/articles/components/ScreeningDecisionDialog";
 import UploadPDFModal from "@/features/articles/components/UploadPDFModal";
-import { usePageTitle } from "@hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 
 const ArticleWorkspacePanel = lazy(() =>
@@ -217,29 +215,14 @@ function PrismaExtractionWorkspace({
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-col">
-        <header className="flex h-[72px] shrink-0 items-center justify-between px-5 md:px-10">
-          <div className="flex min-w-0 items-center gap-3 text-sm font-medium">
-            <button type="button" onClick={() => navigate("/projetos")} className="text-[#6259ff] hover:text-[#5148ee]">
-              Projetos
-            </button>
-            <ChevronDownIcon className="h-3.5 w-3.5 -rotate-90 text-[#9aa4b8]" />
-            <button
-              type="button"
-              onClick={() => navigate(`/projetos/${projectId}`)}
-              className="truncate text-[#667391] hover:text-[#182344]"
-            >
-              {project?.title || "Projeto"}
-            </button>
-            <ChevronDownIcon className="h-3.5 w-3.5 -rotate-90 text-[#9aa4b8]" />
-            <span className="truncate text-[#667391]">Extracao de dados</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6259ff] text-xs font-semibold text-white">
-              JS
-            </div>
-          </div>
-        </header>
+        <AppHeader
+          compact
+          breadcrumbs={[
+            { label: "Projetos", href: "/projetos" },
+            { label: project?.title || "Projeto", href: `/projetos/${projectId}` },
+            { label: "Extração de dados" },
+          ]}
+        />
 
         <main className="flex min-h-0 flex-1 flex-col px-5 pb-0 md:px-10">
           <div className="mb-5 flex shrink-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -556,29 +539,14 @@ function PrismaArticleReviewWorkspace({
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-col">
-        <header className="flex h-[72px] shrink-0 items-center justify-between px-5 md:px-10">
-          <div className="flex min-w-0 items-center gap-3 text-sm font-medium">
-            <button type="button" onClick={() => navigate("/projetos")} className="text-[#6259ff] hover:text-[#5148ee]">
-              Projetos
-            </button>
-            <ChevronDownIcon className="h-3.5 w-3.5 -rotate-90 text-[#9aa4b8]" />
-            <button
-              type="button"
-              onClick={() => navigate(`/projetos/${projectId}`)}
-              className="truncate text-[#667391] hover:text-[#182344]"
-            >
-              {project?.title || "Projeto"}
-            </button>
-            <ChevronDownIcon className="h-3.5 w-3.5 -rotate-90 text-[#9aa4b8]" />
-            <span className="truncate text-[#667391]">{stage.title}</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6259ff] text-xs font-semibold text-white">
-              JS
-            </div>
-          </div>
-        </header>
+        <AppHeader
+          compact
+          breadcrumbs={[
+            { label: "Projetos", href: "/projetos" },
+            { label: project?.title || "Projeto", href: `/projetos/${projectId}` },
+            { label: stage.title },
+          ]}
+        />
 
         <main className="flex min-h-0 flex-1 flex-col px-5 pb-0 md:px-10">
           <div className="mb-5 flex shrink-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -727,7 +695,6 @@ function ArticleDetails() {
     rightTab,
     setRightTab,
   } = useArticleDetailsPage();
-  const updateTitle = usePageTitle({ title: "", backUrl });
   const [screeningDialogOpen, setScreeningDialogOpen] = useState(false);
   const [screeningInitialDecision, setScreeningInitialDecision] = useState("included");
   const [eligibilityDialogOpen, setEligibilityDialogOpen] = useState(false);
@@ -735,43 +702,6 @@ function ArticleDetails() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
-
-  useEffect(() => {
-    if (!article?.title) {
-      return;
-    }
-    updateTitle({
-      title: rightTab === "extracao" && article.reviewOutcome === "included" ? "" : article.title,
-      badge: (
-        rightTab === "extracao" && article.reviewOutcome === "included" ? (
-          <div className="flex min-w-0 items-center gap-2 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => navigate("/projetos")}
-              className="text-[#6259ff] hover:text-[#5148ee]"
-            >
-              Projetos
-            </button>
-            <span className="text-[#a4adc2]">/</span>
-            <button
-              type="button"
-              onClick={() => navigate(`/projetos/${projectId}`)}
-              className="truncate text-[#667391] hover:text-[#182344]"
-            >
-              {project?.title || "Projeto"}
-            </button>
-            <span className="text-[#a4adc2]">/</span>
-            <span className="text-[#667391]">Extracao de dados</span>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={article.currentPhase} />
-            <StatusBadge status={article.reviewOutcome} />
-          </div>
-        )
-      ),
-    });
-  }, [article, navigate, project?.title, projectId, rightTab, updateTitle]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

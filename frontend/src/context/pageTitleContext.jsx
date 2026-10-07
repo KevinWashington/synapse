@@ -16,6 +16,7 @@ export function PageTitleProvider({ children }) {
     backUrl: null,
     actions: null,
     badge: null,
+    breadcrumbs: [],
   });
 
   return (
@@ -29,21 +30,31 @@ export function PageTitleProvider({ children }) {
  * Hook for pages to set the header title, back button, badge, and actions.
  * Clears on unmount.
  */
-export function usePageTitle({ title, backUrl, actions, badge } = {}) {
+export function usePageTitle({ title, backUrl, actions, badge, breadcrumbs } = {}) {
   const ctx = useContext(PageTitleContext);
   if (!ctx) throw new Error("usePageTitle must be used within PageTitleProvider");
 
   const { setPageTitle } = ctx;
-  const latestDecoratorsRef = useRef({ actions, badge });
+  const latestDecoratorsRef = useRef({ actions, badge, breadcrumbs });
 
   useEffect(() => {
-    latestDecoratorsRef.current = { actions, badge };
-  }, [actions, badge]);
+    latestDecoratorsRef.current = { actions, badge, breadcrumbs };
+  }, [actions, badge, breadcrumbs]);
 
   useEffect(() => {
-    const { actions: currentActions, badge: currentBadge } = latestDecoratorsRef.current;
-    setPageTitle({ title, backUrl, actions: currentActions, badge: currentBadge });
-    return () => setPageTitle({ title: "", backUrl: null, actions: null, badge: null });
+    const {
+      actions: currentActions,
+      badge: currentBadge,
+      breadcrumbs: currentBreadcrumbs,
+    } = latestDecoratorsRef.current;
+    setPageTitle({
+      title,
+      backUrl,
+      actions: currentActions,
+      badge: currentBadge,
+      breadcrumbs: currentBreadcrumbs || [],
+    });
+    return () => setPageTitle({ title: "", backUrl: null, actions: null, badge: null, breadcrumbs: [] });
   }, [title, backUrl, setPageTitle]);
 
   // Allow imperative updates for actions/badge that change frequently
