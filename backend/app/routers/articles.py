@@ -24,6 +24,12 @@ from app.models.project import Project
 from app.models.user import User
 from app.services.ai_service import AIService
 from app.services.project_access_service import get_project_article, resolve_project_access
+from app.services.review_decision_service import (
+    has_active_assignments,
+    list_visible_decisions,
+    require_assigned_write_if_managed,
+    submit_review_decision,
+)
 from app.schemas.article import (
     ArticleCreate,
     ArticleEvidenceUpdate,
@@ -1591,6 +1597,29 @@ async def screening_decision(
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
 
+    if await has_active_assignments(db, article_id=articleId, phase="screening"):
+        access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+        result = await submit_review_decision(
+            db,
+            access=access,
+            article_id=articleId,
+            phase="screening",
+            payload=data,
+            reviewer_user_id=current_user.id,
+        )
+        if result.state == "consolidated":
+            _set_legacy_state_from_workflow(result.article)
+        await db.commit()
+        await db.refresh(result.article)
+        if result.state == "consolidated":
+            await _sync_article_indexes(result.article, db)
+        response = _build_article_response(result.article)
+        response.reviewState = result.state
+        response.reviewDecisions = await list_visible_decisions(
+            db, article_id=articleId, phase="screening", current_user_id=current_user.id
+        )
+        return response
+
     if article.reviewOutcome != "active":
         article.reviewOutcome = "active"
 
@@ -1768,6 +1797,30 @@ async def eligibility_decision(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
+    if await has_active_assignments(db, article_id=articleId, phase="eligibility"):
+        access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+        result = await submit_review_decision(
+            db,
+            access=access,
+            article_id=articleId,
+            phase="eligibility",
+            payload=data,
+            reviewer_user_id=current_user.id,
+        )
+        if result.state == "consolidated":
+            apply_quality_metrics(result.article, project.qualityAssessmentSchema or [])
+            _set_legacy_state_from_workflow(result.article)
+        await db.commit()
+        await db.refresh(result.article)
+        if result.state == "consolidated":
+            await _sync_article_indexes(result.article, db)
+        response = _build_article_response(result.article)
+        response.reviewState = result.state
+        response.reviewDecisions = await list_visible_decisions(
+            db, article_id=articleId, phase="eligibility", current_user_id=current_user.id
+        )
+        return response
     if article.currentPhase not in {"eligibility", "included"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1831,6 +1884,7 @@ async def update_article_evidence(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
 
     if not _is_included_for_synthesis(article):
         raise HTTPException(
@@ -2012,6 +2066,15 @@ async def update_article_notes(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    managed_phase = "screening" if article.currentPhase in {"identification", "screening"} else "eligibility"
+    if data.decision == "pendente" and await has_active_assignments(
+        db, article_id=articleId, phase=managed_phase
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "ASSIGNED_REVIEW_ACTIVE", "message": "Reabra a revisão pelo fluxo de coordenação."},
+        )
+    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
     article.notas = data.notas
     await db.commit()
     await db.refresh(article)
@@ -2052,6 +2115,7 @@ async def upload_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
     if article.currentPhase != "eligibility":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

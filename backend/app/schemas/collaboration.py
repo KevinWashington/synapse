@@ -123,3 +123,31 @@ class AssignmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ConflictResolutionRequest(BaseModel):
+    decision: Literal["included", "excluded", "full_text_unavailable"]
+    reason: str = Field(..., min_length=1, max_length=2000)
+
+
+class ReopenReviewRequest(BaseModel):
+    phase: Literal["screening", "eligibility"]
+    reason: str = Field(..., min_length=1, max_length=2000)
+
+
+class ConflictResponse(BaseModel):
+    id: int
+    projectId: int
+    articleId: int
+    phase: Literal["screening", "eligibility"]
+    status: str
+    decisionIds: list[int]
+    resolvedDecision: str | None = None
+    resolutionReason: str | None = None
+    resolvedByUserId: int | None = None
+    createdAt: datetime
+    resolvedAt: datetime | None = None
+    decisions: list[dict] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True

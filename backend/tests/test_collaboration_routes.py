@@ -11,6 +11,9 @@ def test_collaboration_routes_are_registered():
         ("/api/projetos/{projectId}/assignments/preview", "POST"),
         ("/api/projetos/{projectId}/assignments/distribute", "POST"),
         ("/api/projetos/{projectId}/assignments/me", "GET"),
+        ("/api/projetos/{projectId}/conflicts", "GET"),
+        ("/api/projetos/{projectId}/conflicts/{conflictId}/resolve", "POST"),
+        ("/api/projetos/{projectId}/artigos/{articleId}/reopen-review", "POST"),
     }
     assert expected <= routes
 

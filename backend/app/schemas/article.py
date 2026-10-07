@@ -299,6 +299,8 @@ class ArticleResponse(BaseModel):
     ownerId: int
     createdAt: datetime
     updatedAt: datetime
+    reviewState: Literal["waiting_for_reviewer", "consolidated", "conflict"] | None = None
+    reviewDecisions: list[dict] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

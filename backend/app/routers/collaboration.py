@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user
 from app.database import get_db
-from app.models.collaboration import ProjectInvitation, ProjectMember, ReviewAssignment
+from app.models.collaboration import ProjectInvitation, ProjectMember, ReviewAssignment, ReviewConflict, ReviewDecision
 from app.models.user import User
 from app.schemas.collaboration import (
     InvitationCreate,
@@ -21,6 +21,9 @@ from app.schemas.collaboration import (
     DistributionPreviewResponse,
     DistributionRequest,
     ReassignmentRequest,
+    ConflictResolutionRequest,
+    ConflictResponse,
+    ReopenReviewRequest,
 )
 from app.services.invitation_service import create_audit_event, invite_project_member
 from app.services.notification_service import (
@@ -39,6 +42,11 @@ from app.services.review_assignment_service import (
     preview_distribution,
     reassign_review,
     mark_reviewer_unavailable,
+)
+from app.services.review_decision_service import (
+    reopen_review as reopen_assigned_review,
+    resolve_conflict,
+    visible_decision_payloads,
 )
 
 
@@ -295,3 +303,36 @@ async def reassign_assignment(projectId: int, assignmentId: int, data: Reassignm
     await db.commit()
     await db.refresh(result)
     return result
+
+
+@router.get("/{projectId}/conflicts", response_model=list[ConflictResponse])
+async def get_conflicts(projectId: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, "resolve_conflicts")
+    result = await db.execute(select(ReviewConflict).where(ReviewConflict.projectId == projectId).order_by(ReviewConflict.createdAt.desc()))
+    conflicts = result.scalars().all()
+    responses = []
+    for conflict in conflicts:
+        decisions_result = await db.execute(select(ReviewDecision).where(ReviewDecision.id.in_(conflict.decisionIds)))
+        decisions = visible_decision_payloads(decisions_result.scalars().all(), current_user_id=current_user.id, complete=True)
+        response = ConflictResponse.model_validate(conflict)
+        response.decisions = decisions
+        responses.append(response)
+    return responses
+
+
+@router.post("/{projectId}/conflicts/{conflictId}/resolve", response_model=ConflictResponse)
+async def resolve_review_conflict(projectId: int, conflictId: int, data: ConflictResolutionRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    conflict = await resolve_conflict(db, access=access, conflict_id=conflictId, decision_value=data.decision, reason=data.reason, resolved_by_user_id=current_user.id)
+    await db.commit()
+    await db.refresh(conflict)
+    return conflict
+
+
+@router.post("/{projectId}/artigos/{articleId}/reopen-review")
+async def reopen_article_review(projectId: int, articleId: int, data: ReopenReviewRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    article = await reopen_assigned_review(db, access=access, article_id=articleId, phase=data.phase, reason=data.reason, actor_user_id=current_user.id)
+    await db.commit()
+    return {"success": True, "articleId": article.id, "phase": data.phase}
