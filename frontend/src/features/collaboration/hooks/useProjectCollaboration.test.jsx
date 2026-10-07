@@ -48,10 +48,10 @@ describe("project collaboration state", () => {
     ["transferOwnership", [{ userId: 4 }], ["members", "access"]],
     ["previewAssignments", [{ phase: "screening" }], []],
     ["distributeAssignments", [{ phase: "screening" }], ["assignments/me", "notifications"]],
-    ["reassignAssignment", [7, { reviewerUserId: 9 }], ["assignments/me", "notifications"]],
+    ["reassignAssignment", [7, { reviewerUserId: 9 }], ["assignments/me"]],
     ["markNotificationRead", [5], ["notifications"]],
     ["markAllNotificationsRead", [], ["notifications"]],
-    ["resolveConflict", [8, { decision: "included", reason: "Evidence" }], ["conflicts", "notifications"]],
+    ["resolveConflict", [8, { decision: "included", reason: "Evidence" }], ["assignments/me", "conflicts", "notifications"]],
     ["reopenReview", [9, { phase: "screening", reason: "Correction" }], ["assignments/me", "conflicts", "notifications"]],
   ])("%s refreshes only affected collections", async (method, args, collections) => {
     const { result } = await mount();
@@ -78,6 +78,38 @@ describe("project collaboration state", () => {
     requests.length = 0;
     await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
     expect(requests).toEqual([]);
+  });
+  it("loads inherited eligibility assignments after included conflict arbitration", async () => {
+    const { result } = await mount();
+    const get = vi.mocked(apiService.get).getMockImplementation();
+    vi.mocked(apiService.get).mockImplementation((url) => url.endsWith("/assignments/me")
+      ? Promise.resolve([{ id: 7 }, { id: 9, phase: "eligibility", status: "pending" }])
+      : get(url));
+    await act(async () => { await result.current.resolveConflict(8, { decision: "included", reason: "Evidence" }); });
+    expect(result.current.assignments).toEqual([{ id: 7 }, { id: 9, phase: "eligibility", status: "pending" }]);
+  });
+  it.each(["response", "error"])("ignores an older notification poll %s after a mark-read refresh", async (completion) => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useProjectCollaboration(project));
+    await act(async () => {});
+    let completePoll;
+    let failPoll;
+    vi.mocked(apiService.get).mockImplementationOnce(() => new Promise((resolve, reject) => {
+      completePoll = resolve;
+      failPoll = reject;
+    }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30000); });
+    expect(result.current.unreadCount).toBe(1);
+    vi.mocked(apiService.get).mockResolvedValueOnce([{ id: 5, readAt: "2026-10-07" }, { id: 6, readAt: "2026-10-07" }]);
+    await act(async () => { await result.current.markNotificationRead(5); });
+    expect(result.current.unreadCount).toBe(0);
+    await act(async () => {
+      if (completion === "response") completePoll([{ id: 5, readAt: null }]);
+      else failPoll(Object.assign(new Error("Stale request failed"), { status: 500 }));
+    });
+    expect(result.current.notifications).toEqual([{ id: 5, readAt: "2026-10-07" }, { id: 6, readAt: "2026-10-07" }]);
+    expect(result.current.unreadCount).toBe(0);
+    expect(result.current.error).toBeNull();
   });
   it("shows the project 404 message and clears inaccessible state", async () => {
     vi.mocked(apiService.get).mockRejectedValue(Object.assign(new Error("Projeto não encontrado."), { status: 404 }));

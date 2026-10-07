@@ -12,10 +12,10 @@ const MUTATIONS = {
   transferOwnership: ["team", "access"],
   previewAssignments: [],
   distributeAssignments: ["assignments", "notifications"],
-  reassignAssignment: ["assignments", "notifications"],
+  reassignAssignment: ["assignments"],
   markNotificationRead: ["notifications"],
   markAllNotificationsRead: ["notifications"],
-  resolveConflict: ["conflicts", "notifications"],
+  resolveConflict: ["assignments", "conflicts", "notifications"],
   reopenReview: ["assignments", "conflicts", "notifications"],
 };
 
@@ -40,6 +40,10 @@ export function useProjectCollaboration(project) {
     if (!session?.active) return;
     if (collection === "conflicts" && !session.capabilities.includes("resolve_conflicts")) return;
     if (collection === "assignments" && !session.capabilities.includes("review_assigned")) return;
+    // Only the most recently started request may update a collection or its error.
+    const generation = (session.generations[collection] ?? 0) + 1;
+    session.generations[collection] = generation;
+    const isCurrent = () => session.active && session.generations[collection] === generation;
     const loaders = {
       team: () => collaborationService.getTeam(session.id),
       assignments: () => collaborationService.getMyAssignments(session.id),
@@ -49,7 +53,7 @@ export function useProjectCollaboration(project) {
     };
     try {
       const response = await loaders[collection]();
-      if (!session.active) return;
+      if (!isCurrent()) return;
       if (collection === "access") session.capabilities = response.capabilities;
       setState((current) => {
         if (collection === "team") return { ...current, members: response.members, invitations: response.invitations };
@@ -62,6 +66,7 @@ export function useProjectCollaboration(project) {
         return { ...current, [collection]: response ?? [] };
       });
     } catch (error) {
+      if (!isCurrent()) return;
       recordError(session, error);
       throw error;
     }
@@ -69,7 +74,7 @@ export function useProjectCollaboration(project) {
 
   useEffect(() => {
     const capabilities = JSON.parse(capabilityKey);
-    const session = { id: projectId, capabilities, active: Boolean(projectId), timer: null };
+    const session = { id: projectId, capabilities, active: Boolean(projectId), timer: null, generations: {} };
     sessionRef.current = session;
     setState({ ...emptyState(), capabilities: projectId ? capabilities : [], loading: Boolean(projectId) });
     if (!projectId) return;
