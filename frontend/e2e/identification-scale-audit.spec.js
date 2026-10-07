@@ -113,6 +113,9 @@ test.describe("identification at scale", () => {
       await expect(page.getByText("Página 2 de 6", { exact: true })).toBeVisible();
 
       await page.getByRole("button", { name: "Enviar todos os únicos para triagem" }).click();
+      const promotionDialog = page.getByRole("dialog", { name: "Enviar todos os únicos?" });
+      await expect(promotionDialog).toBeVisible();
+      await promotionDialog.getByRole("button", { name: "Confirmar envio" }).click();
       await expect(page.getByRole("heading", { name: "Revisar duplicatas" })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText("2 na fila", { exact: true })).toBeVisible();
       await expect(page.getByText("Possíveis duplicatas")).toBeVisible();
@@ -125,10 +128,15 @@ test.describe("identification at scale", () => {
 
       await page.getByRole("radio", { name: "Manter Duplicata de escala na fonte A" }).check();
       await page.getByRole("button", { name: "Confirmar revisão de duplicatas" }).click();
+      const duplicateReviewDialog = page.getByRole("dialog", { name: "Aplicar revisão de duplicatas?" });
+      await expect(duplicateReviewDialog).toBeVisible();
+      await duplicateReviewDialog.getByRole("button", { name: "Aplicar revisão" }).click();
       await expect(page.getByRole("heading", { name: "Revisar duplicatas" })).not.toBeVisible({ timeout: 30_000 });
       await expect(page.getByText("1 na fila", { exact: true })).toBeVisible();
 
       await page.getByRole("button", { name: "Enviar todos os únicos para triagem" }).click();
+      await expect(promotionDialog).toBeVisible();
+      await promotionDialog.getByRole("button", { name: "Confirmar envio" }).click();
       await expect(page.getByText("0 na fila", { exact: true })).toBeVisible({ timeout: 30_000 });
       await page.getByRole("button", { name: /Triagem/ }).first().click();
       await expect(page.getByText("104 na fila", { exact: true })).toBeVisible();

@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import path from "node:path";
 
 const evidenceDir = path.resolve("../docs/audits/playwright-2026-10-06");
+const apiBaseUrl = "http://localhost:5000";
+const csrfToken = "playwright-csrf";
 
 async function authenticate(context) {
   const token = process.env.E2E_SESSION_TOKEN;
@@ -17,6 +19,25 @@ async function authenticate(context) {
 async function settle(page) {
   await page.waitForLoadState("networkidle");
   await expect(page.locator("body")).not.toContainText("Carregando página...");
+}
+
+async function deleteProject(request, projectId) {
+  let lastError;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await request.delete(`${apiBaseUrl}/api/projetos/${projectId}`, {
+        headers: { "X-CSRF-Token": csrfToken },
+      });
+      if (response.ok() || response.status() === 404) return;
+      lastError = new Error(`Project cleanup failed with status ${response.status()}: ${await response.text()}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  throw lastError;
 }
 
 test.describe("anonymous access", () => {
@@ -46,6 +67,18 @@ test.describe("authenticated product flow", () => {
       if (message.type() === "error") browserErrors.push(`console: ${message.text()}`);
     });
 
+    const createResponse = await page.request.post(`${apiBaseUrl}/api/projetos`, {
+      data: {
+        title: `Auditoria isolada do produto ${testInfo.project.name} ${Date.now()}`,
+        objetivo: "Validar as superficies principais sem depender de outro teste em execucao.",
+        status: "em-progresso",
+      },
+      headers: { "X-CSRF-Token": csrfToken },
+    });
+    expect(createResponse.ok(), await createResponse.text()).toBeTruthy();
+    const project = await createResponse.json();
+
+    try {
     await page.goto("/");
     await settle(page);
     await expect(page.getByText(/Bem-vindo,/)).toBeVisible();
@@ -55,11 +88,13 @@ test.describe("authenticated product flow", () => {
     await page.goto("/projetos");
     await settle(page);
     await expect(page.getByRole("heading", { name: "Projetos", exact: true })).toBeVisible();
-    const firstProject = page.locator('[data-testid="project-open"]:visible').first();
-    await expect(firstProject).toBeVisible();
+    const auditProject = testInfo.project.name === "mobile-chromium"
+      ? page.locator("article").filter({ has: page.getByRole("heading", { name: project.title, exact: true }) }).getByRole("button", { name: "Abrir projeto" })
+      : page.getByTestId("project-open").filter({ hasText: project.title });
+    await expect(auditProject).toBeVisible();
     await page.screenshot({ path: path.join(evidenceDir, `${testInfo.project.name}-03-projects.png`), fullPage: true });
 
-    await firstProject.click();
+    await auditProject.click();
     await settle(page);
     await expect(page.getByRole("button", { name: "Planejamento", exact: true })).toBeVisible();
     await expect(page.getByText(/Progresso da revis/)).toBeVisible({ timeout: 20_000 });
@@ -81,5 +116,8 @@ test.describe("authenticated product flow", () => {
       contentType: "text/plain",
     });
     expect(browserErrors.filter((message) => !message.includes("favicon"))).toEqual([]);
+    } finally {
+      await deleteProject(page.request, project.id);
+    }
   });
 });

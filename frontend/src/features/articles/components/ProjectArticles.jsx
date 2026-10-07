@@ -400,7 +400,7 @@ export function StageListPanel({
 
   return (
     <>
-    <section className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-[#edf0f7] bg-white">
+    <section className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-[#edf0f7] bg-white xl:h-[720px]">
       <div className="border-b border-[#edf0f7] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

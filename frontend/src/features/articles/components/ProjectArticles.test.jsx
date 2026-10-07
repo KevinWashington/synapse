@@ -114,8 +114,10 @@ describe("ProjectArticles work queue", () => {
 
     const scrollRegion = screen.getByTestId("stage-list-scroll");
     const footer = screen.getByText("1 exibido de 124").closest("div.border-t");
+    const panel = scrollRegion.closest("section");
 
     expect(scrollRegion.parentElement).toHaveClass("flex", "h-full", "flex-col");
+    expect(panel).toHaveClass("xl:h-[720px]");
     expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
     expect(footer).toHaveClass("mt-auto");
   });

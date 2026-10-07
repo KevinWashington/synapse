@@ -43,23 +43,23 @@
 - Produces: `setActiveTab(nextTab: string)` performing one atomic query update.
 - Preserves: `setActiveFlowTab(nextFlow: string)` with `tab=artigos` and a valid `flow` in the same URL.
 
-- [ ] **Step 1: Write failing navigation tests**
+- [x] **Step 1: Write failing navigation tests**
 
 Cover Visão Geral → Planejamento, Planejamento → Artigos, Fluxo → Artigos, nested flow changes, browser back/forward, and invalid `tab`/`flow`. Assert one click produces the final URL and content without an intermediate return.
 
-- [ ] **Step 2: Run the focused test and verify the current mirrored state fails**
+- [x] **Step 2: Run the focused test and verify the current mirrored state fails**
 
 Run: `npm run test:ci -- --run src/features/projects/hooks/useProjectDetailsPage.test.jsx`
 
-- [ ] **Step 3: Remove mirrored tab state and conflicting effects**
+- [x] **Step 3: Remove mirrored tab state and conflicting effects**
 
 Derive `activeTab` from `searchParams`; preserve `flow` only for `tab=artigos`; remove the `ProjectArticles` effect that rewrites overview/report after mount; default an absent article flow directly to `identification`.
 
-- [ ] **Step 4: Run navigation and existing project-header tests**
+- [x] **Step 4: Run navigation and existing project-header tests**
 
 Run: `npm run test:ci -- --run src/features/projects/hooks/useProjectDetailsPage.test.jsx src/features/projects/components/ProjectDetailsHeader.test.jsx`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `fix: make project tab navigation URL authoritative`
 
@@ -76,27 +76,27 @@ Commit: `fix: make project tab navigation URL authoritative`
 - Produces: screening/eligibility requests with `{ phase, outcome: "active", page, limit: 20 }`.
 - Produces: work-queue footer and badge using `articleTotal`, never page length.
 
-- [ ] **Step 1: Write failing queue tests**
+- [x] **Step 1: Write failing queue tests**
 
 Assert active-outcome request filters, a single `Na fila` filter for screening/eligibility, exact server totals, no excluded row, one `Resumo` label, and flex classes that pin the footer below a growing scroll region.
 
-- [ ] **Step 2: Run the focused tests and verify failures**
+- [x] **Step 2: Run the focused tests and verify failures**
 
 Run: `npm run test:ci -- --run src/features/articles/hooks/useProjectArticles.test.jsx src/features/articles/components/ProjectArticles.test.jsx`
 
-- [ ] **Step 3: Implement active queues and layout**
+- [x] **Step 3: Implement active queues and layout**
 
 Add `outcome: "active"` to screening/eligibility filters, stop deriving global counts from the loaded page, simplify their filters, make the stage card a full-height flex column, let the list consume remaining height, pin the footer with `mt-auto`, and remove the duplicate summary heading.
 
-- [ ] **Step 4: Handle a now-empty last page**
+- [x] **Step 4: Handle a now-empty last page**
 
 When a refresh returns zero rows with `page > 1` and `total > 0`, set the page to `ceil(total / 20)` and fetch that page once. Add the case to the hook test.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Expected: all queue tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Commit: `fix: align article queues with server totals`
 
@@ -120,27 +120,27 @@ Commit: `fix: align article queues with server totals`
 - Produces: extraction completion confirmation that submits the current payload with `markExtractionComplete: true` only after confirmation.
 - Removes: all `window.confirm` calls in the touched project/article deletion flows.
 
-- [ ] **Step 1: Write failing generic-dialog tests**
+- [x] **Step 1: Write failing generic-dialog tests**
 
 Assert accessible title/description, cancel closes without mutation, confirm calls once, and pending state disables both actions.
 
-- [ ] **Step 2: Implement the shared dialog using the existing Radix dialog primitives**
+- [x] **Step 2: Implement the shared dialog using the existing Radix dialog primitives**
 
 Run: `npm run test:ci -- --run src/components/ui/ConfirmationDialog.test.jsx`
 
-- [ ] **Step 3: Write failing extraction-completion tests**
+- [x] **Step 3: Write failing extraction-completion tests**
 
 Assert draft saves immediately, complete opens the modal, cancel leaves entered field values intact and does not call `onSave`, and confirm calls `onSave` once with the current values and completion flag.
 
-- [ ] **Step 4: Integrate confirmation into the editor and make tests pass**
+- [x] **Step 4: Integrate confirmation into the editor and make tests pass**
 
 Keep the pending payload inside `ArticleEvidenceEditor` so every rendering variant follows the same completion rule.
 
-- [ ] **Step 5: Add confirmations to bulk promotion, duplicate application, article deletion, and project deletion**
+- [x] **Step 5: Add confirmations to bulk promotion, duplicate application, article deletion, and project deletion**
 
 Move deletion confirmation state into the rendering page; hooks expose mutation callbacks without invoking native dialogs. Extend relevant tests to prove cancel/confirm behavior.
 
-- [ ] **Step 6: Run all touched tests and commit**
+- [x] **Step 6: Run all touched tests and commit**
 
 Commit: `feat: confirm consequential workflow actions`
 
@@ -159,23 +159,23 @@ Commit: `feat: confirm consequential workflow actions`
 - Produces: allowed tabs `notas/chat` for screening and eligibility.
 - Produces: optional `Usar justificativa da IA` action using `article.aiEvaluation`.
 
-- [ ] **Step 1: Write failing AI-copy tests**
+- [x] **Step 1: Write failing AI-copy tests**
 
 Assert the action is absent without AI text; when present it fills the textarea, remains editable, does not change the decision, and does not submit before `Salvar decisão`.
 
-- [ ] **Step 2: Implement AI copy and run the dialog test**
+- [x] **Step 2: Implement AI copy and run the dialog test**
 
 Run: `npm run test:ci -- --run src/features/articles/components/ScreeningDecisionDialog.test.jsx`
 
-- [ ] **Step 3: Write failing stage-tab tests**
+- [x] **Step 3: Write failing stage-tab tests**
 
 Assert triagem/elegibilidade render only Notas and Assistente IA; an invalid `workspace=extracao` resolves to Notas; the standalone Assistente IA header button is absent.
 
-- [ ] **Step 4: Implement stage-aware tabs and URL normalization**
+- [x] **Step 4: Implement stage-aware tabs and URL normalization**
 
 Pass `activeFlow` from the review workspace and normalize an invalid `rightTab` once without a navigation loop.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Commit: `fix: show only valid article review tools`
 
@@ -195,23 +195,23 @@ Commit: `fix: show only valid article review tools`
 - Breadcrumb item: `{ label: string, href?: string }`.
 - Account controls consume authenticated user/logout internally and always show theme, avatar, name/email menu, and logout.
 
-- [ ] **Step 1: Write failing shared-header tests**
+- [x] **Step 1: Write failing shared-header tests**
 
 Assert chevron breadcrumbs, clickable ancestors, authenticated avatar image/fallback, account menu, theme control, and no hard-coded `JS` identity.
 
-- [ ] **Step 2: Implement `AppHeader` and migrate `Layout`**
+- [x] **Step 2: Implement `AppHeader` and migrate `Layout`**
 
 Extend page-title context with `breadcrumbs`; keep first-level pages without synthetic breadcrumb entries.
 
-- [ ] **Step 3: Migrate project and article workspaces**
+- [x] **Step 3: Migrate project and article workspaces**
 
 Use `Projetos > projeto > seção` in project/article internals. Preserve the focused workspace without sidebar while rendering the same 72px header and real account controls.
 
-- [ ] **Step 4: Run header, layout, and project tests**
+- [x] **Step 4: Run header, layout, and project tests**
 
 Run: `npm run test:ci -- --run src/components/layout/AppHeader.test.jsx src/features/projects/components/ProjectDetailsHeader.test.jsx`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit: `feat: unify internal headers and breadcrumbs`
 
@@ -227,15 +227,15 @@ Commit: `feat: unify internal headers and breadcrumbs`
 - Consumes: existing `onSaveNotes(notes)` callback.
 - Preserves: the mounted `ArticleEvidenceEditor` while the left panel switches.
 
-- [ ] **Step 1: Write failing extraction-workspace tests**
+- [x] **Step 1: Write failing extraction-workspace tests**
 
 Assert no `Ver detalhes do artigo`, functional PDF/Notas tabs, saving notes, unchanged form values after both tab switches, and next/previous URLs retaining `flow=included&workspace=extracao`.
 
-- [ ] **Step 2: Implement local PDF/notes switching**
+- [x] **Step 2: Implement local PDF/notes switching**
 
 Pass `onSaveNotes` into the extraction workspace, render `NotesEditor` in the left panel, and remove navigation to the review workspace.
 
-- [ ] **Step 3: Run focused tests and commit**
+- [x] **Step 3: Run focused tests and commit**
 
 Commit: `fix: keep extraction context while viewing notes`
 
@@ -252,23 +252,23 @@ Commit: `fix: keep extraction context while viewing notes`
 - Produces: connection-specific toast when `ApiError.status === 0`.
 - Preserves: idempotent promotion across repeated calls.
 
-- [ ] **Step 1: Extend backend tests to more than two frontend pages**
+- [x] **Step 1: Extend backend tests to more than two frontend pages**
 
 Use at least 45 unique records plus a duplicate group. Assert every unique advances, duplicates remain, and a second helper call moves zero records.
 
-- [ ] **Step 2: Run backend scale tests**
+- [x] **Step 2: Run backend scale tests**
 
 Run: `python -m pytest backend/tests/test_identification_bulk_promotion.py -q`
 
-- [ ] **Step 3: Write and implement the frontend connection-error test**
+- [x] **Step 3: Write and implement the frontend connection-error test**
 
 Mock a status-0 API error and assert the toast says the server is unavailable and the local queue remains unchanged. Preserve backend-provided messages for nonzero statuses.
 
-- [ ] **Step 4: Optimize the backend only if the scale test or timed local endpoint proves it necessary**
+- [x] **Step 4: Optimize the backend only if the scale test or timed local endpoint proves it necessary**
 
 Keep edits isolated from the existing unrelated hunks in `articles.py`; group similarity candidates by year before pair comparisons without changing DOI/title-year rules.
 
-- [ ] **Step 5: Run backend/frontend focused tests and commit**
+- [x] **Step 5: Run backend/frontend focused tests and commit**
 
 Commit: `fix: harden bulk identification promotion`
 
@@ -283,26 +283,26 @@ Commit: `fix: harden bulk identification promotion`
 - Uses a disposable project created for the test; never uses project 7.
 - Covers viewport widths used by existing desktop audits.
 
-- [ ] **Step 1: Add the end-to-end scenario**
+- [x] **Step 1: Add the end-to-end scenario**
 
 Create/import more than 20 articles with a duplicate pair; promote all uniques; make screening and eligibility decisions; copy/edit AI justification; confirm queue totals/pagination; open extraction; switch PDF/Notas; cancel then confirm completion; navigate included articles; traverse every project tab; test back/forward; verify shared account header.
 
-- [ ] **Step 2: Start/restart local containers and Vite only if needed**
+- [x] **Step 2: Start/restart local containers and Vite only if needed**
 
 Verify with `docker ps`; use the repository compose setup and hidden Vite process already established for this workspace.
 
-- [ ] **Step 3: Run the focused Playwright spec**
+- [x] **Step 3: Run the focused Playwright spec**
 
 Run: `npm run test:e2e -- e2e/article-flow-stability.spec.js`
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 Run frontend unit tests, lint, production build, backend focused tests, and the complete Playwright suite. Confirm no test mutated project 7.
 
-- [ ] **Step 5: Inspect key screenshots manually**
+- [x] **Step 5: Inspect key screenshots manually**
 
 Check the queue footer alignment, header consistency, breadcrumbs, modal hierarchy, and extraction PDF/Notas layout at desktop and a narrower responsive width.
 
-- [ ] **Step 6: Commit final tests/documentation**
+- [x] **Step 6: Commit final tests/documentation**
 
 Commit: `test: cover stable article workflow end to end`

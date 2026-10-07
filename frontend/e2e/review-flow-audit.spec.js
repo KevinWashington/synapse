@@ -116,9 +116,9 @@ test.describe("review workflow audit", () => {
       await page.getByPlaceholder(/Obrigatorio ao excluir/).fill("Nao responde a pergunta de pesquisa.");
       await page.getByRole("button", { name: "Salvar decisao" }).click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
-      const detailTextAfterExclusion = await page.locator("section").filter({ hasText: titles[1] }).last().innerText();
-      expect(detailTextAfterExclusion).toContain("Excluido");
-      observations.push("excluded-detail-shows-current-state=true");
+      await expect(articleRow(page, titles[1])).toHaveCount(0);
+      await expect(page.getByText("Selecione um artigo", { exact: true })).toBeVisible();
+      observations.push("excluded-record-leaves-active-queue=true");
       await capture(page, testInfo, "05", "screening-after-decisions");
 
       await page.getByRole("button", { name: /Elegibilidade/ }).first().click();
