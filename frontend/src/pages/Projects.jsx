@@ -8,7 +8,6 @@ import {
   Leaf,
   MoreHorizontal,
   PlusIcon,
-  SearchIcon,
   Sparkles,
   TrashIcon,
   EditIcon,
@@ -16,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
-import { Input } from "@/components/ui/Input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import {
   Select,
   SelectContent,
@@ -278,13 +277,12 @@ function Projects() {
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative w-full">
-          <SearchIcon className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78839d]" />
-          <Input
+        <div className="w-full">
+          <SearchInput
             placeholder="Buscar projetos..."
+            aria-label="Buscar projetos"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="h-11 rounded-lg border-[#dfe4ef] bg-white pl-11 text-sm shadow-none"
           />
         </div>
 

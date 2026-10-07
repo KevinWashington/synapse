@@ -23,31 +23,49 @@ const projects = [
   },
 ];
 
+const projectPageState = {
+  editData: {},
+  editLoading: false,
+  editOpen: false,
+  error: null,
+  handleDeleteProject: vi.fn(),
+  handleEditProject: vi.fn(),
+  handleProjectClick: vi.fn(),
+  handleSaveEdit: vi.fn(),
+  loadProjects: vi.fn(),
+  loading: false,
+  projects,
+  searchTerm: "",
+  setEditData: vi.fn(),
+  setEditOpen: vi.fn(),
+  setSearchTerm: vi.fn(),
+  setShowNewProjectModal: vi.fn(),
+  showNewProjectModal: false,
+};
+
 vi.mock("@/features/projects", () => ({
   EditProjectPanel: () => null,
   NewProjectModal: () => null,
-  useProjectsPage: () => ({
-    editData: {},
-    editLoading: false,
-    editOpen: false,
-    error: null,
-    handleDeleteProject: vi.fn(),
-    handleEditProject: vi.fn(),
-    handleProjectClick: vi.fn(),
-    handleSaveEdit: vi.fn(),
-    loadProjects: vi.fn(),
-    loading: false,
-    projects,
-    searchTerm: "",
-    setEditData: vi.fn(),
-    setEditOpen: vi.fn(),
-    setSearchTerm: vi.fn(),
-    setShowNewProjectModal: vi.fn(),
-    showNewProjectModal: false,
-  }),
+  useProjectsPage: () => projectPageState,
 }));
 
 describe("Projects", () => {
+  it("exposes an accessible project search control", () => {
+    render(
+      <MemoryRouter>
+        <PageTitleProvider>
+          <Projects />
+        </PageTitleProvider>
+      </MemoryRouter>
+    );
+
+    const search = screen.getByRole("searchbox", { name: "Buscar projetos" });
+    fireEvent.change(search, { target: { value: "saúde" } });
+
+    expect(search).toHaveAttribute("placeholder", "Buscar projetos...");
+    expect(projectPageState.setSearchTerm).toHaveBeenCalledWith("saúde");
+  });
+
   it("sorts projects through the shared select", async () => {
     render(
       <MemoryRouter>

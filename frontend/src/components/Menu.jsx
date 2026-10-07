@@ -3,6 +3,7 @@ import {
   BookOpen,
   FileText,
   Folder,
+  Home,
   Menu as MenuIcon,
   Plus,
   Sparkles,
@@ -21,6 +22,11 @@ import { cn } from "@/lib/utils";
 import { projectService } from "@/features/projects/services/projectService";
 
 const NAV_ITEMS = [
+  {
+    path: "/",
+    label: "Início",
+    icon: Home,
+  },
   {
     path: "/projetos",
     label: "Projetos",
@@ -44,6 +50,9 @@ const PROJECT_STYLES = [
 
 function isActivePath(pathname, search, path) {
   const basePath = path.split("?")[0];
+  if (path === "/") {
+    return pathname === "/" || pathname === "/dashboard";
+  }
   if (path.includes("?")) {
     return `${pathname}${search}` === path;
   }
@@ -58,6 +67,7 @@ function NavItem({ item, onItemClick }) {
     <Link
       to={item.path}
       onClick={onItemClick}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
         active
@@ -132,7 +142,7 @@ function SidebarContent({ onItemClick }) {
     <div className="flex h-full flex-col bg-[#fbfcff]">
       <div className="px-6 pb-6 pt-5">
         <Link
-          to="/projetos"
+          to="/"
           onClick={onItemClick}
           className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
           aria-label="Synapse"

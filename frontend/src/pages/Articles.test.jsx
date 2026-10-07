@@ -84,6 +84,22 @@ describe("article library list", () => {
     expect(screen.getByRole("button", { name: "Abrir Artigo 1" })).toHaveClass("cursor-pointer");
   });
 
+  it("exposes an accessible article search control", () => {
+    render(
+      <MemoryRouter>
+        <PageTitleProvider>
+          <ArticlesPage.default />
+        </PageTitleProvider>
+      </MemoryRouter>
+    );
+
+    const search = screen.getByRole("searchbox", { name: "Pesquisar artigos" });
+    fireEvent.change(search, { target: { value: "evidência" } });
+
+    expect(search).toHaveAttribute("placeholder", "Pesquisar artigos...");
+    expect(libraryState.setSearchTerm).toHaveBeenCalledWith("evidência");
+  });
+
   it("keeps excluded articles reachable from the status filter", async () => {
     render(
       <MemoryRouter>

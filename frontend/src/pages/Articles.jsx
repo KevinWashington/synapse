@@ -5,10 +5,9 @@ import {
   FileText,
   MessageSquare,
   Paperclip,
-  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import {
   Select,
   SelectContent,
@@ -191,14 +190,12 @@ function Articles() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--syn-text-secondary)]" />
-          <Input
+        <div className="flex-1">
+          <SearchInput
             placeholder="Pesquisar artigos..."
             aria-label="Pesquisar artigos"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="pl-10"
           />
         </div>
         <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
