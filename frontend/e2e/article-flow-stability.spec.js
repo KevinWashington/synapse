@@ -162,7 +162,7 @@ test.describe("stable article workflow", () => {
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
       const screeningDialog = page.getByRole("dialog", { name: "Decisão de triagem" });
       await expect(screeningDialog).toBeVisible();
-      await screeningDialog.getByRole("button", { name: "Usar justificativa da IA" }).click();
+      await screeningDialog.getByRole("button", { name: "Copiar justificativa da IA" }).click();
       const screeningReason = screeningDialog.getByRole("textbox", { name: "Justificativa" });
       await expect(screeningReason).toHaveValue(/justificativa sugerida/);
       await screeningReason.fill("Justificativa da IA copiada e revisada pelo pesquisador.");

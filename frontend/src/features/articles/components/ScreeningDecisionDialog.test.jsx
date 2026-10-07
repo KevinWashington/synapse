@@ -17,7 +17,7 @@ describe("ScreeningDecisionDialog accessibility", () => {
     expect(screen.getByRole("textbox", { name: "Justificativa" })).toBeInTheDocument();
   });
 
-  it("hides AI copy when there is no suggestion", () => {
+  it("keeps AI copy visible and disabled when there is no suggestion", () => {
     render(
       <ScreeningDecisionDialog
         article={{ id: 1, title: "Estudo" }}
@@ -28,27 +28,31 @@ describe("ScreeningDecisionDialog accessibility", () => {
       />
     );
 
-    expect(screen.queryByRole("button", { name: "Usar justificativa da IA" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copiar justificativa da IA" })).toBeDisabled();
+    expect(screen.getByText("Execute a Triagem IA para gerar uma sugestão.")).toBeInTheDocument();
   });
 
   it("copies the AI suggestion for editing without submitting it", async () => {
+    const onClose = vi.fn();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(
       <ScreeningDecisionDialog
-        article={{ id: 1, title: "Estudo", aiEvaluation: "População fora da PICO." }}
+        article={{ id: 1, title: "Estudo", aiEvaluation: "  População fora da PICO.  " }}
         initialDecision="excluded"
         isOpen
         isSaving={false}
-        onClose={vi.fn()}
+        onClose={onClose}
         onSubmit={onSubmit}
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Usar justificativa da IA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copiar justificativa da IA" }));
 
     const field = screen.getByRole("textbox", { name: "Justificativa" });
     expect(field).toHaveValue("População fora da PICO.");
     expect(onSubmit).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeVisible();
 
     fireEvent.change(field, { target: { value: "População fora da PICO; revisado manualmente." } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar decisão" }));

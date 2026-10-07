@@ -23,6 +23,9 @@ function ScreeningDecisionDialog({
   const [decision, setDecision] = useState("included");
   const [reasonText, setReasonText] = useState("");
   const [error, setError] = useState("");
+  const aiJustification = typeof article?.aiEvaluation === "string"
+    ? article.aiEvaluation.trim()
+    : "";
 
   useEffect(() => {
     if (!isOpen) {
@@ -78,18 +81,21 @@ function ScreeningDecisionDialog({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
               <Label htmlFor="screening-reason">Justificativa</Label>
-              {article?.aiEvaluation?.trim() ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={isSaving}
-                  onClick={() => setReasonText(article.aiEvaluation.trim())}
-                >
-                  Usar justificativa da IA
-                </Button>
-              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={isSaving || !aiJustification}
+                onClick={() => setReasonText(aiJustification)}
+              >
+                Copiar justificativa da IA
+              </Button>
             </div>
+            {!aiJustification ? (
+              <p className="text-sm text-gray-500">
+                Execute a Triagem IA para gerar uma sugestão.
+              </p>
+            ) : null}
             <Textarea
               id="screening-reason"
               value={reasonText}
