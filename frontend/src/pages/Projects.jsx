@@ -17,6 +17,13 @@ import {
 import { Button } from "@/components/ui/Button";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmptyState, LoadingState } from "@/components/layout";
 import {
   DropdownMenu,
@@ -52,7 +59,7 @@ const STATUS_STYLES = {
 const STATUS_LABELS = {
   ideia: "Planejamento",
   "em-progresso": "Em andamento",
-  concluido: "Concluido",
+  concluido: "Concluído",
   pausado: "Em triagem",
 };
 
@@ -62,7 +69,7 @@ function formatNumber(value) {
 
 function formatUpdatedAt(project) {
   const date = new Date(project.updatedAt);
-  return `${date.toLocaleDateString("pt-BR")} as ${date.toLocaleTimeString("pt-BR", {
+  return `${date.toLocaleDateString("pt-BR")} às ${date.toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
   })}`;
@@ -168,15 +175,15 @@ function ProjectRow({ project, index, onClick, onEdit, onDelete }) {
         <div className="grid grid-cols-4 gap-4">
           <PrismaMetric color="bg-[#7167ff]" label="Identificados" value={stats.identified} />
           <PrismaMetric color="bg-[#60c889]" label="Triagem" value={stats.screening} />
-          <PrismaMetric color="bg-[#ffc96f]" label="Elegiveis" value={stats.eligible} />
-          <PrismaMetric color="bg-[#cbd3df]" label="Incluidos" value={stats.included} />
+          <PrismaMetric color="bg-[#ffc96f]" label="Elegíveis" value={stats.eligible} />
+          <PrismaMetric color="bg-[#cbd3df]" label="Incluídos" value={stats.included} />
         </div>
         <PrismaProgress stats={stats} />
       </td>
 
       <td className="px-5 py-5 text-sm leading-6 text-[#56627f]">
         <span>{formatUpdatedAt(project)}</span>
-        <span className="block text-xs">por Você</span>
+        <span className="block text-xs">por você</span>
       </td>
 
       <td className="px-5 py-5 text-right" onClick={stopPropagation}>
@@ -193,7 +200,7 @@ function ProjectRow({ project, index, onClick, onEdit, onDelete }) {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onDelete(project)} variant="destructive">
               <TrashIcon className="h-4 w-4" />
-              Deletar
+              Excluir
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -257,7 +264,7 @@ function Projects() {
         <div>
           <h1 className="text-3xl font-semibold tracking-normal text-[#0f1734]">Projetos</h1>
           <p className="mt-2 text-sm text-[#667391]">
-            Organize e acompanhe todas as suas revisoes sistematicas.
+            Organize e acompanhe todas as suas revisões sistemáticas.
           </p>
         </div>
         <Button
@@ -281,17 +288,19 @@ function Projects() {
           />
         </div>
 
-        <div className="flex items-center gap-4">
-          <select
-            value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value)}
-            className="h-11 rounded-lg border border-[#dfe4ef] bg-white px-4 text-sm font-medium text-[#253252] outline-none"
+        <Select value={sortOrder} onValueChange={setSortOrder}>
+          <SelectTrigger
+            aria-label="Ordenar projetos"
+            className="h-11 w-full rounded-lg border-[#dfe4ef] bg-white text-sm font-medium text-[#253252] shadow-none lg:w-[190px]"
           >
-            <option value="recent">Mais recentes</option>
-            <option value="oldest">Mais antigos</option>
-            <option value="title">Titulo</option>
-          </select>
-        </div>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">Mais recentes</SelectItem>
+            <SelectItem value="oldest">Mais antigos</SelectItem>
+            <SelectItem value="title">Título</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {error && (
@@ -351,7 +360,7 @@ function Projects() {
                 <tr className="bg-white text-left text-xs font-semibold text-[#667391]">
                   <th className="px-5 py-4">Projeto</th>
                   <th className="px-5 py-4">Progresso (PRISMA)</th>
-                  <th className="px-5 py-4">Ultima atualização</th>
+                  <th className="px-5 py-4">Última atualização</th>
                   <th className="px-5 py-4 text-right">Ações</th>
                 </tr>
               </thead>
@@ -384,7 +393,7 @@ function Projects() {
             description={
               searchTerm
                 ? "Tente ajustar os filtros de pesquisa"
-                : "Começe criando seu primeiro projeto de revisao literaria"
+                : "Comece criando seu primeiro projeto de revisão literária"
             }
             actionLabel="Criar primeiro projeto"
             onAction={() => setShowNewProjectModal(true)}
@@ -411,9 +420,9 @@ function Projects() {
 
       <ConfirmationDialog
         open={Boolean(deleteTarget)}
-        title="Deletar projeto?"
+        title="Excluir projeto?"
         description={deleteTarget ? `O projeto “${deleteTarget.title}” e seus dados serão removidos permanentemente.` : ""}
-        confirmLabel="Deletar projeto"
+        confirmLabel="Excluir projeto"
         tone="destructive"
         isPending={isDeleting}
         onConfirm={async () => {

@@ -52,8 +52,8 @@ export function ArticleLibraryList({
   const rangeEnd = total ? rangeStart + articles.length - 1 : 0;
 
   return (
-    <section className="flex h-[calc(100dvh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] shadow-[var(--syn-shadow-card)] sm:h-[calc(100dvh-10rem)]">
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--syn-border)] px-5 py-4">
+    <section data-testid="library-list-surface" className="flex min-h-[420px] flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--syn-border)] pb-4">
         <div>
           <h2 className="text-sm font-semibold text-[var(--syn-text-primary)]">Artigos do projeto</h2>
           <p className="mt-1 text-xs text-[var(--syn-text-secondary)]">{formatNumber(total)} registros encontrados</p>
@@ -63,7 +63,7 @@ export function ArticleLibraryList({
         </span>
       </div>
 
-      <div data-testid="library-list-scroll" className="min-h-0 flex-1 overflow-y-auto bg-[var(--syn-bg-secondary)] p-3">
+      <div data-testid="library-list-scroll" className="min-h-0 flex-1 overflow-y-auto py-3">
         {loading ? (
           <LoadingState message="Carregando artigos..." />
         ) : articles.length === 0 ? (
@@ -73,7 +73,7 @@ export function ArticleLibraryList({
             description="Selecione um projeto ou importe artigos via BibTeX"
           />
         ) : (
-          <div className="grid gap-2">
+          <div className="grid gap-3">
             {articles.map((article) => (
               <article
                 key={article.id}
@@ -83,7 +83,7 @@ export function ArticleLibraryList({
                 <button
                   type="button"
                   onClick={() => onOpenArticle(article)}
-                  className="flex min-w-0 items-start gap-3 text-left"
+                  className="flex min-w-0 cursor-pointer items-start gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
                   aria-label={`Abrir ${article.title}`}
                 >
                   <span className="grid h-10 min-w-10 shrink-0 place-items-center rounded-lg bg-[#eef1ff] text-xs font-bold text-[#6259ff]">
@@ -115,7 +115,7 @@ export function ArticleLibraryList({
                     type="button"
                     onClick={() => onOpenArticle(article)}
                     aria-label={`Abrir detalhes de ${article.title}`}
-                    className="grid h-8 w-8 place-items-center rounded-full text-[var(--syn-text-secondary)] transition-colors hover:bg-[#eef1ff] hover:text-[#6259ff]"
+                    className="grid h-8 w-8 cursor-pointer place-items-center rounded-full text-[var(--syn-text-secondary)] transition-colors hover:bg-[#eef1ff] hover:text-[#6259ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -126,7 +126,7 @@ export function ArticleLibraryList({
         )}
       </div>
 
-      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--syn-border)] px-5 py-3 text-xs text-[var(--syn-text-secondary)]">
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--syn-border)] py-4 text-xs text-[var(--syn-text-secondary)]">
         <span>Mostrando {formatNumber(rangeStart)}–{formatNumber(rangeEnd)} de {formatNumber(total)} artigos</span>
         <div className="flex items-center gap-2">
           <Button
@@ -179,22 +179,30 @@ function Articles() {
     setSelectedProjectId,
   } = useArticlesLibraryPage();
 
-  usePageTitle({ title: "Biblioteca de Artigos" });
+  usePageTitle({ title: "" });
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
-      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap">
+    <div className="space-y-7">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-normal text-[#0f1734]">Biblioteca de artigos</h1>
+        <p className="mt-2 text-sm text-[#667391]">
+          Consulte, filtre e retome a revisão dos artigos de todos os seus projetos.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--syn-text-secondary)]" />
           <Input
             placeholder="Pesquisar artigos..."
+            aria-label="Pesquisar artigos"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             className="pl-10"
           />
         </div>
         <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-          <SelectTrigger className="w-full sm:w-[200px] sm:max-w-[200px]">
+          <SelectTrigger aria-label="Projeto da biblioteca" className="h-11 w-full bg-white sm:w-[220px] sm:max-w-[220px]">
             <SelectValue placeholder="Selecionar projeto" />
           </SelectTrigger>
           <SelectContent>
@@ -206,7 +214,7 @@ function Articles() {
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-full sm:w-[140px] sm:max-w-[140px]">
+          <SelectTrigger aria-label="Status dos artigos" className="h-11 w-full bg-white sm:w-[160px] sm:max-w-[160px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

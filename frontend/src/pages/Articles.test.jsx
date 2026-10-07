@@ -1,6 +1,33 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import { PageTitleProvider } from "@/context/pageTitleContext";
 import * as ArticlesPage from "./Articles";
+
+const libraryState = {
+  articlePage: 1,
+  articlePageSize: 20,
+  articleTotal: 45,
+  articles: [],
+  filterStatus: "todos",
+  loading: false,
+  openDetail: vi.fn(),
+  panelOpen: false,
+  projects: [{ id: 7, title: "Revisão de saúde" }],
+  searchTerm: "",
+  selectedArticle: null,
+  selectedProjectId: "7",
+  setArticlePage: vi.fn(),
+  setFilterStatus: vi.fn(),
+  setPanelOpen: vi.fn(),
+  setSearchTerm: vi.fn(),
+  setSelectedProjectId: vi.fn(),
+};
+
+vi.mock("@/features/articles", () => ({
+  ArticleLibraryDetailPanel: () => null,
+  useArticlesLibraryPage: () => libraryState,
+}));
 
 const articles = Array.from({ length: 20 }, (_, index) => ({
   id: index + 1,
@@ -38,5 +65,69 @@ describe("article library list", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
     expect(onPageChange).toHaveBeenCalledWith(2);
+  });
+
+  it("renders the library hierarchy without an enclosing list card", () => {
+    libraryState.articles = articles;
+    render(
+      <MemoryRouter>
+        <PageTitleProvider>
+          <ArticlesPage.default />
+        </PageTitleProvider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole("heading", { level: 1, name: "Biblioteca de artigos" })).toBeInTheDocument();
+    expect(screen.getByTestId("library-list-surface")).not.toHaveClass("rounded-[var(--syn-radius-card)]");
+    expect(screen.getByTestId("library-list-surface")).not.toHaveClass("h-[calc(100dvh-15rem)]");
+    expect(screen.getByRole("button", { name: "Abrir Artigo 1" })).toHaveClass("cursor-pointer");
+  });
+
+  it("keeps excluded articles reachable from the status filter", async () => {
+    render(
+      <MemoryRouter>
+        <PageTitleProvider>
+          <ArticlesPage.default />
+        </PageTitleProvider>
+      </MemoryRouter>
+    );
+
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Status dos artigos" }), {
+      key: "ArrowDown",
+    });
+    fireEvent.click(await screen.findByRole("option", { name: "Excluído" }));
+    expect(libraryState.setFilterStatus).toHaveBeenCalledWith("excluido");
+  });
+
+  it("disables pagination for empty and single-page results", () => {
+    const { rerender } = render(
+      <ArticlesPage.ArticleLibraryList
+        articles={[]}
+        loading={false}
+        onOpenArticle={vi.fn()}
+        onPageChange={vi.fn()}
+        page={1}
+        pageSize={20}
+        total={0}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Página anterior" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Próxima página" })).toBeDisabled();
+
+    rerender(
+      <ArticlesPage.ArticleLibraryList
+        articles={articles.slice(0, 1)}
+        loading={false}
+        onOpenArticle={vi.fn()}
+        onPageChange={vi.fn()}
+        page={1}
+        pageSize={20}
+        total={1}
+      />
+    );
+
+    expect(screen.getByText("Página 1 de 1")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Próxima página" })).toBeDisabled();
   });
 });
