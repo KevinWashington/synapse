@@ -6,8 +6,8 @@ import { toast } from "@/lib/toast";
 
 const PHASE_FILTERS = {
   identification: { phase: "identification", outcome: "active" },
-  screening: { phase: "screening" },
-  eligibility: { phase: "eligibility" },
+  screening: { phase: "screening", outcome: "active" },
+  eligibility: { phase: "eligibility", outcome: "active" },
   included: { outcome: "included" },
 };
 const FLOW_TABS = new Set(["identification", "screening", "eligibility", "included"]);
@@ -151,8 +151,17 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         page: pageOverride,
         limit: ARTICLE_PAGE_SIZE,
       });
-      setArticles(response.articles || []);
-      setArticleTotal(response.total || 0);
+      const nextArticles = response.articles || [];
+      const nextTotal = response.total || 0;
+      const lastPage = Math.max(1, Math.ceil(nextTotal / ARTICLE_PAGE_SIZE));
+
+      setArticleTotal(nextTotal);
+      if (nextTotal > 0 && nextArticles.length === 0 && pageOverride > lastPage) {
+        setArticlePage(lastPage);
+        return;
+      }
+
+      setArticles(nextArticles);
       if (resolvedFlowTab !== "identification") {
         setSelectedIdentificationIds([]);
       }

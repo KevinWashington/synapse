@@ -150,7 +150,7 @@ function getArticleBadge(article, stageKey, duplicateIds) {
   return { label: "Incluido", className: "bg-[#e8f8ef] text-[#258c55]", dot: "bg-[#22b66f]" };
 }
 
-function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = articles.length) {
+export function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = articles.length) {
   if (stageKey === "identification") {
     const duplicates = duplicateIds.size;
     return [
@@ -160,20 +160,8 @@ function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = article
     ];
   }
 
-  if (stageKey === "screening") {
-    return [
-      { key: "all", label: "Na fila", count: articles.length },
-      { key: "pending", label: "Pendentes", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Pendente").length },
-      { key: "exclude", label: "Excluidos", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluido").length },
-    ];
-  }
-
-  if (stageKey === "eligibility") {
-    return [
-      { key: "all", label: "Na fila", count: articles.length },
-      { key: "pending", label: "Pendentes", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Pendente").length },
-      { key: "exclude", label: "Excluidos", count: articles.filter((article) => getArticleBadge(article, stageKey, duplicateIds).label === "Excluido").length },
-    ];
+  if (stageKey === "screening" || stageKey === "eligibility") {
+    return [{ key: "all", label: "Na fila", count: stageTotal }];
   }
 
   return [
@@ -392,7 +380,7 @@ export function StageListPanel({
   const pageCount = Math.max(1, Math.ceil(resolvedTotal / articlePageSize));
 
   return (
-    <section className="min-w-0 rounded-lg border border-[#edf0f7] bg-white">
+    <section className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-[#edf0f7] bg-white">
       <div className="border-b border-[#edf0f7] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -482,7 +470,7 @@ export function StageListPanel({
         </div>
       </div>
 
-      <div data-testid="stage-list-scroll" className="min-h-[420px] max-h-[560px] overflow-y-auto">
+      <div data-testid="stage-list-scroll" className="min-h-0 flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex h-64 items-center justify-center gap-2 text-sm text-[#667391]">
             <LoaderIcon className="h-4 w-4 animate-spin" />
@@ -553,7 +541,7 @@ export function StageListPanel({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f7] px-5 py-4 text-sm text-[#667391]">
         <div className="flex flex-wrap items-center gap-2">
           <span>{formatNumber(articles.length)} {articles.length === 1 ? "exibido" : "exibidos"} de {formatNumber(resolvedTotal)}</span>
           {reachedStageCount !== resolvedTotal ? (
@@ -717,8 +705,7 @@ export function ArticleDetailPanel({
               </div>
             ) : (
               <div>
-                <h3 className="text-sm font-semibold text-[#111936]">Resumo</h3>
-                <p className="mt-3 line-clamp-[8] text-sm leading-7 text-[#56627f]">
+                <p className="line-clamp-[8] text-sm leading-7 text-[#56627f]">
                   {article.abstract || "Resumo nao cadastrado para este artigo."}
                 </p>
               </div>

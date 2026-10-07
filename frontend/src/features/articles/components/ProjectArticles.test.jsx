@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ArticleDetailPanel,
+  getFilterOptions,
   StageListPanel,
 } from "./ProjectArticles";
 import * as ProjectArticlesComponents from "./ProjectArticles";
@@ -85,6 +86,48 @@ describe("ProjectArticles work queue", () => {
     });
 
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it.each(["screening", "eligibility"])(
+    "shows one server-backed work queue filter for %s",
+    (stage) => {
+      expect(getFilterOptions(stage, new Set(), [article], 124)).toEqual([
+        { key: "all", label: "Na fila", count: 124 },
+      ]);
+    }
+  );
+
+  it("pins pagination below a flexible scrolling list", () => {
+    renderList({ activeStage: "screening", articleTotal: 124 });
+
+    const scrollRegion = screen.getByTestId("stage-list-scroll");
+    const footer = screen.getByText("1 exibido de 124").closest("div.border-t");
+
+    expect(scrollRegion.parentElement).toHaveClass("flex", "h-full", "flex-col");
+    expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
+    expect(footer).toHaveClass("mt-auto");
+  });
+
+  it("labels the screening abstract as Resumo only once", () => {
+    render(
+      <ArticleDetailPanel
+        activeStage="screening"
+        article={{ ...article, currentPhase: "screening", abstract: "Resumo do estudo" }}
+        currentIndex={0}
+        onClose={vi.fn()}
+        onNext={vi.fn()}
+        onOpenArticle={vi.fn()}
+        onOpenEligibility={vi.fn()}
+        onOpenScreening={vi.fn()}
+        onOpenUploadPdf={vi.fn()}
+        onPrevious={vi.fn()}
+        onSkip={vi.fn()}
+        project={{ dataExtractionSchema: [] }}
+        total={1}
+      />
+    );
+
+    expect(screen.getAllByText("Resumo")).toHaveLength(1);
   });
 
   it("blocks inclusion until a PDF exists and offers a truthful skip action", () => {
