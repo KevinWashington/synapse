@@ -29,15 +29,15 @@ export const STUDY_TYPE_OPTIONS = [
 
 export const FLOW_TABS = [
   { key: "overview", label: "Visao geral" },
-  { key: "identification", label: "Identificacao" },
+  { key: "identification", label: "Identificação" },
   { key: "screening", label: "Triagem" },
   { key: "eligibility", label: "Elegibilidade" },
   { key: "included", label: "Incluidos" },
-  { key: "report", label: "Relatorio" },
+  { key: "report", label: "Relatório" },
 ];
 
 export const PHASE_LABELS = {
-  identification: "Identificacao",
+  identification: "Identificação",
   screening: "Triagem",
   eligibility: "Elegibilidade",
   included: "Incluidos",
@@ -47,7 +47,7 @@ export const OUTCOME_LABELS = {
   active: "Ativo",
   duplicate_removed: "Duplicado removido",
   excluded_screening: "Excluido no screening",
-  full_text_unavailable: "Texto completo indisponivel",
+  full_text_unavailable: "Texto completo indisponível",
   excluded_eligibility: "Excluido na elegibilidade",
   included: "Incluido",
 };

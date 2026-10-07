@@ -160,13 +160,13 @@ test.describe("stable article workflow", () => {
       await expect(page.getByText("Página 2 de 2", { exact: true })).toBeVisible();
       await openArticleFromRow(page, primaryTitle);
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
-      const screeningDialog = page.getByRole("dialog", { name: "Decisao de triagem" });
+      const screeningDialog = page.getByRole("dialog", { name: "Decisão de triagem" });
       await expect(screeningDialog).toBeVisible();
       await screeningDialog.getByRole("button", { name: "Usar justificativa da IA" }).click();
       const screeningReason = screeningDialog.getByRole("textbox", { name: "Justificativa" });
       await expect(screeningReason).toHaveValue(/justificativa sugerida/);
       await screeningReason.fill("Justificativa da IA copiada e revisada pelo pesquisador.");
-      await screeningDialog.getByRole("button", { name: "Salvar decisao" }).click();
+      await screeningDialog.getByRole("button", { name: "Salvar decisão" }).click();
       await expect(screeningDialog).not.toBeVisible();
 
       await post(
@@ -195,10 +195,10 @@ test.describe("stable article workflow", () => {
 
       await openArticleFromRow(page, primaryTitle);
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
-      const eligibilityDialog = page.getByRole("dialog", { name: "Decisao de Elegibilidade" });
+      const eligibilityDialog = page.getByRole("dialog", { name: "Decisão de elegibilidade" });
       await eligibilityDialog.getByRole("button", { name: "Sim" }).click();
       await eligibilityDialog.getByRole("button", { name: "RQ 1" }).click();
-      await eligibilityDialog.getByRole("button", { name: "Salvar decisao" }).click();
+      await eligibilityDialog.getByRole("button", { name: "Salvar decisão" }).click();
       await expect(eligibilityDialog).not.toBeVisible();
 
       await page.getByRole("button", { name: /Inclusão/ }).first().click();
@@ -207,7 +207,7 @@ test.describe("stable article workflow", () => {
       await page.getByRole("button", { name: "Abrir workspace de extração" }).click();
       await expect(page).toHaveURL(new RegExp(`/projetos/${project.id}/artigos/${primaryId}\\?flow=included&workspace=extracao`));
       await expect(page.getByRole("button", { name: "Abrir menu da conta" })).toBeVisible();
-      await expect(page.getByRole("navigation", { name: "Navegacao estrutural" })).toContainText("Extração de dados");
+      await expect(page.getByRole("navigation", { name: "Navegação estrutural" })).toContainText("Extração de dados");
 
       const extractionField = page.getByPlaceholder("Digite resultado principal...");
       await extractionField.fill("Resultado mantido entre PDF e Notas");
@@ -217,23 +217,23 @@ test.describe("stable article workflow", () => {
       await expect(extractionField).toHaveValue("Resultado mantido entre PDF e Notas");
       await capture(page, testInfo, "03", "extraction-desktop");
 
-      await page.getByRole("button", { name: "Marcar como concluido" }).click();
+      await page.getByRole("button", { name: "Marcar como concluído" }).click();
       const completionDialog = page.getByRole("dialog", { name: "Concluir extração?" });
       await expect(completionDialog).toBeVisible();
       await completionDialog.getByRole("button", { name: "Cancelar" }).click();
       await expect(completionDialog).not.toBeVisible();
       await expect(extractionField).toHaveValue("Resultado mantido entre PDF e Notas");
-      await page.getByRole("button", { name: "Marcar como concluido" }).click();
+      await page.getByRole("button", { name: "Marcar como concluído" }).click();
       await completionDialog.getByRole("button", { name: "Confirmar conclusão" }).click();
       await expect(completionDialog).not.toBeVisible();
 
-      const nextButton = page.locator("main").getByRole("button", { name: /Proximo/ });
+      const nextButton = page.locator("main").getByRole("button", { name: /Próximo/ });
       const previousButton = page.locator("main").getByRole("button", { name: /Anterior/ });
       const navigationButton = (await nextButton.isEnabled()) ? nextButton : previousButton;
       await navigationButton.click();
       await expect(page).toHaveURL(/flow=included&workspace=extracao/);
       await expect(page.getByText("Carregando artigo...")).not.toBeVisible({ timeout: 30_000 });
-      await expect(page.getByText("Formulario de extracao", { exact: true })).toBeVisible();
+      await expect(page.getByText("Formulário de extração", { exact: true })).toBeVisible();
 
       await page.setViewportSize({ width: 1024, height: 768 });
       await capture(page, testInfo, "04", "extraction-narrow");

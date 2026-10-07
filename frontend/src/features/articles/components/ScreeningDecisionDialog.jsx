@@ -51,7 +51,7 @@ function ScreeningDecisionDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Decisao de triagem</DialogTitle>
+          <DialogTitle>Decisão de triagem</DialogTitle>
           <DialogDescription>{article?.title || "Registro selecionado"}</DialogDescription>
         </DialogHeader>
 
@@ -95,7 +95,7 @@ function ScreeningDecisionDialog({
               value={reasonText}
               onChange={(event) => setReasonText(event.target.value)}
               rows={4}
-              placeholder="Obrigatorio ao excluir. Ex.: nao condiz com a PICO."
+              placeholder="Obrigatório ao excluir. Ex.: não condiz com a PICO."
               disabled={isSaving}
             />
             {error ? <p className="text-sm text-red-500">{error}</p> : null}
@@ -112,7 +112,7 @@ function ScreeningDecisionDialog({
                   Salvando...
                 </span>
               ) : (
-                "Salvar decisao"
+                "Salvar decisão"
               )}
             </Button>
           </DialogFooter>

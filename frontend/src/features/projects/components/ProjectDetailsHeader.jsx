@@ -66,6 +66,7 @@ function ProjectDetailsHeader({
           return (
             <button
               key={tab.key}
+              aria-current={isActive ? "page" : undefined}
               onClick={() => onTabChange(tab.key)}
               className={cn(
                 "relative flex cursor-pointer items-center gap-2 whitespace-nowrap px-1 pb-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",

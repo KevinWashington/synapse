@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 
-const evidenceDir = path.resolve("../docs/audits/playwright-2026-10-06");
+const evidenceDir = path.resolve("../docs/audits/playwright-ui-consistency-2026-10-07");
 const apiBaseUrl = "http://localhost:5000";
 const csrfToken = "playwright-csrf";
+
+fs.mkdirSync(evidenceDir, { recursive: true });
 
 async function authenticate(context) {
   const token = process.env.E2E_SESSION_TOKEN;
@@ -83,11 +86,15 @@ test.describe("authenticated product flow", () => {
     await settle(page);
     await expect(page.getByText(/Bem-vindo,/)).toBeVisible();
     await expect(page.getByText("Total de Projetos")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Ativos/ })).toBeVisible();
+    await expect(page.getByText("In Progress", { exact: true })).toHaveCount(0);
     await page.screenshot({ path: path.join(evidenceDir, `${testInfo.project.name}-02-dashboard.png`), fullPage: true });
 
     await page.goto("/projetos");
     await settle(page);
     await expect(page.getByRole("heading", { name: "Projetos", exact: true })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Ordenar projetos" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Lixeira" })).toHaveCount(0);
     const auditProject = testInfo.project.name === "mobile-chromium"
       ? page.locator("article").filter({ has: page.getByRole("heading", { name: project.title, exact: true }) }).getByRole("button", { name: "Abrir projeto" })
       : page.getByTestId("project-open").filter({ hasText: project.title });
@@ -97,7 +104,10 @@ test.describe("authenticated product flow", () => {
     await auditProject.click();
     await settle(page);
     await expect(page.getByRole("button", { name: "Planejamento", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Abrir menu da conta" })).toBeVisible();
     await expect(page.getByText(/Progresso da revis/)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Identificação", { exact: true })).toBeVisible();
+    await expect(page.getByText("Ações rápidas", { exact: true })).toBeVisible();
     await page.screenshot({ path: path.join(evidenceDir, `${testInfo.project.name}-04-project-overview.png`), fullPage: true });
     await page.getByRole("button", { name: "Artigos", exact: true }).click();
     await expect(page.getByRole("button", { name: "Exportar dados" })).toBeVisible();

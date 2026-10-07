@@ -350,7 +350,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       try {
         setIsSavingDecision(true);
         await articleService.submitScreeningDecision(project.id, screeningArticle.id, payload);
-        toast.success("Decisao de triagem registrada.");
+        toast.success("Decisão de triagem registrada.");
         setScreeningArticle(null);
         await refreshAll();
       } catch (error) {
@@ -371,7 +371,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       try {
         setIsSavingDecision(true);
         await articleService.submitEligibilityDecision(project.id, eligibilityArticle.id, payload);
-        toast.success("Decisao de elegibilidade registrada.");
+        toast.success("Decisão de elegibilidade registrada.");
         onGraphNeedsRefresh?.();
         setEligibilityArticle(null);
         await refreshAll({ refreshSynthesisReport: true });

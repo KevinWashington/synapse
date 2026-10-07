@@ -38,7 +38,7 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
   return (
     <header
       data-density={compact ? "compact" : "regular"}
-      className="flex h-[72px] shrink-0 items-center justify-between gap-4 bg-[#fbfcff] px-5 md:px-10"
+      className="flex h-[72px] shrink-0 items-center justify-between gap-4 bg-[#fbfcff] pl-20 pr-5 md:px-10"
     >
       <div className="flex min-w-0 items-center gap-3">
         {backUrl ? (

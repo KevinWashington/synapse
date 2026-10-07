@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 
 const apiBaseUrl = "http://localhost:5000";
 const csrfToken = "playwright-csrf";
-const evidenceDir = path.resolve("../docs/audits/playwright-library-pagination-2026-10-06");
+const evidenceDir = path.resolve("../docs/audits/playwright-ui-consistency-2026-10-07");
+
+fs.mkdirSync(evidenceDir, { recursive: true });
 
 async function authenticate(context) {
   const token = process.env.E2E_SESSION_TOKEN;
@@ -58,8 +61,14 @@ test.describe("article library pagination", () => {
       );
 
       await page.goto("/artigos");
+      await expect(page.getByRole("heading", { name: "Biblioteca de artigos" })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Lixeira" })).toHaveCount(0);
       await page.getByRole("combobox").first().click();
       await page.getByRole("option", { name: project.title }).click();
+
+      await page.getByRole("combobox", { name: "Status dos artigos" }).click();
+      await expect(page.getByRole("option", { name: "Excluído" })).toBeVisible();
+      await page.keyboard.press("Escape");
 
       await expect(page.getByText("25 registros encontrados", { exact: true })).toBeVisible();
       await expect(page.getByTestId("library-article-card")).toHaveCount(20);

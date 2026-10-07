@@ -57,17 +57,17 @@ function useDashboardData() {
     () => [
       {
         key: "active",
-        label: "Active",
+        label: "Ativos",
         count: inProgressProjects.length + todoProjects.length,
       },
       {
         key: "in-progress",
-        label: "In Progress",
+        label: "Em andamento",
         count: inProgressProjects.length,
       },
       {
         key: "completed",
-        label: "Completed",
+        label: "Concluídos",
         count: completedProjects.length,
       },
     ],

@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 
-const evidenceDir = path.resolve("../docs/audits/playwright-identification-scale-2026-10-06");
+const evidenceDir = path.resolve("../docs/audits/playwright-ui-consistency-2026-10-07");
 const apiBaseUrl = "http://localhost:5000";
 const csrfToken = "playwright-csrf";
+
+fs.mkdirSync(evidenceDir, { recursive: true });
 
 async function authenticate(context) {
   const token = process.env.E2E_SESSION_TOKEN;

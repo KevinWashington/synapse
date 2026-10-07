@@ -29,10 +29,10 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 const FUNNEL_STEPS = [
-  { key: "identified", label: "Identificacao", color: "#6259ff" },
+  { key: "identified", label: "Identificação", color: "#6259ff" },
   { key: "screening", label: "Triagem", color: "#6259ff" },
   { key: "eligible", label: "Elegibilidade", color: "#49c987" },
-  { key: "included", label: "Inclusao", color: "#ffc35a" },
+  { key: "included", label: "Inclusão", color: "#ffc35a" },
 ];
 
 const PIE_COLORS = ["#6259ff", "#7c73ff", "#49c987", "#ffc35a", "#ff7b7b"];
@@ -95,7 +95,7 @@ function FunnelChart({ stats }) {
 
   return (
     <div className="h-full rounded-lg border border-[#edf0f7] bg-white p-5">
-      <p className="mb-5 text-sm font-semibold text-[#111936]">Progresso da revisao (PRISMA)</p>
+      <p className="mb-5 text-sm font-semibold text-[#111936]">Progresso da revisão (PRISMA)</p>
       <div className="space-y-2">
         {steps.map((step) => (
           <div
@@ -124,7 +124,7 @@ function FunnelChart({ stats }) {
           <div />
           <div className="text-center">
             <p className="text-lg font-semibold leading-none text-[#111936]">{formatNumber(stats.included)}</p>
-            <p className="mt-1 text-xs text-[#667391]">estudos incluidos</p>
+            <p className="mt-1 text-xs text-[#667391]">estudos incluídos</p>
           </div>
         </div>
       </div>
@@ -162,8 +162,8 @@ function EvolutionCard({ evolution }) {
   return (
     <div data-testid="overview-evolution" className="min-h-[280px] rounded-lg border border-[#edf0f7] bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#111936]">Evolucao das etapas</p>
-        <span className="rounded-lg border border-[#edf0f7] px-3 py-1 text-xs text-[#56627f]">Ultimos 10 dias</span>
+        <p className="text-sm font-semibold text-[#111936]">Evolução das etapas</p>
+        <span className="rounded-lg border border-[#edf0f7] px-3 py-1 text-xs text-[#56627f]">Últimos 10 dias</span>
       </div>
       {evolution.length ? (
         <div className="h-[210px]">
@@ -181,7 +181,7 @@ function EvolutionCard({ evolution }) {
         </div>
       ) : (
         <div className="flex h-[210px] items-center justify-center text-sm text-[#667391]">
-          Sem eventos suficientes para montar a evolucao.
+          Sem eventos suficientes para montar a evolução.
         </div>
       )}
     </div>
@@ -213,7 +213,7 @@ function StudyTypeCard({ studyTypes, included }) {
           ) : null}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-lg font-semibold text-[#111936]">{formatNumber(included)}</span>
-            <span className="text-xs text-[#667391]">incluidos</span>
+            <span className="text-xs text-[#667391]">incluídos</span>
           </div>
         </div>
         <div className="space-y-3">
@@ -239,7 +239,7 @@ function PlanningSummaryCard({ summary, onOpenPlanning }) {
     <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm font-semibold text-[#111936]">Resumo do planejamento</p>
-        <button type="button" onClick={onOpenPlanning} className="text-xs font-semibold text-[#6259ff]">
+        <button type="button" onClick={onOpenPlanning} className="cursor-pointer rounded-sm text-xs font-semibold text-[#6259ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40">
           Ver planejamento
         </button>
       </div>
@@ -253,13 +253,13 @@ function PlanningSummaryCard({ summary, onOpenPlanning }) {
           <span className="font-medium text-[#253252]">{summary.searchStringCount} string(s) cadastrada(s)</span>
         </div>
         <div className="grid grid-cols-[150px_1fr] gap-3">
-          <span className="text-[#667391]">Criterios</span>
+          <span className="text-[#667391]">Critérios</span>
           <span className="font-medium text-[#253252]">
-            {summary.inclusionCriteriaCount} inclusao / {summary.exclusionCriteriaCount} exclusao
+            {summary.inclusionCriteriaCount} inclusão / {summary.exclusionCriteriaCount} exclusão
           </span>
         </div>
         <div className="grid grid-cols-[150px_1fr] gap-3">
-          <span className="text-[#667391]">Extracao de dados</span>
+          <span className="text-[#667391]">Extração de dados</span>
           <span className="font-medium text-[#253252]">{summary.extractionFieldCount} campo(s) configurado(s)</span>
         </div>
       </div>
@@ -280,7 +280,7 @@ function RecentActivitiesCard({ activities, onOpenArticle }) {
             key={activity.id}
             type="button"
             onClick={() => activity.articleId && onOpenArticle(activity.articleId)}
-            className="flex w-full items-center gap-3 text-left"
+            className="flex w-full cursor-pointer items-center gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
           >
             <span className={cn("flex h-7 w-7 items-center justify-center rounded-full", ACTIVITY_STYLES[activity.type] || ACTIVITY_STYLES.created)}>
               {activity.type === "included" ? <CheckCircle2Icon className="h-4 w-4" /> : <FileTextIcon className="h-4 w-4" />}
@@ -305,19 +305,19 @@ function QuickActionsCard({ onImport, onGoToScreening, onViewFlow, onExport }) {
     { label: "Ir para triagem", icon: FilterIcon, onClick: onGoToScreening },
     { label: "Ver fluxo (PRISMA)", icon: BarChart3Icon, onClick: onViewFlow },
     { label: "Exportar dados", icon: DownloadIcon, onClick: onExport },
-    { label: "Gerar relatorio", icon: FileTextIcon, onClick: onExport },
+    { label: "Gerar relatório", icon: FileTextIcon, onClick: onExport },
   ];
 
   return (
     <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
-      <p className="mb-4 text-sm font-semibold text-[#111936]">Acoes rapidas</p>
+      <p className="mb-4 text-sm font-semibold text-[#111936]">Ações rápidas</p>
       <div className="space-y-1">
         {actions.map((action) => (
           <button
             key={action.label}
             type="button"
             onClick={action.onClick}
-            className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-sm font-medium text-[#253252] hover:bg-[#f7f8fc]"
+            className="flex w-full cursor-pointer items-center justify-between rounded-lg px-2 py-2 text-sm font-medium text-[#253252] hover:bg-[#f7f8fc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
           >
             <span className="flex items-center gap-3">
               <action.icon className="h-4 w-4 text-[#667391]" />
@@ -384,9 +384,9 @@ function ProjectOverview({
   async function handleExport() {
     try {
       await articleService.exportSelectionReport(project.id, "csv");
-      toast.success("Relatorio CSV exportado.");
+      toast.success("Relatório CSV exportado.");
     } catch (currentError) {
-      toast.error(`Erro ao exportar relatorio: ${currentError.message}`);
+      toast.error(`Erro ao exportar relatório: ${currentError.message}`);
     }
   }
 

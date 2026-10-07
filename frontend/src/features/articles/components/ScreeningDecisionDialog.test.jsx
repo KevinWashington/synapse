@@ -51,7 +51,7 @@ describe("ScreeningDecisionDialog accessibility", () => {
     expect(onSubmit).not.toHaveBeenCalled();
 
     fireEvent.change(field, { target: { value: "População fora da PICO; revisado manualmente." } });
-    fireEvent.click(screen.getByRole("button", { name: "Salvar decisao" }));
+    fireEvent.click(screen.getByRole("button", { name: "Salvar decisão" }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
       decision: "excluded",

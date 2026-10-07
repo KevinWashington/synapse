@@ -68,7 +68,7 @@ describe("AppHeader", () => {
     const { container, rerender } = renderHeader({ compact: false });
     const regularHeader = container.querySelector("header");
 
-    expect(regularHeader).toHaveClass("h-[72px]", "px-5", "md:px-10");
+    expect(regularHeader).toHaveClass("h-[72px]", "pl-20", "pr-5", "md:px-10");
     expect(regularHeader).not.toHaveClass("lg:px-14", "pl-16");
 
     rerender(
@@ -78,6 +78,6 @@ describe("AppHeader", () => {
     );
 
     const compactHeader = container.querySelector("header");
-    expect(compactHeader).toHaveClass("h-[72px]", "px-5", "md:px-10");
+    expect(compactHeader).toHaveClass("h-[72px]", "pl-20", "pr-5", "md:px-10");
   });
 });

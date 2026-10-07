@@ -63,7 +63,7 @@ export function ArticleLibraryList({
         </span>
       </div>
 
-      <div data-testid="library-list-scroll" className="min-h-0 flex-1 overflow-y-auto py-3">
+      <div data-testid="library-list-scroll" className="min-h-0 max-h-[620px] flex-1 overflow-y-auto py-3 pr-1">
         {loading ? (
           <LoadingState message="Carregando artigos..." />
         ) : articles.length === 0 ? (

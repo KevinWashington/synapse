@@ -49,6 +49,12 @@ describe("ProjectDetailsHeader", () => {
       />
     );
 
+    expect(screen.getByRole("button", { name: "Planejamento" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.getByRole("button", { name: "Artigos" })).not.toHaveAttribute("aria-current");
+
     fireEvent.click(screen.getByRole("button", { name: "Artigos" }));
     expect(onTabChange).toHaveBeenCalledWith("artigos");
   });

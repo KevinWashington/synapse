@@ -115,8 +115,8 @@ function ArticleEvidenceEditor({
   if (!isIncluded) {
     return (
       <EmptyState
-        title="Extracao estruturada bloqueada"
-        description="Conclua a elegibilidade e inclua este artigo no corpus final antes de preencher os dados de extracao e qualidade."
+        title="Extração estruturada bloqueada"
+        description="Conclua a elegibilidade e inclua este artigo no corpus final antes de preencher os dados de extração e qualidade."
       />
     );
   }
@@ -124,8 +124,8 @@ function ArticleEvidenceEditor({
   if (!extractionSchema.length && !qualitySchema.length) {
     return (
       <EmptyState
-        title="Nenhum esquema de extracao configurado"
-        description="Volte ao planejamento do projeto e defina primeiro os campos de extracao ou criterios de qualidade."
+        title="Nenhum esquema de extração configurado"
+        description="Volte ao planejamento do projeto e defina primeiro os campos de extração ou critérios de qualidade."
       />
     );
   }
@@ -144,7 +144,7 @@ function ArticleEvidenceEditor({
               {article?.qualityScore != null ? `${article.qualityScore}%` : "-"}
             </p>
             <p className="mt-1 text-sm text-[var(--syn-text-secondary)]">
-              Classificacao: {formatQualityRating(article?.qualityRating)}
+              Classificação: {formatQualityRating(article?.qualityRating)}
             </p>
           </div>
           <div className="rounded-lg border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] p-3">
@@ -152,7 +152,7 @@ function ArticleEvidenceEditor({
               Esquemas ativos
             </p>
             <p className="mt-2 text-sm text-[var(--syn-text-primary)]">
-              {extractionSchema.length} campo(s) de extracao
+              {extractionSchema.length} campo(s) de extração
             </p>
             <p className="mt-1 text-sm text-[var(--syn-text-primary)]">
               {qualitySchema.length} criterio(s) de qualidade
@@ -170,7 +170,7 @@ function ArticleEvidenceEditor({
           >
             <div>
               <p className="text-sm font-semibold text-[#111936]">
-                {isWorkspaceVariant ? "Informacoes gerais" : "Extracao de dados"}
+                {isWorkspaceVariant ? "Informações gerais" : "Extração de dados"}
               </p>
               {!isWorkspaceVariant ? (
                 <p className="text-xs text-[var(--syn-text-secondary)]">
@@ -335,7 +335,7 @@ function ArticleEvidenceEditor({
 
                     {usesOptions && !(field.options || []).length ? (
                       <p className="text-xs text-[var(--syn-text-secondary)]">
-                        Este campo ainda nao possui opcoes configuradas.
+                        Este campo ainda não possui opções configuradas.
                       </p>
                     ) : null}
                   </div>
@@ -353,10 +353,10 @@ function ArticleEvidenceEditor({
             )}
           >
             <div>
-              <p className="text-sm font-semibold text-[#111936]">Avaliacao de qualidade</p>
+              <p className="text-sm font-semibold text-[#111936]">Avaliação de qualidade</p>
               {!isWorkspaceVariant ? (
                 <p className="text-xs text-[var(--syn-text-secondary)]">
-                  Use a escala fixa para registrar a avaliacao de cada criterio.
+                  Use a escala fixa para registrar a avaliação de cada critério.
                 </p>
               ) : null}
             </div>
@@ -410,7 +410,7 @@ function ArticleEvidenceEditor({
           ) : (
             <>
               <SaveIcon className="h-4 w-4" />
-              Salvar extracao
+              Salvar extração
             </>
           )}
         </Button>

@@ -165,7 +165,7 @@ describe("ProjectArticles work queue", () => {
 
     expect(screen.getByRole("button", { name: "Incluir" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Pular por agora" })).toBeInTheDocument();
-    expect(screen.getByText(/Envie o PDF para liberar a decisao de inclusao/)).toBeInTheDocument();
+    expect(screen.getByText(/Envie o PDF para liberar a decisão de inclusão/)).toBeInTheDocument();
   });
 });
 

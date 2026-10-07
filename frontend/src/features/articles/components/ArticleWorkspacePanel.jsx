@@ -21,7 +21,7 @@ const INCLUDED_TABS = [
   REVIEW_TABS[0],
   {
     key: "extracao",
-    label: "Extracao",
+    label: "Extração",
     icon: DatabaseIcon,
   },
   REVIEW_TABS[1],

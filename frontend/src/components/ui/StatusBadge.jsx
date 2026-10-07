@@ -9,35 +9,35 @@ const variants = {
 };
 
 const STATUS_MAP = {
-  ideia: { variant: "neutral", label: "Todo" },
-  "em-progresso": { variant: "blue", label: "In Progress" },
-  concluido: { variant: "low", label: "Completed" },
-  pausado: { variant: "medium", label: "On Hold" },
-  pendente: { variant: "medium", label: "Nao lido" },
+  ideia: { variant: "neutral", label: "Planejamento" },
+  "em-progresso": { variant: "blue", label: "Em andamento" },
+  concluido: { variant: "low", label: "Concluído" },
+  pausado: { variant: "medium", label: "Pausado" },
+  pendente: { variant: "medium", label: "Não lido" },
   analisado: { variant: "low", label: "Lido" },
-  excluido: { variant: "high", label: "Excluido" },
-  incluido: { variant: "blue", label: "Incluido" },
+  excluido: { variant: "high", label: "Excluído" },
+  incluido: { variant: "blue", label: "Incluído" },
   lendo: { variant: "neutral", label: "Lendo" },
-  identification: { variant: "neutral", label: "Identification" },
-  screening: { variant: "medium", label: "Screening" },
-  eligibility: { variant: "blue", label: "Eligibility" },
+  identification: { variant: "neutral", label: "Identificação" },
+  screening: { variant: "medium", label: "Triagem" },
+  eligibility: { variant: "blue", label: "Elegibilidade" },
   active: { variant: "neutral", label: "Ativo" },
   duplicate_removed: { variant: "high", label: "Duplicado" },
-  excluded_screening: { variant: "high", label: "Excluido no Screening" },
-  full_text_unavailable: { variant: "medium", label: "Texto Completo Indisponivel" },
-  excluded_eligibility: { variant: "high", label: "Excluido na Elegibilidade" },
+  excluded_screening: { variant: "high", label: "Excluído na triagem" },
+  full_text_unavailable: { variant: "medium", label: "Texto completo indisponível" },
+  excluded_eligibility: { variant: "high", label: "Excluído na elegibilidade" },
 };
 
 const PRIORITY_MAP = {
-  high: { variant: "high", label: "High Priority" },
-  medium: { variant: "medium", label: "Medium Priority" },
-  low: { variant: "low", label: "Low Priority" },
+  high: { variant: "high", label: "Prioridade alta" },
+  medium: { variant: "medium", label: "Prioridade média" },
+  low: { variant: "low", label: "Prioridade baixa" },
 };
 
 const TYPE_MAP = {
-  "revisao-sistematica": { variant: "high", label: "Revisao Sistematica" },
-  "meta-analise": { variant: "blue", label: "Meta-analise" },
-  "scoping-review": { variant: "low", label: "Scoping Review" },
+  "revisao-sistematica": { variant: "high", label: "Revisão sistemática" },
+  "meta-analise": { variant: "blue", label: "Meta-análise" },
+  "scoping-review": { variant: "low", label: "Revisão de escopo" },
 };
 
 export function StatusBadge({

@@ -80,6 +80,7 @@ describe("article library list", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Biblioteca de artigos" })).toBeInTheDocument();
     expect(screen.getByTestId("library-list-surface")).not.toHaveClass("rounded-[var(--syn-radius-card)]");
     expect(screen.getByTestId("library-list-surface")).not.toHaveClass("h-[calc(100dvh-15rem)]");
+    expect(screen.getByTestId("library-list-scroll")).toHaveClass("max-h-[620px]", "overflow-y-auto");
     expect(screen.getByRole("button", { name: "Abrir Artigo 1" })).toHaveClass("cursor-pointer");
   });
 

@@ -54,7 +54,7 @@ const STAGES = [
     key: "screening",
     number: 2,
     label: "Triagem",
-    description: "Classifique os estudos com base nos criterios de elegibilidade definidos.",
+    description: "Classifique os estudos com base nos critérios de elegibilidade definidos.",
     icon: ShieldCheckIcon,
   },
   {
@@ -68,7 +68,7 @@ const STAGES = [
     key: "included",
     number: 4,
     label: "Inclusão",
-    description: "Estudos que atendem a todos os criterios e serao incluidos na revisão.",
+    description: "Estudos que atendem a todos os critérios e serão incluídos na revisão.",
     icon: CheckCircle2Icon,
   },
 ];
@@ -158,7 +158,7 @@ export function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = 
     return [
       { key: "all", label: "Na fila", count: stageTotal },
       { key: "duplicates", label: "Duplicatas", count: duplicates },
-      { key: "unique", label: "Unicos", count: Math.max(stageTotal - duplicates, 0) },
+      { key: "unique", label: "Únicos", count: Math.max(stageTotal - duplicates, 0) },
     ];
   }
 
@@ -170,7 +170,7 @@ export function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = 
     { key: "all", label: "Todos", count: articles.length },
     {
       key: "pending_extraction",
-      label: "Aguarda extracao",
+      label: "Aguarda extração",
       count: articles.filter((article) => !Object.keys(article.extractionData || {}).length).length,
     },
   ];
@@ -431,7 +431,7 @@ export function StageListPanel({
             <Input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder={activeStage === "identification" ? "Buscar por titulo, autor ou palavra-chave" : "Buscar artigos"}
+              placeholder={activeStage === "identification" ? "Buscar por título, autor ou palavra-chave" : "Buscar artigos"}
               className="h-11 rounded-lg border-[#dfe4ef] bg-white pl-11 text-sm shadow-none"
             />
           </div>
@@ -726,20 +726,20 @@ export function ArticleDetailPanel({
             {activeStage === "eligibility" ? (
               <div className="rounded-lg border border-[#edf0f7] bg-[#fbfcff] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-[#111936]">{article.hasPdf ? "PDF disponivel" : "Texto completo pendente"}</span>
+                  <span className="text-sm font-semibold text-[#111936]">{article.hasPdf ? "PDF disponível" : "Texto completo pendente"}</span>
                   <Button variant="outline" size="sm" className="h-8 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => article.hasPdf ? onOpenArticle(article.id) : onOpenUploadPdf(article)}>
                     {article.hasPdf ? <ExternalLinkIcon className="h-3.5 w-3.5" /> : <UploadIcon className="h-3.5 w-3.5" />}
                     {article.hasPdf ? "Abrir artigo" : "Enviar PDF"}
                   </Button>
                 </div>
                 <div className="h-64 overflow-hidden rounded-md border border-[#dfe4ef] bg-white p-5 text-sm leading-6 text-[#56627f]">
-                  {article.abstract || "Este artigo ainda nao possui resumo cadastrado. Envie o PDF ou complemente os metadados para avaliar o texto completo."}
+                  {article.abstract || "Este artigo ainda não possui resumo cadastrado. Envie o PDF ou complemente os metadados para avaliar o texto completo."}
                 </div>
               </div>
             ) : (
               <div>
                 <p className="line-clamp-[8] text-sm leading-7 text-[#56627f]">
-                  {article.abstract || "Resumo nao cadastrado para este artigo."}
+                  {article.abstract || "Resumo não cadastrado para este artigo."}
                 </p>
               </div>
             )}
@@ -763,7 +763,7 @@ export function ArticleDetailPanel({
 
             {activeStage === "screening" ? (
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-[#111936]">Sua decisao</h3>
+                <h3 className="mb-3 text-sm font-semibold text-[#111936]">Sua decisão</h3>
                 <div className="grid gap-3 md:grid-cols-3">
                   <Button className="h-12 gap-2 rounded-lg border border-[#27a363] bg-[#eefaf3] text-[#19884f] hover:bg-[#e3f6eb]" onClick={() => onOpenScreening(article, "included")}>
                     <CheckCircle2Icon className="h-5 w-5" />
@@ -783,7 +783,7 @@ export function ArticleDetailPanel({
 
             {activeStage === "eligibility" ? (
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-[#111936]">Sua decisao</h3>
+                <h3 className="mb-3 text-sm font-semibold text-[#111936]">Sua decisão</h3>
                 <div className="grid gap-3 md:grid-cols-3">
                   <Button
                     className="h-12 gap-2 rounded-lg border border-[#27a363] bg-[#eefaf3] text-[#19884f] hover:bg-[#e3f6eb]"
@@ -803,11 +803,11 @@ export function ArticleDetailPanel({
                   </Button>
                 </div>
                 {!article.hasPdf && article.fullTextStatus !== "uploaded" ? (
-                  <p className="mt-3 text-xs text-[#d48700]">Envie o PDF para liberar a decisao de inclusao.</p>
+                  <p className="mt-3 text-xs text-[#d48700]">Envie o PDF para liberar a decisão de inclusão.</p>
                 ) : null}
                 {!article.hasPdf ? (
                   <Button variant="outline" className="mt-3 h-10 rounded-lg border-[#dfe4ef] bg-white" onClick={() => onOpenEligibility(article, "full_text_unavailable")}>
-                    Marcar texto completo indisponivel
+                    Marcar texto completo indisponível
                   </Button>
                 ) : null}
               </div>
@@ -887,7 +887,7 @@ export function StageSidebar({
     ],
     included: [
       { label: "Incluidos", value: summary?.included || 0, dot: "bg-[#14a365]" },
-      { label: "Aguarda extracao", value: extractionPending, dot: "bg-[#6259ff]" },
+      { label: "Aguarda extração", value: extractionPending, dot: "bg-[#6259ff]" },
     ],
   }[activeStage];
 
@@ -920,7 +920,7 @@ export function StageSidebar({
       ) : null}
 
       <section className="rounded-lg border border-[#edf0f7] bg-white p-5">
-        <h3 className="text-sm font-semibold text-[#111936]">Acoes rapidas</h3>
+        <h3 className="text-sm font-semibold text-[#111936]">Ações rápidas</h3>
         <div className="mt-4 space-y-2">
           {activeStage === "identification" ? (
             <>
@@ -957,7 +957,7 @@ export function StageSidebar({
           {activeStage === "included" ? (
             <>
               <Button variant="outline" className="h-10 w-full justify-start rounded-lg border-[#dfe4ef] bg-white" onClick={onExportStage}>
-                Exportar lista de incluidos
+                Exportar lista de incluídos
               </Button>
               <Button variant="outline" className="h-10 w-full justify-start rounded-lg border-[#dfe4ef] bg-white" onClick={onViewFlow}>
                 Ver fluxograma PRISMA
@@ -973,8 +973,8 @@ export function StageSidebar({
           {activeStage === "identification"
             ? "Revise e remova duplicatas para garantir que cada estudo seja avaliado apenas uma vez."
             : activeStage === "included"
-              ? "Preencha a extracao estruturada dos estudos incluidos antes da sintese final."
-              : "Registre decisoes com justificativas para manter a trilha de auditoria da revisao."}
+              ? "Preencha a extração estruturada dos estudos incluídos antes da síntese final."
+              : "Registre decisões com justificativas para manter a trilha de auditoria da revisão."}
         </p>
       </section>
     </aside>
@@ -1132,7 +1132,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
       return;
     }
     selectAdjacent(1);
-    toast.info("Artigo mantido pendente. Proximo item aberto.");
+    toast.info("Artigo mantido pendente. Próximo item aberto.");
   }
 
   return (
@@ -1225,7 +1225,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
             setScreeningInitialDecision(initialDecision);
             setScreeningArticle(article);
             if (initialDecision === "excluded") {
-              toast.info("Informe a justificativa na janela de decisao.");
+              toast.info("Informe a justificativa na janela de decisão.");
             }
           }}
           onOpenUploadPdf={openUploadPdf}

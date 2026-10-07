@@ -166,7 +166,7 @@ function useArticleDetailsPage() {
       try {
         const updated = await articleService.submitScreeningDecision(projectId, articleId, payload);
         setArticle(updated);
-        toast.success("Decisao de screening registrada.");
+        toast.success("Decisão de triagem registrada.");
         return updated;
       } catch (currentError) {
         toast.error("Erro ao registrar screening: " + currentError.message);
@@ -181,7 +181,7 @@ function useArticleDetailsPage() {
       try {
         const updated = await articleService.submitEligibilityDecision(projectId, articleId, payload);
         setArticle(updated);
-        toast.success("Decisao de elegibilidade registrada.");
+        toast.success("Decisão de elegibilidade registrada.");
         return updated;
       } catch (currentError) {
         toast.error("Erro ao registrar elegibilidade: " + currentError.message);

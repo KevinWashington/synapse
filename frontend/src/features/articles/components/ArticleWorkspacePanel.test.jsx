@@ -22,7 +22,7 @@ describe("ArticleWorkspacePanel stage tools", () => {
 
       expect(screen.getByRole("button", { name: "Notas" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Assistente IA" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Extracao" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Extração" })).not.toBeInTheDocument();
     }
   );
 

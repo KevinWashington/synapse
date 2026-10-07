@@ -1,9 +1,12 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
 
-const evidenceDir = path.resolve("../docs/audits/playwright-review-flow-2026-10-06");
+const evidenceDir = path.resolve("../docs/audits/playwright-ui-consistency-2026-10-07");
 const apiBaseUrl = "http://localhost:5000";
 const csrfToken = "playwright-csrf";
+
+fs.mkdirSync(evidenceDir, { recursive: true });
 
 async function authenticate(context) {
   const token = process.env.E2E_SESSION_TOKEN;
@@ -108,13 +111,13 @@ test.describe("review workflow audit", () => {
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
       await expect(page.getByRole("dialog")).toBeVisible();
       await capture(page, testInfo, "04", "screening-include-dialog");
-      await page.getByRole("button", { name: "Salvar decisao" }).click();
+      await page.getByRole("button", { name: "Salvar decisão" }).click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
 
       await openArticleFromRow(page, titles[1]);
       await page.getByRole("button", { name: "Excluir", exact: true }).click();
-      await page.getByPlaceholder(/Obrigatorio ao excluir/).fill("Nao responde a pergunta de pesquisa.");
-      await page.getByRole("button", { name: "Salvar decisao" }).click();
+      await page.getByPlaceholder(/Obrigatório ao excluir/).fill("Não responde à pergunta de pesquisa.");
+      await page.getByRole("button", { name: "Salvar decisão" }).click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
       await expect(articleRow(page, titles[1])).toHaveCount(0);
       await expect(page.getByText("Selecione um artigo", { exact: true })).toBeVisible();
@@ -125,11 +128,11 @@ test.describe("review workflow audit", () => {
       await expect(page.getByRole("heading", { name: "Elegibilidade" })).toBeVisible();
       await expect(articleRow(page, titles[0])).toBeVisible();
       await page.getByRole("button", { name: "Pular por agora", exact: true }).click();
-      await expect(page.getByText("Artigo mantido pendente. Proximo item aberto.")).toBeVisible();
+      await expect(page.getByText("Artigo mantido pendente. Próximo item aberto.")).toBeVisible();
       await capture(page, testInfo, "06", "eligibility-pending-action");
 
       await expect(page.getByRole("button", { name: "Incluir", exact: true })).toBeDisabled();
-      await expect(page.getByText("Envie o PDF para liberar a decisao de inclusao.")).toBeVisible();
+      await expect(page.getByText("Envie o PDF para liberar a decisão de inclusão.")).toBeVisible();
       await capture(page, testInfo, "07", "eligibility-inclusion-blocked-without-pdf");
 
       await page.getByRole("button", { name: "Enviar PDF" }).click();
@@ -140,9 +143,9 @@ test.describe("review workflow audit", () => {
       });
       await page.getByRole("dialog").getByRole("button", { name: "Enviar PDF" }).click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
-      await expect(page.getByText("PDF disponivel")).toBeVisible();
+      await expect(page.getByText("PDF disponível")).toBeVisible();
       const detailAfterUpload = await page.locator("section").filter({ hasText: titles[0] }).last().innerText();
-      observations.push(`detail-after-upload-shows-pdf=${detailAfterUpload.includes("PDF disponivel")}`);
+      observations.push(`detail-after-upload-shows-pdf=${detailAfterUpload.includes("PDF disponível")}`);
       observations.push(`detail-after-upload-still-pending=${detailAfterUpload.includes("Texto completo pendente")}`);
       await capture(page, testInfo, "08", "eligibility-after-upload");
 
@@ -150,7 +153,7 @@ test.describe("review workflow audit", () => {
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
       await page.getByText("Sim", { exact: true }).click();
       await page.getByText("RQ 1", { exact: true }).click();
-      await page.getByRole("button", { name: "Salvar decisao" }).click();
+      await page.getByRole("button", { name: "Salvar decisão" }).click();
       await expect(page.getByRole("dialog")).not.toBeVisible();
 
       await page.getByRole("button", { name: /Inclus/ }).first().click();

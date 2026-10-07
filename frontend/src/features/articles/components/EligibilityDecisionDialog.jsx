@@ -463,7 +463,7 @@ function EligibilityDecisionDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Decisao de Elegibilidade</DialogTitle>
+          <DialogTitle>Decisão de elegibilidade</DialogTitle>
           <DialogDescription>{article?.title || "Artigo selecionado"}</DialogDescription>
         </DialogHeader>
 
@@ -630,7 +630,7 @@ function EligibilityDecisionDialog({
                   Salvando...
                 </span>
               ) : (
-                "Salvar decisao"
+                "Salvar decisão"
               )}
             </Button>
           </DialogFooter>
