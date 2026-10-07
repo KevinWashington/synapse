@@ -74,6 +74,22 @@ function buildInitialData(project, framework) {
   };
 }
 
+function stableSerialize(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(",")}]`;
+  }
+
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .filter((key) => value[key] !== undefined)
+      .map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`)
+      .join(",")}}`;
+  }
+
+  return JSON.stringify(value);
+}
+
 export default function useProjectPlanning(project = {}, onProjectUpdated) {
   const framework = project.framework || "PICOC";
 
@@ -88,12 +104,24 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
   const [targetDatabase, setTargetDatabase] = useState("scopus");
   const [loadingMap, setLoadingMap] = useState(() => INITIAL_LOADING_MAP);
   const latestProjectRef = useRef(project);
+  const savedDataRef = useRef(buildInitialData(project, framework));
 
   latestProjectRef.current = project;
 
   useEffect(() => {
-    setData(buildInitialData(latestProjectRef.current, framework));
+    const nextData = buildInitialData(latestProjectRef.current, framework);
+    savedDataRef.current = nextData;
+    setData(nextData);
   }, [framework, project?.id, project?.updatedAt, project?.updated_at]);
+
+  const isDirty = useMemo(
+    () => stableSerialize(data) !== stableSerialize(savedDataRef.current),
+    [data]
+  );
+
+  const discardChanges = useCallback(() => {
+    setData(buildInitialData(savedDataRef.current, framework));
+  }, [framework]);
 
   const setActionLoading = useCallback((key, value) => {
     setLoadingMap((current) => {
@@ -310,8 +338,10 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
         ...data,
         picoc: data.picoc,
       });
+      const nextData = buildInitialData(updatedProject, updatedProject.framework || framework);
       latestProjectRef.current = updatedProject;
-      setData(buildInitialData(updatedProject, updatedProject.framework || framework));
+      savedDataRef.current = nextData;
+      setData(nextData);
       onProjectUpdated?.(updatedProject);
 
       toast.success("Projeto salvo com sucesso!");
@@ -444,18 +474,18 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
   ]);
 
   const generateExtractionSchema = useCallback(async () => {
-    if (!ensureResearchQuestions("gerar o esquema de extracao")) {
+    if (!ensureResearchQuestions("gerar o esquema de extração")) {
       return;
     }
 
-    if (!ensureRequiredComponents("antes de gerar o esquema de extracao")) {
+    if (!ensureRequiredComponents("antes de gerar o esquema de extração")) {
       return;
     }
 
     if (
       data.dataExtractionSchema?.length &&
       !confirm(
-        "Gerar com IA vai substituir o esquema de extracao atual. Deseja continuar?"
+        "Gerar com IA vai substituir o esquema de extração atual. Deseja continuar?"
       )
     ) {
       return;
@@ -476,9 +506,9 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
         dataExtractionSchema: response.dataExtractionSchema || [],
       }));
 
-      toast.success("Esquema de extracao gerado com sucesso!");
+      toast.success("Esquema de extração gerado com sucesso!");
     } catch (error) {
-      toast.error("Erro ao gerar esquema de extracao: " + error.message);
+      toast.error("Erro ao gerar esquema de extração: " + error.message);
     } finally {
       setActionLoading("extractionSchema", false);
     }
@@ -494,18 +524,18 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
   ]);
 
   const generateQualityAssessmentSchema = useCallback(async () => {
-    if (!ensureResearchQuestions("gerar os criterios de qualidade")) {
+    if (!ensureResearchQuestions("gerar os critérios de qualidade")) {
       return;
     }
 
-    if (!ensureRequiredComponents("antes de gerar os criterios de qualidade")) {
+    if (!ensureRequiredComponents("antes de gerar os critérios de qualidade")) {
       return;
     }
 
     if (
       data.qualityAssessmentSchema?.length &&
       !confirm(
-        "Gerar com IA vai substituir os criterios de qualidade atuais. Deseja continuar?"
+        "Gerar com IA vai substituir os critérios de qualidade atuais. Deseja continuar?"
       )
     ) {
       return;
@@ -526,9 +556,9 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
         qualityAssessmentSchema: response.qualityAssessmentSchema || [],
       }));
 
-      toast.success("Criterios de qualidade gerados com sucesso!");
+      toast.success("Critérios de qualidade gerados com sucesso!");
     } catch (error) {
-      toast.error("Erro ao gerar criterios de qualidade: " + error.message);
+      toast.error("Erro ao gerar critérios de qualidade: " + error.message);
     } finally {
       setActionLoading("qualityAssessmentSchema", false);
     }
@@ -548,6 +578,7 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
     addArrayItem,
     addQualityCriterion,
     data,
+    discardChanges,
     framework,
     frameworkComponents,
     frameworkInfo,
@@ -557,6 +588,7 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
     generateResearchQuestions,
     generateSearchStrings,
     handleSave,
+    isDirty,
     loadingMap,
     removeExtractionField,
     removeArrayItem,

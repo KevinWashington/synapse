@@ -122,18 +122,19 @@ function PlanningArrayField({
               ) : (
                 <div className="flex items-start gap-1 group">
                   <div
-                    className="flex-1 p-2 px-3 rounded-lg bg-[var(--syn-bg-secondary)] text-sm text-[var(--syn-text-primary)] border border-transparent group-hover:border-[var(--syn-border)] transition-all cursor-pointer"
+                    className="flex-1 cursor-pointer rounded-lg border border-[var(--syn-border)] bg-white p-2 px-3 text-sm text-[var(--syn-text-primary)] transition-all hover:border-[#c7cede]"
                     onClick={() => handleStartEditing(index, item)}
                   >
                     {item}
                   </div>
-                  <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex transition-opacity">
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleStartEditing(index, item)}
                       className="h-8 w-8 p-0"
+                      aria-label={`Editar ${item}`}
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -143,6 +144,7 @@ function PlanningArrayField({
                       size="sm"
                       onClick={() => onRemoveItem(fieldKey, index)}
                       className="h-8 w-8 p-0 hover:text-red-500"
+                      aria-label={`Remover ${item}`}
                     >
                       <X className="h-4 w-4" />
                     </Button>

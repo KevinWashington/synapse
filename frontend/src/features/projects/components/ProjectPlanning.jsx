@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpenIcon,
   CalendarIcon,
@@ -52,10 +52,10 @@ const COMPONENT_COLORS = [
 
 const FIELD_TYPE_LABELS = {
   text: "Texto curto",
-  number: "Numero",
-  single_select: "Selecao unica",
-  multi_select: "Multipla selecao",
-  boolean: "Sim/Nao",
+  number: "Número",
+  single_select: "Seleção única",
+  multi_select: "Múltipla seleção",
+  boolean: "Sim/Não",
 };
 
 function formatDate(value) {
@@ -130,12 +130,12 @@ function ArrayEditor({
                 value={item}
                 title={item}
                 onChange={(event) => updateArrayItem(fieldKey, index, event.target.value)}
-                className="h-8 truncate border-transparent bg-white/75 text-xs text-[#253252] shadow-none"
+                className="h-8 truncate border-[#dfe4ef] bg-white text-xs text-[#253252] shadow-none"
               />
               <button
                 type="button"
                 onClick={() => removeArrayItem(fieldKey, index)}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/70"
+                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
                 aria-label="Remover item"
               >
                 <Trash2Icon className="h-3.5 w-3.5" />
@@ -148,7 +148,7 @@ function ArrayEditor({
             value={newValue}
             onChange={(event) => setNewValue(event.target.value)}
             placeholder={placeholder}
-            className="h-8 border-transparent bg-white/75 text-xs shadow-none"
+            className="h-8 border-[#dfe4ef] bg-white text-xs shadow-none"
           />
           <Button
             type="button"
@@ -197,12 +197,12 @@ function CriteriaSummaryGroup({ items, label, tone }) {
           ))
         ) : (
           <div className="rounded-md border border-dashed border-white/80 px-3 py-4 text-center text-xs">
-            Nenhum criterio definido
+            Nenhum critério definido
           </div>
         )}
         {hiddenCount > 0 ? (
           <p className="px-1 text-[11px] font-medium">
-            +{hiddenCount} criterios no editor
+            +{hiddenCount} critérios no editor
           </p>
         ) : null}
       </div>
@@ -216,10 +216,10 @@ function EligibilityCriteriaSummary({ inclusionItems, exclusionItems }) {
   return (
     <div className="space-y-3">
       <div className="rounded-md border border-[#edf0f7] bg-[#fbfcff] px-3 py-2">
-        <span className="text-xs font-semibold text-[#253252]">{total} criterios definidos</span>
+        <span className="text-xs font-semibold text-[#253252]">{total} critérios definidos</span>
       </div>
-      <CriteriaSummaryGroup items={inclusionItems} label="Inclusao" tone="green" />
-      <CriteriaSummaryGroup items={exclusionItems} label="Exclusao" tone="red" />
+      <CriteriaSummaryGroup items={inclusionItems} label="Inclusão" tone="green" />
+      <CriteriaSummaryGroup items={exclusionItems} label="Exclusão" tone="red" />
     </div>
   );
 }
@@ -257,7 +257,7 @@ function SearchStringsEditor({
         <span>Base</span>
         <span>String de busca</span>
         <span>Resultados</span>
-        <span>Ultima atualizacao</span>
+        <span>Última atualização</span>
         <span />
       </div>
 
@@ -306,7 +306,7 @@ function SearchStringsEditor({
                 <button
                   type="button"
                   onClick={() => setEditingSearchIndex(index)}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e7ebf4] text-[#253252] hover:bg-[#f4f6fb]"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#e7ebf4] text-[#253252] hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
                   aria-label="Editar string"
                 >
                   <Edit3Icon className="h-3.5 w-3.5" />
@@ -314,7 +314,7 @@ function SearchStringsEditor({
                 <button
                   type="button"
                   onClick={() => onRemove("searchStrings", index)}
-                  className="flex h-8 w-8 items-center justify-center rounded-md border border-[#e7ebf4] text-[#667391] hover:bg-[#f4f6fb]"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-[#e7ebf4] text-[#667391] hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
                   aria-label="Remover string"
                 >
                   <Trash2Icon className="h-3.5 w-3.5" />
@@ -492,13 +492,14 @@ function exportPlanning(project, data) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function ProjectPlanning({ project = {}, onProjectUpdated }) {
+function ProjectPlanning({ project = {}, onDirtyChange, onProjectUpdated }) {
   const [criteriaDialogOpen, setCriteriaDialogOpen] = useState(false);
   const {
     addExtractionField,
     addArrayItem,
     addQualityCriterion,
     data,
+    discardChanges,
     framework,
     frameworkComponents,
     generateCriteria,
@@ -507,6 +508,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
     generateResearchQuestions,
     generateSearchStrings,
     handleSave,
+    isDirty,
     loadingMap,
     removeExtractionField,
     removeArrayItem,
@@ -519,6 +521,10 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
     updateField,
     updateQualityCriterion,
   } = useProjectPlanning(project, onProjectUpdated);
+
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const completion = useMemo(() => {
     const checks = [
@@ -551,15 +557,6 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
             <DownloadIcon className="h-4 w-4" />
             Exportar planejamento
           </Button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            disabled={loadingMap.save}
-            className="h-10 gap-2 rounded-lg bg-[#6259ff] px-5 text-white hover:bg-[#5148ee]"
-          >
-            {loadingMap.save ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar alteracoes
-          </Button>
         </div>
       </div>
 
@@ -581,7 +578,8 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
                   value={data.picoc?.[component.key] || ""}
                   onChange={(event) => updateComponent(component.key, event.target.value)}
                   placeholder={component.placeholder}
-                  className="h-9 border-transparent bg-[#fbfcff] text-sm text-[#253252] shadow-none"
+                  aria-label={component.labelPt}
+                  className="h-10 border-[#dfe4ef] bg-white text-sm text-[#253252] shadow-none hover:border-[#c7cede]"
                 />
               </div>
             ))}
@@ -590,7 +588,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
 
         <PlanningCard
           title="Perguntas de pesquisa"
-          description="Defina as perguntas que orientam a revisao sistematica."
+          description="Defina as perguntas que orientam a revisão sistemática."
           action={
             <Button
               variant="outline"
@@ -615,7 +613,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
 
       <div className="grid gap-5">
         <PlanningCard
-          title="Estrategia de busca"
+          title="Estratégia de busca"
           description="Gerencie as strings de busca para as bases de dados."
           action={
             <div className="flex items-center gap-2">
@@ -657,8 +655,8 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <PlanningCard
-          title="Criterios de elegibilidade"
-          description="Defina os criterios para inclusao e exclusao de estudos."
+          title="Critérios de elegibilidade"
+          description="Defina os critérios para inclusão e exclusão de estudos."
           action={
             <div className="flex items-center gap-2">
               <Button
@@ -691,7 +689,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
 
         <PlanningCard
           title="Extração de dados"
-          description="Configure os campos que serao extraidos dos estudos."
+          description="Configure os campos que serão extraídos dos estudos."
           action={
             <div className="flex items-center gap-2">
               <Button
@@ -721,10 +719,10 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
                 <Input
                   value={field.label || ""}
                   onChange={(event) => updateExtractionField(index, { label: event.target.value })}
-                  className="h-8 border-transparent bg-[#fbfcff] text-xs text-[#253252] shadow-none"
+                  className="h-9 border-[#dfe4ef] bg-white text-xs text-[#253252] shadow-none hover:border-[#c7cede]"
                 />
                 <Select value={field.type || "text"} onValueChange={(value) => updateExtractionField(index, { type: value })}>
-                  <SelectTrigger className="h-8 border-transparent bg-[#fbfcff] text-xs shadow-none">
+                  <SelectTrigger className="h-9 border-[#dfe4ef] bg-white text-xs shadow-none">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -738,7 +736,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
                 <button
                   type="button"
                   onClick={() => removeExtractionField(index)}
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-[#667391] hover:bg-[#f4f6fb]"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-[#667391] hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
                   aria-label="Remover campo"
                 >
                   <Trash2Icon className="h-4 w-4" />
@@ -751,21 +749,21 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <PlanningCard
-          title="Guia para screening"
-          description="Oriente a triagem por titulo e resumo."
+          title="Guia para triagem"
+          description="Oriente a triagem por título e resumo."
         >
           <Textarea
             value={data.screeningGuidance}
             onChange={(event) => updateField("screeningGuidance", event.target.value)}
-            placeholder="Orientacoes para triagem por titulo e resumo..."
+            placeholder="Orientações para triagem por título e resumo..."
             rows={5}
             className="min-h-[132px] resize-none overflow-y-auto border-[#e7ebf4] bg-[#fbfcff] text-xs shadow-none"
           />
         </PlanningCard>
 
         <PlanningCard
-          title="Criterios de qualidade"
-          description="Defina os criterios usados para avaliacao de qualidade dos estudos."
+          title="Critérios de qualidade"
+          description="Defina os critérios usados para avaliação da qualidade dos estudos."
           action={
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={addQualityCriterion}>
@@ -797,8 +795,8 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
                 <button
                   type="button"
                   onClick={() => removeQualityCriterion(index)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[#667391] hover:bg-[#f4f6fb]"
-                  aria-label="Remover criterio"
+                  className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-[#667391] hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
+                  aria-label="Remover critério"
                 >
                   <Trash2Icon className="h-4 w-4" />
                 </button>
@@ -806,7 +804,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
             ))}
             {!(data.qualityAssessmentSchema || []).length ? (
               <div className="rounded-md border border-dashed border-[#dfe4ef] bg-[#fbfcff] px-4 py-6 text-center">
-                <p className="text-sm font-semibold text-[#253252]">Nenhum criterio definido</p>
+                <p className="text-sm font-semibold text-[#253252]">Nenhum critério definido</p>
                 <p className="mt-1 text-xs text-[#667391]">Adicione manualmente ou gere com IA.</p>
               </div>
             ) : null}
@@ -820,10 +818,10 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
             {[
               { label: framework, detail: "Framework", done: completion.checks[0], icon: Globe2Icon },
               { label: "Perguntas", detail: `${data.researchQuestions?.length || 0} perguntas`, done: completion.checks[1], icon: BookOpenIcon },
-              { label: "Estrategia de busca", detail: `${data.searchStrings?.length || 0} strings`, done: completion.checks[2], icon: DatabaseIcon },
-              { label: "Criterios", detail: `${(data.criteriosInclusao?.length || 0) + (data.criteriosExclusao?.length || 0)} definidos`, done: completion.checks[3], icon: ShieldCheckIcon },
+              { label: "Estratégia de busca", detail: `${data.searchStrings?.length || 0} strings`, done: completion.checks[2], icon: DatabaseIcon },
+              { label: "Critérios", detail: `${(data.criteriosInclusao?.length || 0) + (data.criteriosExclusao?.length || 0)} definidos`, done: completion.checks[3], icon: ShieldCheckIcon },
               { label: "Extração de dados", detail: `${data.dataExtractionSchema?.length || 0} campos`, done: completion.checks[4], icon: FileTextIcon },
-              { label: "Configuracoes", detail: `${data.qualityAssessmentSchema?.length || 0} qualidade`, done: completion.checks[5], icon: UsersIcon },
+              { label: "Configurações", detail: `${data.qualityAssessmentSchema?.length || 0} qualidade`, done: completion.checks[5], icon: UsersIcon },
             ].map((item, index, items) => (
               <div key={item.label} className="relative flex-col items-center gap-3">
                 <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", item.done ? "bg-[#e8f8ef] text-[#2fa060]" : "bg-[#f4f6fb] text-[#9aa4b8]")}>
@@ -844,19 +842,48 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
             <div className="relative flex h-28 w-28 items-center justify-center rounded-full bg-[conic-gradient(#6259ff_var(--planning-progress),#edf0f7_0)]" style={{ "--planning-progress": `${completion.percent}%` }}>
               <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white">
                 <span className="text-lg font-semibold text-[#111936]">{completion.percent}%</span>
-                <span className="text-xs text-[#667391]">concluido</span>
+                <span className="text-xs text-[#667391]">concluído</span>
               </div>
             </div>
           </div>
         </div>
       </PlanningCard>
 
+      {isDirty ? (
+        <div className="sticky bottom-4 z-20 flex flex-col gap-3 rounded-xl border border-[#d8d4ff] bg-white px-4 py-3 shadow-[0_18px_50px_rgba(31,38,73,0.18)] sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#111936]">Alterações não salvas</p>
+            <p className="mt-0.5 text-xs text-[#667391]">Salve antes de sair para não perder o planejamento.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={discardChanges}
+              disabled={loadingMap.save}
+              className="h-10 border-[#dfe4ef] bg-white"
+            >
+              Descartar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={loadingMap.save}
+              className="h-10 gap-2 bg-[#6259ff] px-5 text-white hover:bg-[#5148ee]"
+            >
+              {loadingMap.save ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar alterações
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       <Dialog open={criteriaDialogOpen} onOpenChange={setCriteriaDialogOpen}>
         <DialogContent className="max-h-[86vh] max-w-6xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Criterios de elegibilidade</DialogTitle>
+            <DialogTitle>Critérios de elegibilidade</DialogTitle>
             <DialogDescription>
-              Edite os criterios de inclusão e exclusão usados na seleção dos estudos.
+              Edite os critérios de inclusão e exclusão usados na seleção dos estudos.
             </DialogDescription>
           </DialogHeader>
 
@@ -866,7 +893,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
               fieldKey="criteriosInclusao"
               items={data.criteriosInclusao}
               label="Inclusão"
-              placeholder="Novo criterio de inclusão..."
+              placeholder="Novo critério de inclusão..."
               removeArrayItem={removeArrayItem}
               tone="green"
               updateArrayItem={updateArrayItem}
@@ -876,7 +903,7 @@ function ProjectPlanning({ project = {}, onProjectUpdated }) {
               fieldKey="criteriosExclusao"
               items={data.criteriosExclusao}
               label="Exclusão"
-              placeholder="Novo criterio de exclusão..."
+              placeholder="Novo critério de exclusão..."
               removeArrayItem={removeArrayItem}
               tone="red"
               updateArrayItem={updateArrayItem}

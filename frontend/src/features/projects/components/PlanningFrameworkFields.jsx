@@ -39,6 +39,7 @@ const PlanejamentoFrameworkField = memo(function PlanejamentoFrameworkField({
         value={value || ""}
         onChange={handleChange}
         placeholder={componentConfig.placeholder}
+        className="border-[#dfe4ef] bg-white shadow-none hover:border-[#c7cede]"
       />
     </div>
   );
