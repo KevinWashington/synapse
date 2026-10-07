@@ -8,7 +8,6 @@ import {
   FileIcon,
   FileTextIcon,
   LoaderIcon,
-  MessageSquareIcon,
   SaveIcon,
   SearchIcon,
   SparklesIcon,
@@ -656,10 +655,6 @@ function PrismaArticleReviewWorkspace({
                     {article.authors} ({article.year}) - {article.journal}
                   </p>
                 </div>
-                <Button variant="outline" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => setRightTab("chat")}>
-                  Assistente IA
-                  <MessageSquareIcon className="h-4 w-4" />
-                </Button>
               </div>
 
               <div className="min-h-[420px] flex-1 overflow-hidden">
@@ -672,6 +667,7 @@ function PrismaArticleReviewWorkspace({
             <section className="min-h-0 overflow-hidden rounded-lg border border-[#edf0f7] bg-white">
               <Suspense fallback={<ArticlePanelLoader />}>
                 <ArticleWorkspacePanel
+                  activeFlow={activeFlow}
                   article={article}
                   onAddNote={onAddNote}
                   onSaveEvidence={onSaveEvidence}

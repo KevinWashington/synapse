@@ -76,7 +76,20 @@ function ScreeningDecisionDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="screening-reason">Justificativa</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="screening-reason">Justificativa</Label>
+              {article?.aiEvaluation?.trim() ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isSaving}
+                  onClick={() => setReasonText(article.aiEvaluation.trim())}
+                >
+                  Usar justificativa da IA
+                </Button>
+              ) : null}
+            </div>
             <Textarea
               id="screening-reason"
               value={reasonText}

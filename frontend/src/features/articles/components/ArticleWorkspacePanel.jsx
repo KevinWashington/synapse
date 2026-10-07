@@ -1,18 +1,14 @@
+import { useEffect } from "react";
 import { DatabaseIcon, MessageSquareIcon, PenLineIcon } from "lucide-react";
 import { ArticleChatPanel } from "@features/ai";
 import ArticleEvidenceEditor from "@features/articles/components/ArticleEvidenceEditor";
 import NotesEditor from "@features/articles/components/NotesEditor";
 
-const WORKSPACE_TABS = [
+const REVIEW_TABS = [
   {
     key: "notas",
     label: "Notas",
     icon: PenLineIcon,
-  },
-  {
-    key: "extracao",
-    label: "Extracao",
-    icon: DatabaseIcon,
   },
   {
     key: "chat",
@@ -21,7 +17,18 @@ const WORKSPACE_TABS = [
   },
 ];
 
+const INCLUDED_TABS = [
+  REVIEW_TABS[0],
+  {
+    key: "extracao",
+    label: "Extracao",
+    icon: DatabaseIcon,
+  },
+  REVIEW_TABS[1],
+];
+
 function ArticleWorkspacePanel({
+  activeFlow,
   article,
   project,
   onAddNote,
@@ -32,12 +39,23 @@ function ArticleWorkspacePanel({
   setRightTab,
   isSavingEvidence,
 }) {
+  const workspaceTabs = activeFlow === "included" ? INCLUDED_TABS : REVIEW_TABS;
+  const effectiveRightTab = workspaceTabs.some((tab) => tab.key === rightTab)
+    ? rightTab
+    : "notas";
+
+  useEffect(() => {
+    if (effectiveRightTab !== rightTab) {
+      setRightTab(effectiveRightTab);
+    }
+  }, [effectiveRightTab, rightTab, setRightTab]);
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)]">
       <div className="flex shrink-0 flex-wrap gap-1 border-b border-[var(--syn-border)] p-2">
-        {WORKSPACE_TABS.map((tab) => {
+        {workspaceTabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = rightTab === tab.key;
+          const isActive = effectiveRightTab === tab.key;
 
           return (
             <button
@@ -61,9 +79,9 @@ function ArticleWorkspacePanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {rightTab === "notas" ? (
+        {effectiveRightTab === "notas" ? (
           <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} />
-        ) : rightTab === "extracao" ? (
+        ) : effectiveRightTab === "extracao" ? (
           <ArticleEvidenceEditor
             article={article}
             project={project}
