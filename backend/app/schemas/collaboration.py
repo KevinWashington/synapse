@@ -86,3 +86,40 @@ class NotificationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DistributionRequest(BaseModel):
+    phase: Literal["screening", "eligibility"]
+
+
+class AssignmentPlanItemResponse(BaseModel):
+    articleId: int
+    reviewerUserId: int
+    slot: int
+
+
+class DistributionPreviewResponse(BaseModel):
+    phase: Literal["screening", "eligibility"]
+    articleCount: int
+    reviewerCount: int
+    assignments: list[AssignmentPlanItemResponse] = Field(default_factory=list)
+    loads: dict[int, int] = Field(default_factory=dict)
+
+
+class ReassignmentRequest(BaseModel):
+    reviewerUserId: int
+
+
+class AssignmentResponse(BaseModel):
+    id: int
+    projectId: int
+    articleId: int
+    phase: Literal["screening", "eligibility"]
+    reviewerUserId: int
+    slot: int
+    status: str
+    assignedAt: datetime
+    submittedAt: datetime | None = None
+
+    class Config:
+        from_attributes = True
