@@ -68,7 +68,7 @@ function ProjectDetailsHeader({
               key={tab.key}
               onClick={() => onTabChange(tab.key)}
               className={cn(
-                "relative flex items-center gap-2 whitespace-nowrap px-1 pb-3 text-xs font-semibold transition-colors",
+                "relative flex cursor-pointer items-center gap-2 whitespace-nowrap px-1 pb-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
                 isActive ? "text-[#6259ff]" : "text-[#56627f] hover:text-[#182344]"
               )}
             >

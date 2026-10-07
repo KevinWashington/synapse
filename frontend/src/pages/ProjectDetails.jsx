@@ -5,6 +5,7 @@ import {
   FileTextIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { EmptyState, LoadingState } from "@/components/layout";
 import {
   EditProjectPanel,
@@ -79,6 +80,38 @@ function ProjectDetails() {
 
   const [synthesisData, setSynthesisData] = useState(null);
   const [synthesisLoading, setSynthesisLoading] = useState(false);
+  const [planningDirty, setPlanningDirty] = useState(false);
+  const [pendingTab, setPendingTab] = useState(null);
+
+  const requestTabChange = useCallback(
+    (nextTab) => {
+      if (nextTab === activeTab) {
+        return;
+      }
+
+      if (activeTab === "planejamento" && planningDirty) {
+        setPendingTab(nextTab);
+        return;
+      }
+
+      setActiveTab(nextTab);
+    },
+    [activeTab, planningDirty, setActiveTab]
+  );
+
+  useEffect(() => {
+    if (!planningDirty) {
+      return undefined;
+    }
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [planningDirty]);
 
   const loadSynthesis = useCallback(async () => {
     if (!project?.id) {
@@ -140,7 +173,7 @@ function ProjectDetails() {
         project={project}
         onContinueScreening={() => navigate(`/projetos/${project.id}?tab=artigos&flow=screening`)}
         onEditProject={handleEditProject}
-        onTabChange={setActiveTab}
+        onTabChange={requestTabChange}
       />
 
       <div className="min-h-0 flex-1">
@@ -151,12 +184,16 @@ function ProjectDetails() {
               onGoToScreening={() => navigate(`/projetos/${project.id}?tab=artigos&flow=screening`)}
               onImportArticles={() => navigate(`/projetos/${project.id}?tab=artigos&flow=identification&action=import`)}
               onOpenArticle={(articleId) => navigate(`/projetos/${project.id}/artigos/${articleId}`)}
-              onOpenPlanning={() => setActiveTab("planejamento")}
+              onOpenPlanning={() => requestTabChange("planejamento")}
               onViewFlow={() => navigate(`/projetos/${project.id}?tab=fluxo`)}
             />
           )}
           {activeTab === "planejamento" && (
-            <ProjectPlanning project={project} onProjectUpdated={handleProjectUpdated} />
+            <ProjectPlanning
+              project={project}
+              onDirtyChange={setPlanningDirty}
+              onProjectUpdated={handleProjectUpdated}
+            />
           )}
           {activeTab === "artigos" && (
             <ProjectArticles
@@ -202,6 +239,28 @@ function ProjectDetails() {
         onFieldChange={(field, value) =>
           setEditData((current) => ({ ...current, [field]: value }))
         }
+      />
+
+      <ConfirmationDialog
+        open={Boolean(pendingTab)}
+        title="Sair sem salvar?"
+        description="As alterações feitas no planejamento serão perdidas se você mudar de aba agora."
+        confirmLabel="Sair sem salvar"
+        cancelLabel="Continuar editando"
+        tone="destructive"
+        onConfirm={() => {
+          const nextTab = pendingTab;
+          setPendingTab(null);
+          setPlanningDirty(false);
+          if (nextTab) {
+            setActiveTab(nextTab);
+          }
+        }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingTab(null);
+          }
+        }}
       />
     </div>
   );
