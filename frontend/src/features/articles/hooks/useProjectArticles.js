@@ -330,7 +330,13 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       setArticlePage(1);
       await refreshAll({ targetFlowTab: "identification" });
     } catch (error) {
-      toast.error("Erro ao enviar registros únicos para triagem: " + error.message);
+      if (error?.status === 0) {
+        toast.error(
+          "Servidor indisponível. Verifique se o backend está em execução e tente novamente."
+        );
+      } else {
+        toast.error("Erro ao enviar registros únicos para triagem: " + error.message);
+      }
     } finally {
       setIsPromotingUnique(false);
     }

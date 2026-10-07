@@ -70,6 +70,9 @@ function useArticleDetailsPage() {
       filters.outcome = "included";
     } else if (["identification", "screening", "eligibility"].includes(listFlow)) {
       filters.phase = listFlow;
+      if (listFlow === "screening" || listFlow === "eligibility") {
+        filters.outcome = "active";
+      }
     } else {
       setArticleList([]);
       return;

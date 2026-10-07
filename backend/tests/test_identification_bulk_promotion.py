@@ -97,3 +97,36 @@ def test_distinct_dois_are_not_grouped_only_because_metadata_is_similar():
     }
     assert first.duplicateGroupKey is None
     assert second.duplicateGroupKey is None
+
+
+def test_bulk_promotion_moves_all_unique_records_beyond_two_frontend_pages_once():
+    unique_records = [
+        make_article(
+            article_id,
+            f"Registro unico de escala {article_id}",
+            doi=f"10.5555/registro-{article_id}",
+        )
+        for article_id in range(1, 46)
+    ]
+    duplicate_a = make_article(46, "Duplicata na base A", doi="10.5555/duplicado")
+    duplicate_b = make_article(47, "Duplicata na base B", doi="10.5555/duplicado")
+    records = [*unique_records, duplicate_a, duplicate_b]
+
+    first_result = articles._promote_unique_identification_articles(records)
+
+    assert first_result == {
+        "movedCount": 45,
+        "unresolvedDuplicateGroups": 1,
+        "unresolvedDuplicateRecords": 2,
+    }
+    assert all(record.currentPhase == "screening" for record in unique_records)
+    assert duplicate_a.currentPhase == "identification"
+    assert duplicate_b.currentPhase == "identification"
+
+    second_result = articles._promote_unique_identification_articles(records)
+
+    assert second_result == {
+        "movedCount": 0,
+        "unresolvedDuplicateGroups": 1,
+        "unresolvedDuplicateRecords": 2,
+    }

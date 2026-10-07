@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   getDuplicateCandidates: vi.fn(),
   getSelectionReport: vi.fn(),
   getSelectionSummary: vi.fn(),
+  promoteAllUniqueToScreening: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock("@features/articles/services/articleService", () => ({
@@ -16,11 +18,12 @@ vi.mock("@features/articles/services/articleService", () => ({
     getDuplicateCandidates: mocks.getDuplicateCandidates,
     getSelectionReport: mocks.getSelectionReport,
     getSelectionSummary: mocks.getSelectionSummary,
+    promoteAllUniqueToScreening: mocks.promoteAllUniqueToScreening,
   },
 }));
 
 vi.mock("@/lib/toast", () => ({
-  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  toast: { error: mocks.toastError, success: vi.fn(), warning: vi.fn() },
 }));
 
 function wrapperAt(entry) {
@@ -36,6 +39,7 @@ describe("useProjectArticles work queues", () => {
     mocks.getDuplicateCandidates.mockResolvedValue([]);
     mocks.getSelectionReport.mockResolvedValue({});
     mocks.getSelectionSummary.mockResolvedValue({});
+    mocks.promoteAllUniqueToScreening.mockResolvedValue({ movedCount: 0 });
   });
 
   it.each(["screening", "eligibility"])(
@@ -88,5 +92,44 @@ describe("useProjectArticles work queues", () => {
       expect(result.current.articles).toHaveLength(1);
       expect(result.current.articles[0].title).toBe("Último artigo");
     });
+  });
+
+  it("keeps the identification queue and reports an unavailable server on connection failure", async () => {
+    const visibleArticle = { id: 1, title: "Artigo preservado", currentPhase: "identification" };
+    mocks.getArticlesByProject.mockResolvedValue({ articles: [visibleArticle], total: 1 });
+    mocks.promoteAllUniqueToScreening.mockRejectedValue({
+      status: 0,
+      message: "Failed to fetch",
+    });
+
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }), {
+      wrapper: wrapperAt("/projetos/7?tab=artigos&flow=identification"),
+    });
+
+    await waitFor(() => expect(result.current.articles).toEqual([visibleArticle]));
+    await act(async () => result.current.promoteAllUniqueToScreening());
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Servidor indisponível. Verifique se o backend está em execução e tente novamente."
+    );
+    expect(result.current.articles).toEqual([visibleArticle]);
+  });
+
+  it("preserves the backend message for non-connection promotion errors", async () => {
+    mocks.promoteAllUniqueToScreening.mockRejectedValue({
+      status: 500,
+      message: "Falha no banco",
+    });
+
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }), {
+      wrapper: wrapperAt("/projetos/7?tab=artigos&flow=identification"),
+    });
+
+    await waitFor(() => expect(result.current.isLoadingArticles).toBe(false));
+    await act(async () => result.current.promoteAllUniqueToScreening());
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Erro ao enviar registros únicos para triagem: Falha no banco"
+    );
   });
 });
