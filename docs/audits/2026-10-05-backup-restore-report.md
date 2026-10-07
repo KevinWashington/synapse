@@ -1,6 +1,6 @@
 # Relatório de backup anterior às migrações
 
-Data da execução: 2026-10-05 (America/Fortaleza)  
+Data da execução: 2026-10-05 (America/Fortaleza)
 Escopo: banco PostgreSQL local existente antes de alterações de autenticação ou esquema.
 
 ## Artefato verificado

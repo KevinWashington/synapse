@@ -16,4 +16,3 @@ describe("review flow state", () => {
     expect(toggleVisibleSelection([1, 2, 9], [1, 2])).toEqual([9]);
   });
 });
-

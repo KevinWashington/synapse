@@ -28,4 +28,3 @@ Make identification work for projects with more than 100 records, keep suspected
 - All project and owner scoping remains enforced by the backend.
 - Bulk promotion affects only `reviewOutcome=active`, `currentPhase=identification`, and records without `duplicateGroupKey` after the fresh analysis.
 - Existing user changes in backend files must be preserved.
-

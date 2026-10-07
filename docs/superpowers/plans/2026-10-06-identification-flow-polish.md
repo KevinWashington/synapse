@@ -109,4 +109,3 @@
 - [ ] Exercise pagination, total count, duplicate review, bulk unique promotion, tab header stability, and dashboard desktop/mobile layouts in Playwright.
 - [ ] Capture screenshots and record any remaining issue.
 - [ ] Fix any Critical or Important finding with a RED-GREEN test cycle and rerun verification.
-
