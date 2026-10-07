@@ -35,7 +35,7 @@ const PdfViewer = lazy(() => import("@features/articles/components/PdfViewer"));
 const NotesEditor = lazy(() => import("@features/articles/components/NotesEditor"));
 
 function ArticlePanelLoader() {
-  return <LoadingState message="Carregando conteudo..." />;
+  return <LoadingState message="Carregando conteúdo..." />;
 }
 
 
@@ -74,7 +74,7 @@ function hasExtractionProgress(article, schema) {
 
 function getExtractionStatus(article, currentArticleId, schema) {
   if (String(article.id) === String(currentArticleId)) {
-    return { label: "Em extracao", className: "bg-[#eef1ff] text-[#6259ff]" };
+    return { label: "Em extração", className: "bg-[#eef1ff] text-[#6259ff]" };
   }
 
   if (article.extractionCompletedAt) {
@@ -137,7 +137,7 @@ function PrismaExtractionWorkspace({
   }
 
   return (
-    <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="hidden min-h-0 flex-col border-r border-[#edf0f7] bg-[#fbfcff] px-5 pb-4 xl:flex">
         <div className="flex h-[72px] shrink-0 items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.2)]">
@@ -152,11 +152,11 @@ function PrismaExtractionWorkspace({
           onClick={() => navigate(backUrl)}
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          Voltar para inclusao
+          Voltar para inclusão
         </Button>
 
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[#111936]">Estudos incluidos</h2>
+          <h2 className="text-sm font-semibold text-[#111936]">Estudos incluídos</h2>
           <span className="rounded-full bg-[#eef1f7] px-2.5 py-1 text-xs font-semibold text-[#111936]">
             {formatNumber(totalCount)}
           </span>
@@ -190,7 +190,7 @@ function PrismaExtractionWorkspace({
                   type="button"
                   onClick={() => openArticle(item)}
                   className={cn(
-                    "w-full rounded-lg border p-3 text-left transition-colors",
+                    "w-full cursor-pointer rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
                     active
                       ? "border-[#bdb7ff] bg-[#fbfaff] shadow-[0_12px_28px_rgba(98,89,255,0.08)]"
                       : "border-[#edf0f7] bg-white hover:border-[#cfd6e7]"
@@ -208,7 +208,7 @@ function PrismaExtractionWorkspace({
               );
             })
           ) : (
-            <p className="py-8 text-center text-xs text-[#667391]">Nenhum estudo incluido encontrado.</p>
+            <p className="py-8 text-center text-xs text-[#667391]">Nenhum estudo incluído encontrado.</p>
           )}
         </div>
 
@@ -231,13 +231,13 @@ function PrismaExtractionWorkspace({
           <div className="mb-5 flex shrink-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-semibold leading-tight tracking-normal text-[#0f1734]">Extracao de dados</h1>
+                <h1 className="text-3xl font-semibold leading-tight tracking-normal text-[#0f1734]">Extração de dados</h1>
                 <span className="rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-semibold text-[#6259ff]">
                   {project?.status === "em-progresso" ? "Em andamento" : project?.status}
                 </span>
               </div>
               <p className="mt-2 text-sm text-[#56627f]">
-                Preencha as informacoes do estudo com base no planejamento definido.
+                Preencha as informações do estudo com base no planejamento definido.
               </p>
             </div>
 
@@ -270,7 +270,7 @@ function PrismaExtractionWorkspace({
                 disabled={isSavingEvidence}
               >
                 <CheckCircle2Icon className="h-4 w-4" />
-                Marcar como concluido
+                Marcar como concluído
                 <ChevronDownIcon className="h-4 w-4" />
               </Button>
             </div>
@@ -296,7 +296,7 @@ function PrismaExtractionWorkspace({
                       type="button"
                       onClick={() => setLeftTab(tab.key)}
                       className={cn(
-                        "relative pb-3",
+                        "relative cursor-pointer pb-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
                         active
                           ? "text-[#6259ff] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t after:bg-[#6259ff]"
                           : "text-[#56627f] hover:text-[#182344]"
@@ -322,8 +322,8 @@ function PrismaExtractionWorkspace({
             <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white">
               <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#edf0f7] px-4 py-4">
                 <div>
-                  <h2 className="text-base font-semibold text-[#111936]">Formulario de extracao</h2>
-                  <p className="mt-1 text-xs text-[#667391]">Baseado no planejamento da revisao</p>
+                  <h2 className="text-base font-semibold text-[#111936]">Formulário de extração</h2>
+                  <p className="mt-1 text-xs text-[#667391]">Baseado no planejamento da revisão</p>
                 </div>
                 <Button variant="outline" size="sm" className="h-9 rounded-lg border-[#dfe4ef] bg-white" onClick={() => navigate(`/projetos/${projectId}?tab=planejamento`)}>
                   Ver planejamento
@@ -356,7 +356,7 @@ function PrismaExtractionWorkspace({
             </Button>
             <Button variant="ghost" className="h-10 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
               <span className="min-w-0 text-right">
-                <span className="block font-semibold">Proximo</span>
+                <span className="block font-semibold">Próximo</span>
                 {nextArticle ? <span className="block max-w-[260px] truncate">{nextArticle.title}</span> : null}
               </span>
             </Button>
@@ -369,24 +369,24 @@ function PrismaExtractionWorkspace({
 
 const REVIEW_STAGE_CONFIG = {
   identification: {
-    title: "Identificacao",
+    title: "Identificação",
     description: "Revise os metadados importados antes de enviar o registro para triagem.",
     listTitle: "Registros identificados",
   },
   screening: {
     title: "Triagem",
-    description: "Avalie titulo, resumo e criterios para registrar a decisao de triagem.",
+    description: "Avalie título, resumo e critérios para registrar a decisão de triagem.",
     listTitle: "Estudos em triagem",
   },
   eligibility: {
     title: "Elegibilidade",
-    description: "Revise o texto completo e registre a decisao de elegibilidade.",
+    description: "Revise o texto completo e registre a decisão de elegibilidade.",
     listTitle: "Estudos em elegibilidade",
   },
   included: {
-    title: "Extracao de dados",
-    description: "Preencha as informacoes do estudo com base no planejamento definido.",
-    listTitle: "Estudos incluidos",
+    title: "Extração de dados",
+    description: "Preencha as informações do estudo com base no planejamento definido.",
+    listTitle: "Estudos incluídos",
   },
 };
 
@@ -477,7 +477,7 @@ function PrismaArticleReviewWorkspace({
   }
 
   return (
-    <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="hidden min-h-0 flex-col border-r border-[#edf0f7] bg-[#fbfcff] px-5 pb-4 xl:flex">
         <div className="flex h-[72px] shrink-0 items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.2)]">
@@ -492,7 +492,7 @@ function PrismaArticleReviewWorkspace({
           onClick={() => navigate(backUrl)}
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          Voltar para revisao
+          Voltar para revisão
         </Button>
 
         <div className="mb-4 flex items-center justify-between">
@@ -530,7 +530,7 @@ function PrismaArticleReviewWorkspace({
                   type="button"
                   onClick={() => openArticle(item)}
                   className={cn(
-                    "w-full rounded-lg border p-3 text-left transition-colors",
+                    "w-full cursor-pointer rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
                     active
                       ? "border-[#bdb7ff] bg-[#fbfaff] shadow-[0_12px_28px_rgba(98,89,255,0.08)]"
                       : "border-[#edf0f7] bg-white hover:border-[#cfd6e7]"
@@ -581,7 +581,7 @@ function PrismaArticleReviewWorkspace({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="min-w-[260px]">
                 <div className="mb-2 flex items-center justify-between gap-4 text-xs font-semibold text-[#182344]">
-                  <span>Posicao na etapa</span>
+                  <span>Posição na etapa</span>
                   <span>{formatNumber(currentIndex + 1)} de {formatNumber(totalCount)} estudos&nbsp;&nbsp; {progress}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-[#e7eaf3]">
@@ -622,7 +622,7 @@ function PrismaArticleReviewWorkspace({
                   onClick={() => navigate(`/projetos/${projectId}/artigos/${articleId}?flow=included&workspace=extracao`)}
                 >
                   <SparklesIcon className="h-4 w-4" />
-                  Ir para extracao
+                  Ir para extração
                 </Button>
               ) : null}
 
@@ -679,7 +679,7 @@ function PrismaArticleReviewWorkspace({
             </Button>
             <Button variant="ghost" className="h-10 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
               <span className="min-w-0 text-right">
-                <span className="block font-semibold">Proximo</span>
+                <span className="block font-semibold">Próximo</span>
                 {nextArticle ? <span className="block max-w-[260px] truncate">{nextArticle.title}</span> : null}
               </span>
             </Button>
@@ -768,7 +768,7 @@ function ArticleDetails() {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
         <FileIcon className="mb-3 h-12 w-12 text-[var(--syn-text-secondary)]" />
-        <h2 className="mb-1 text-lg font-semibold text-[var(--syn-text-primary)]">Artigo nao encontrado</h2>
+        <h2 className="mb-1 text-lg font-semibold text-[var(--syn-text-primary)]">Artigo não encontrado</h2>
         <Button onClick={() => navigate(backUrl)} className="gap-2">
           <ArrowLeftIcon className="h-4 w-4" />
           Voltar para o Projeto

@@ -22,7 +22,7 @@ const Layout = () => {
             className={
               isArticleWorkspace
                 ? "h-screen flex-1 overflow-hidden p-0"
-                : "min-w-0 flex-1 overflow-y-auto px-5 pb-8 pt-4 md:px-10 lg:px-14"
+                : "min-w-0 flex-1 overflow-y-auto px-5 pb-8 pt-4 md:px-10"
             }
           >
             <Outlet />

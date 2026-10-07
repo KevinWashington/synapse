@@ -56,4 +56,28 @@ describe("AppHeader", () => {
     expect(screen.getByText("ana@example.com")).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Sair" })).toBeInTheDocument();
   });
+
+  it("keeps account controls in compact mode", () => {
+    renderHeader({ compact: true });
+
+    expect(screen.getByRole("button", { name: "Abrir menu da conta" })).toBeInTheDocument();
+    expect(screen.getByText("AR")).toBeInTheDocument();
+  });
+
+  it("uses the same horizontal grid in compact and regular modes", () => {
+    const { container, rerender } = renderHeader({ compact: false });
+    const regularHeader = container.querySelector("header");
+
+    expect(regularHeader).toHaveClass("h-[72px]", "px-5", "md:px-10");
+    expect(regularHeader).not.toHaveClass("lg:px-14", "pl-16");
+
+    rerender(
+      <MemoryRouter>
+        <AppHeader compact breadcrumbs={[{ label: "Projetos", href: "/projetos" }]} />
+      </MemoryRouter>
+    );
+
+    const compactHeader = container.querySelector("header");
+    expect(compactHeader).toHaveClass("h-[72px]", "px-5", "md:px-10");
+  });
 });

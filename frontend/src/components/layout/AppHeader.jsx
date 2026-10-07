@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { useAuth } from "@/features/auth";
-import { cn } from "@/lib/utils";
 
 function getInitials(name, email) {
   const source = name?.trim() || email?.split("@")[0] || "Conta";
@@ -38,10 +37,8 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
 
   return (
     <header
-      className={cn(
-        "flex h-[72px] shrink-0 items-center justify-between gap-4 bg-[#fbfcff]",
-        compact ? "px-5 md:px-10" : "pb-1 pl-16 pr-5 pt-3 md:px-10 lg:px-14"
-      )}
+      data-density={compact ? "compact" : "regular"}
+      className="flex h-[72px] shrink-0 items-center justify-between gap-4 bg-[#fbfcff] px-5 md:px-10"
     >
       <div className="flex min-w-0 items-center gap-3">
         {backUrl ? (
@@ -49,14 +46,14 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
             type="button"
             aria-label="Voltar"
             onClick={() => navigate(backUrl)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#e8ebf4] bg-white text-[#56627f] transition-colors hover:bg-[#f4f6fb]"
+            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[#e8ebf4] bg-white text-[#56627f] transition-colors hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </button>
         ) : null}
 
         {hasBreadcrumbs ? (
-          <nav aria-label="Navegacao estrutural" className="flex min-w-0 items-center gap-2 text-sm font-medium">
+          <nav aria-label="Navegação estrutural" className="flex min-w-0 items-center gap-2 text-sm font-medium">
             {breadcrumbs.map((item, index) => (
               <span key={`${item.label}-${index}`} className="contents">
                 {index ? (
@@ -67,7 +64,7 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
                   />
                 ) : null}
                 {item.href ? (
-                  <Link to={item.href} className="truncate text-[#6259ff] hover:text-[#5148ee]">
+                  <Link to={item.href} className="cursor-pointer truncate rounded-sm text-[#6259ff] hover:text-[#5148ee] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40">
                     {item.label}
                   </Link>
                 ) : (

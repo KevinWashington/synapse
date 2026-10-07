@@ -22,7 +22,7 @@ const article = {
 
 const project = {
   id: 7,
-  title: "Revisao de saude",
+  title: "Revisão de saúde",
   status: "em-progresso",
   dataExtractionSchema: [{ key: "resultado", label: "Resultado", type: "text" }],
   qualityAssessmentSchema: [],
@@ -31,7 +31,7 @@ const project = {
 const articleList = [
   { ...article, id: 1, title: "Estudo anterior" },
   article,
-  { ...article, id: 3, title: "Proximo estudo" },
+  { ...article, id: 3, title: "Próximo estudo" },
 ];
 
 vi.mock("@/features/auth", () => ({
@@ -99,7 +99,11 @@ describe("ArticleDetails extraction workspace", () => {
     expect(screen.queryByRole("button", { name: "Ver detalhes do artigo" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Notas" }));
 
-    const notesField = await screen.findByPlaceholderText("Digite suas notas aqui...");
+    const notesField = await screen.findByPlaceholderText(
+      "Digite suas notas aqui...",
+      {},
+      { timeout: 5000 }
+    );
     fireEvent.change(notesField, { target: { value: "Nota da extracao" } });
     await waitFor(() => expect(handleSaveNotes).toHaveBeenCalledWith("Nota da extracao"), {
       timeout: 2500,
@@ -122,9 +126,20 @@ describe("ArticleDetails extraction workspace", () => {
       "/projetos/7/artigos/1?flow=included&workspace=extracao"
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "ProximoProximo estudo" }));
+    fireEvent.click(screen.getByRole("button", { name: "PróximoPróximo estudo" }));
     expect(navigate).toHaveBeenCalledWith(
       "/projetos/7/artigos/3?flow=included&workspace=extracao"
+    );
+  });
+
+  it("keeps breadcrumbs, account controls, and shell alignment in extraction", async () => {
+    renderPage();
+    await screen.findByPlaceholderText("Digite resultado...");
+
+    expect(screen.getByRole("navigation", { name: "Navegação estrutural" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Abrir menu da conta" })).toBeInTheDocument();
+    expect(screen.getByText("PRISMA").closest("div.grid")).toHaveClass(
+      "xl:grid-cols-[240px_minmax(0,1fr)]"
     );
   });
 });

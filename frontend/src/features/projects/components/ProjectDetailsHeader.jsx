@@ -38,7 +38,7 @@ function ProjectDetailsHeader({
       <div className="mb-5 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-[#0f1734]">{project?.title}</h1>
+            <h1 className="text-3xl font-semibold tracking-normal text-[#0f1734]">{project?.title}</h1>
           </div>
           <p
             data-testid="project-objective"
