@@ -49,6 +49,7 @@ describe("Menu", () => {
     );
 
     expect(screen.getByRole("link", { name: "Synapse" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Synapse" })).toHaveTextContent("Synapse");
     expect(screen.getByRole("link", { name: "Início" })).toHaveAttribute("href", "/");
 
     fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }));

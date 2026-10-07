@@ -46,7 +46,9 @@ describe("ScreeningDecisionDialog accessibility", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Copiar justificativa da IA" }));
+    const copyButton = screen.getByRole("button", { name: "Copiar justificativa da IA" });
+    expect(copyButton).toHaveClass("border");
+    fireEvent.click(copyButton);
 
     const field = screen.getByRole("textbox", { name: "Justificativa" });
     expect(field).toHaveValue("População fora da PICO.");

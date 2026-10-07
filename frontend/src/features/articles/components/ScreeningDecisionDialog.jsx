@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LoaderIcon } from "lucide-react";
+import { CopyIcon, LoaderIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
   Dialog,
@@ -83,11 +83,13 @@ function ScreeningDecisionDialog({
               <Label htmlFor="screening-reason">Justificativa</Label>
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
+                className="gap-2 rounded-lg bg-white shadow-sm"
                 disabled={isSaving || !aiJustification}
                 onClick={() => setReasonText(aiJustification)}
               >
+                <CopyIcon className="h-4 w-4" />
                 Copiar justificativa da IA
               </Button>
             </div>

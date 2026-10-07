@@ -144,10 +144,9 @@ function SidebarContent({ onItemClick }) {
         <Link
           to="/"
           onClick={onItemClick}
-          className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.22)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
-          aria-label="Synapse"
+          className="inline-flex cursor-pointer rounded-md text-xl font-semibold tracking-tight text-[#111936] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
         >
-          <FileText className="h-5 w-5" />
+          Synapse
         </Link>
       </div>
 
