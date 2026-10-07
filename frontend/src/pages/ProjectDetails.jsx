@@ -40,7 +40,6 @@ function ProjectDetails() {
     editOpen,
     error,
     graphRefreshToken,
-    handleDeleteProject,
     handleEditProject,
     handleGraphNeedsRefresh,
     handleProjectUpdated,
@@ -138,7 +137,6 @@ function ProjectDetails() {
         activeTab={activeTab}
         project={project}
         onContinueScreening={() => navigate(`/projetos/${project.id}?tab=artigos&flow=screening`)}
-        onDeleteProject={handleDeleteProject}
         onEditProject={handleEditProject}
         onTabChange={setActiveTab}
       />

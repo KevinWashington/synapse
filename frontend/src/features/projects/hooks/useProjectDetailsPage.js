@@ -97,23 +97,6 @@ function useProjectDetailsPage() {
     }
   }, [editData, project]);
 
-  const handleDeleteProject = useCallback(async () => {
-    if (!project) {
-      return;
-    }
-
-    if (!confirm(`Tem certeza que deseja deletar o projeto "${project.title}"?`)) {
-      return;
-    }
-
-    try {
-      await projectService.deleteProject(project.id);
-      navigate("/projetos");
-    } catch (currentError) {
-      toast.error("Erro ao deletar projeto: " + currentError.message);
-    }
-  }, [navigate, project]);
-
   const handleGraphNeedsRefresh = useCallback(() => {
     setGraphRefreshToken((current) => current + 1);
   }, []);
@@ -129,7 +112,6 @@ function useProjectDetailsPage() {
     editOpen,
     error,
     graphRefreshToken,
-    handleDeleteProject,
     handleEditProject,
     handleGraphNeedsRefresh,
     handleProjectUpdated,

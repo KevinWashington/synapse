@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/layout";
+import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { cn } from "@/lib/utils";
 
 const QUALITY_OPTIONS = [
@@ -70,6 +71,7 @@ function ArticleEvidenceEditor({
   const qualitySchema = project?.qualityAssessmentSchema || [];
   const [extractionValues, setExtractionValues] = useState({});
   const [qualityValues, setQualityValues] = useState({});
+  const [pendingCompletion, setPendingCompletion] = useState(null);
   const isWorkspaceVariant = variant === "workspace";
   const fieldControlClass =
     "min-h-9 rounded-md border-[#dfe4ef] bg-white text-xs text-[#33405f] shadow-none focus-visible:ring-[#6259ff]/20";
@@ -84,16 +86,30 @@ function ArticleEvidenceEditor({
   useEffect(() => {
     setExtractionValues(article?.extractionData || {});
     setQualityValues(article?.qualityAssessmentAnswers || {});
+    setPendingCompletion(null);
   }, [article]);
 
   async function handleSubmit(event) {
     event.preventDefault();
     const submitterValue = event.nativeEvent?.submitter?.value;
-    await onSave({
+    const payload = {
       extractionData: buildExtractionPayload(extractionSchema, extractionValues),
       qualityAssessmentAnswers: buildQualityPayload(qualitySchema, qualityValues),
       markExtractionComplete: submitterValue === "complete",
-    });
+    };
+
+    if (payload.markExtractionComplete) {
+      setPendingCompletion(payload);
+      return;
+    }
+
+    await onSave(payload);
+  }
+
+  async function confirmCompletion() {
+    if (!pendingCompletion) return;
+    await onSave(pendingCompletion);
+    setPendingCompletion(null);
   }
 
   if (!isIncluded) {
@@ -115,6 +131,7 @@ function ArticleEvidenceEditor({
   }
 
   return (
+    <>
     <form id={formId} onSubmit={handleSubmit} className={cn("flex h-full flex-col", className)}>
       <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", isWorkspaceVariant ? "space-y-5" : "space-y-4")}>
         {!isWorkspaceVariant ? (
@@ -400,6 +417,16 @@ function ArticleEvidenceEditor({
       </div>
       ) : null}
     </form>
+    <ConfirmationDialog
+      open={Boolean(pendingCompletion)}
+      title="Concluir extração?"
+      description="O estudo será contabilizado como extraído. Confirme para salvar os dados atuais e concluir esta etapa."
+      confirmLabel="Confirmar conclusão"
+      isPending={isSaving}
+      onConfirm={confirmCompletion}
+      onOpenChange={(open) => !open && setPendingCompletion(null)}
+    />
+    </>
   );
 }
 

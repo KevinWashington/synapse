@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
 import { EmptyState, LoadingState } from "@/components/layout";
 import {
@@ -222,6 +223,8 @@ function Projects() {
     showNewProjectModal,
   } = useProjectsPage();
   const [sortOrder, setSortOrder] = useState("recent");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   usePageTitle({ title: "" });
 
@@ -360,7 +363,7 @@ function Projects() {
                     index={index}
                     onClick={handleProjectClick}
                     onEdit={handleEditProject}
-                    onDelete={handleDeleteProject}
+                    onDelete={setDeleteTarget}
                   />
                 ))}
               </tbody>
@@ -404,6 +407,26 @@ function Projects() {
         isOpen={showNewProjectModal}
         onClose={() => setShowNewProjectModal(false)}
         onSuccess={loadProjects}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(deleteTarget)}
+        title="Deletar projeto?"
+        description={deleteTarget ? `O projeto “${deleteTarget.title}” e seus dados serão removidos permanentemente.` : ""}
+        confirmLabel="Deletar projeto"
+        tone="destructive"
+        isPending={isDeleting}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          setIsDeleting(true);
+          try {
+            await handleDeleteProject(deleteTarget);
+            setDeleteTarget(null);
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
       />
     </div>
   );

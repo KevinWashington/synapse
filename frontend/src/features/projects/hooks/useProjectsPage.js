@@ -53,10 +53,6 @@ function useProjectsPage() {
 
   const handleDeleteProject = useCallback(
     async (project) => {
-      if (!confirm(`Tem certeza que deseja deletar o projeto "${project.title}"?`)) {
-        return;
-      }
-
       try {
         await projectService.deleteProject(project.id);
         toast.success("Projeto deletado com sucesso!");

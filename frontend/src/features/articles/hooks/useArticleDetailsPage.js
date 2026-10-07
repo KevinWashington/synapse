@@ -226,9 +226,6 @@ function useArticleDetailsPage() {
     if (!article) {
       return;
     }
-    if (!confirm(`Tem certeza que deseja deletar o artigo "${article.title}"?`)) {
-      return;
-    }
     try {
       await articleService.deleteArticle(projectId, articleId);
       toast.success("Artigo deletado com sucesso!");

@@ -68,6 +68,18 @@ describe("ProjectArticles work queue", () => {
     expect(screen.getByRole("checkbox", { name: "Selecionar todos os artigos visiveis" })).toBeInTheDocument();
   });
 
+  it("confirms before promoting every unique article", async () => {
+    const onPromoteAllUnique = vi.fn();
+    renderList({ onPromoteAllUnique });
+
+    screen.getByRole("button", { name: "Enviar todos os únicos para triagem" }).click();
+
+    expect(onPromoteAllUnique).not.toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: "Enviar todos os únicos?" })).toBeInTheDocument();
+    screen.getByRole("button", { name: "Confirmar envio" }).click();
+    expect(onPromoteAllUnique).toHaveBeenCalledOnce();
+  });
+
   it("navigates pages without pretending the first 20 are the whole queue", () => {
     const onPageChange = vi.fn();
     renderList({ onPageChange });
@@ -191,7 +203,7 @@ describe("duplicate review", () => {
     expect(screen.getByText(/Escolha o registro que será mantido/)).toBeInTheDocument();
   });
 
-  it("selects the canonical record and applies the review", () => {
+  it("selects the canonical record and confirms before applying the review", async () => {
     const onApply = vi.fn();
     const onSelectCanonical = vi.fn();
     renderDuplicateReview({ onApply, onSelectCanonical });
@@ -200,6 +212,9 @@ describe("duplicate review", () => {
     screen.getByRole("button", { name: "Confirmar revisão de duplicatas" }).click();
 
     expect(onSelectCanonical).toHaveBeenCalledWith("doi:duplicado", 12);
+    expect(onApply).not.toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: "Aplicar revisão de duplicatas?" })).toBeInTheDocument();
+    screen.getByRole("button", { name: "Aplicar revisão" }).click();
     expect(onApply).toHaveBeenCalledOnce();
   });
 });

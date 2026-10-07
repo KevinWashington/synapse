@@ -434,25 +434,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     }
   }, [project?.id]);
 
-  const handleDeleteArticle = useCallback(
-    async (article) => {
-      if (!project?.id || !article?.id) {
-        return;
-      }
-      if (!confirm(`Deseja remover o registro "${article.title}"?`)) {
-        return;
-      }
-      try {
-        await articleService.deleteArticle(project.id, article.id);
-        toast.success("Registro removido com sucesso.");
-        await refreshAll({ refreshSynthesisReport: true });
-      } catch (error) {
-        toast.error("Erro ao remover registro: " + error.message);
-      }
-    },
-    [project?.id, refreshAll]
-  );
-
   return {
     activeFlowTab,
     applyDuplicateReview,
@@ -463,7 +444,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     changeArticlePage,
     duplicateCandidates,
     eligibilityArticle,
-    handleDeleteArticle,
     identificationArticles,
     isBatchEvaluating,
     isLoadingArticles,

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -22,6 +23,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
 import {
   DropdownMenu,
@@ -181,6 +183,8 @@ export function DuplicateReviewPanel({
   onSelectCanonical,
   selectedDuplicateMap,
 }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   if (!candidates.length) {
     return null;
   }
@@ -191,6 +195,7 @@ export function DuplicateReviewPanel({
   );
 
   return (
+    <>
     <section className="rounded-lg border border-[#f0d6a8] bg-[#fffdf8] p-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
@@ -207,7 +212,7 @@ export function DuplicateReviewPanel({
         <Button
           className="h-9 shrink-0 gap-2 rounded-lg bg-[#6259ff] text-xs text-white hover:bg-[#5148ee]"
           disabled={isApplying || !candidates.every((candidate) => selectedDuplicateMap[candidate.groupKey])}
-          onClick={onApply}
+          onClick={() => setConfirmOpen(true)}
         >
           {isApplying ? <LoaderIcon className="h-4 w-4 animate-spin" /> : <CheckIcon className="h-4 w-4" />}
           Confirmar revisão de duplicatas
@@ -256,6 +261,19 @@ export function DuplicateReviewPanel({
         ))}
       </div>
     </section>
+    <ConfirmationDialog
+      open={confirmOpen}
+      title="Aplicar revisão de duplicatas?"
+      description={`Os registros não canônicos de ${formatNumber(candidates.length)} grupo(s) serão removidos da fila ativa.`}
+      confirmLabel="Aplicar revisão"
+      isPending={isApplying}
+      onConfirm={() => {
+        setConfirmOpen(false);
+        onApply();
+      }}
+      onOpenChange={setConfirmOpen}
+    />
+    </>
   );
 }
 
@@ -371,6 +389,7 @@ export function StageListPanel({
   setSearchTerm,
   summary,
 }) {
+  const [confirmPromoteAllOpen, setConfirmPromoteAllOpen] = useState(false);
   const stage = getStageConfig(activeStage);
   const visibleIds = articles.map((article) => article.id);
   const allVisibleSelected = visibleIds.length > 0
@@ -380,6 +399,7 @@ export function StageListPanel({
   const pageCount = Math.max(1, Math.ceil(resolvedTotal / articlePageSize));
 
   return (
+    <>
     <section className="flex h-full min-h-0 min-w-0 flex-col rounded-lg border border-[#edf0f7] bg-white">
       <div className="border-b border-[#edf0f7] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -397,7 +417,7 @@ export function StageListPanel({
               size="sm"
               className="h-9 gap-2 rounded-lg bg-[#6259ff] text-xs text-white hover:bg-[#5148ee]"
               disabled={!resolvedTotal || isPromotingUnique}
-              onClick={onPromoteAllUnique}
+              onClick={() => setConfirmPromoteAllOpen(true)}
             >
               {isPromotingUnique ? <LoaderIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
               Enviar todos os únicos para triagem
@@ -575,6 +595,19 @@ export function StageListPanel({
         ) : null}
       </div>
     </section>
+    <ConfirmationDialog
+      open={confirmPromoteAllOpen}
+      title="Enviar todos os únicos?"
+      description={`Todos os ${formatNumber(resolvedTotal)} registros únicos elegíveis serão enviados para triagem. Grupos duplicados permanecerão para revisão.`}
+      confirmLabel="Confirmar envio"
+      isPending={isPromotingUnique}
+      onConfirm={() => {
+        setConfirmPromoteAllOpen(false);
+        onPromoteAllUnique();
+      }}
+      onOpenChange={setConfirmPromoteAllOpen}
+    />
+    </>
   );
 }
 

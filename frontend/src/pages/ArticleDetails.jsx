@@ -16,6 +16,7 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { LoadingState } from "@/components/layout";
@@ -423,7 +424,7 @@ function PrismaArticleReviewWorkspace({
   articleList,
   articleListLoading,
   backUrl,
-  handleDeleteArticle,
+  onRequestDelete,
   isSavingEvidence,
   navigate,
   onAddNote,
@@ -639,7 +640,7 @@ function PrismaArticleReviewWorkspace({
                 </Button>
               ) : null}
 
-              <Button variant="outline" className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={handleDeleteArticle}>
+              <Button variant="outline" className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onRequestDelete}>
                 <TrashIcon className="h-4 w-4 text-red-500" />
                 Remover
               </Button>
@@ -736,6 +737,7 @@ function ArticleDetails() {
   const [eligibilityDialogOpen, setEligibilityDialogOpen] = useState(false);
   const [eligibilityInitialDecision, setEligibilityInitialDecision] = useState("included");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
 
   useEffect(() => {
@@ -890,7 +892,7 @@ function ArticleDetails() {
       articleList={articleList}
       articleListLoading={articleListLoading}
       backUrl={backUrl}
-      handleDeleteArticle={handleDeleteArticle}
+      onRequestDelete={() => setDeleteConfirmOpen(true)}
       isSavingEvidence={isSavingEvidence}
       navigate={navigate}
       onAddNote={handleAddNote}
@@ -943,6 +945,19 @@ function ArticleDetails() {
         }}
         project={project}
         article={article}
+      />
+
+      <ConfirmationDialog
+        open={deleteConfirmOpen}
+        title="Remover artigo?"
+        description={`O artigo “${article.title}” será removido permanentemente deste projeto.`}
+        confirmLabel="Remover artigo"
+        tone="destructive"
+        onConfirm={async () => {
+          setDeleteConfirmOpen(false);
+          await handleDeleteArticle();
+        }}
+        onOpenChange={setDeleteConfirmOpen}
       />
     </>
   );
