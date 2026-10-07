@@ -1,0 +1,88 @@
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, EmailStr, Field, model_validator
+
+
+MemberRole = Literal["coordinator", "reviewer"]
+TeamRole = Literal["owner", "coordinator", "reviewer"]
+
+
+class InvitationCreate(BaseModel):
+    email: EmailStr
+    role: MemberRole = "reviewer"
+    participatesInReview: bool = True
+
+    @model_validator(mode="after")
+    def reviewer_always_participates(self):
+        if self.role == "reviewer":
+            self.participatesInReview = True
+        return self
+
+
+class InvitationUpdate(BaseModel):
+    role: MemberRole | None = None
+    participatesInReview: bool | None = None
+
+
+class InvitationResponse(BaseModel):
+    id: int
+    projectId: int
+    emailNormalized: str
+    role: MemberRole
+    participatesInReview: bool
+    status: str
+    expiresAt: datetime
+    acceptedAt: datetime | None = None
+    createdAt: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MemberUpdate(BaseModel):
+    role: MemberRole | None = None
+    participatesInReview: bool | None = None
+
+
+class MemberResponse(BaseModel):
+    id: int | None = None
+    projectId: int
+    userId: int
+    name: str | None = None
+    email: str | None = None
+    avatar: str | None = None
+    role: TeamRole
+    status: str
+    participatesInReview: bool
+    joinedAt: datetime | None = None
+    deactivatedAt: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class TeamResponse(BaseModel):
+    members: list[MemberResponse] = Field(default_factory=list)
+    invitations: list[InvitationResponse] = Field(default_factory=list)
+
+
+class OwnershipTransferRequest(BaseModel):
+    userId: int
+
+
+class NotificationResponse(BaseModel):
+    id: int
+    projectId: int
+    recipientUserId: int
+    type: str
+    title: str
+    body: str
+    entityType: str | None = None
+    entityId: int | None = None
+    payload: dict | None = None
+    readAt: datetime | None = None
+    createdAt: datetime
+
+    class Config:
+        from_attributes = True

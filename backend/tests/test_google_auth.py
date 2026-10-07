@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException, Response
@@ -31,6 +32,11 @@ class FakeDatabase:
 
     async def commit(self):
         self.commits += 1
+
+    async def flush(self):
+        for value in self.added:
+            if getattr(value, "id", None) is None:
+                value.id = 99
 
     async def refresh(self, user):
         user.id = user.id or 99
@@ -95,6 +101,8 @@ async def test_google_login_creates_new_account_and_session_cookie(monkeypatch):
             avatar=value.avatar,
         ),
     )
+    claimed = AsyncMock(return_value=[])
+    monkeypatch.setattr(auth, "claim_pending_invitations", claimed)
     result = await auth.google_login(
         GoogleCredentialRequest(credential="credential"),
         response,
@@ -107,13 +115,16 @@ async def test_google_login_creates_new_account_and_session_cookie(monkeypatch):
     assert result.model_dump().get("token") is None
     assert db.added[0].passwordHash is None
     assert "synapse_session=" in "\n".join(response.headers.getlist("set-cookie"))
+    claimed.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_google_login_links_legacy_account_by_verified_email():
+async def test_google_login_links_legacy_account_by_verified_email(monkeypatch):
     from app.routers.auth import google_login
     from app.schemas.auth import GoogleCredentialRequest
 
+    from app.routers import auth
+    monkeypatch.setattr(auth, "claim_pending_invitations", AsyncMock(return_value=[]))
     legacy = user()
     result = await google_login(
         GoogleCredentialRequest(credential="credential"),
@@ -128,10 +139,12 @@ async def test_google_login_links_legacy_account_by_verified_email():
 
 
 @pytest.mark.asyncio
-async def test_google_login_rejects_conflicting_or_disabled_account():
+async def test_google_login_rejects_conflicting_or_disabled_account(monkeypatch):
     from app.routers.auth import google_login
     from app.schemas.auth import GoogleCredentialRequest
 
+    from app.routers import auth
+    monkeypatch.setattr(auth, "claim_pending_invitations", AsyncMock(return_value=[]))
     cases = [
         (FakeDatabase([None, user(googleSub="other")]), 409),
         (FakeDatabase([user(isActive=False)]), 401),
