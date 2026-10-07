@@ -119,6 +119,8 @@ function useProjectDetailsPage() {
     loading,
     navigate,
     project,
+    role: project?.role ?? null,
+    capabilities: project?.capabilities ?? [],
     setActiveTab,
     setEditData,
     setEditOpen,

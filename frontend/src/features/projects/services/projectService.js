@@ -49,6 +49,15 @@ class ProjectService {
     }
   }
 
+  async getProjectAccess(id) {
+    const project = await this.getProjectById(id);
+    return {
+      role: project.role ?? null,
+      capabilities: project.capabilities ?? [],
+      participatesInReview: project.participatesInReview ?? false,
+    };
+  }
+
   async updateProject(id, projectData) {
     try {
       if (!id) {

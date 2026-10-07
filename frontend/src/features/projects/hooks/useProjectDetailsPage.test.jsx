@@ -1,4 +1,5 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { projectService } from "@features/projects/services/projectService";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import useProjectDetailsPage from "./useProjectDetailsPage";
@@ -12,6 +13,23 @@ vi.mock("@features/projects/services/projectService", () => ({
 vi.mock("@/lib/toast", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
+
+it("exposes server role and capabilities through project details", async () => {
+  vi.mocked(projectService.getProjectById).mockResolvedValueOnce({ id: 7, role: "reviewer", capabilities: ["read_project", "review_assigned"] });
+  const { result } = renderHook(() => useProjectDetailsPage(), { wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter> });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.role).toBe("reviewer");
+  expect(result.current.capabilities).toEqual(["read_project", "review_assigned"]);
+});
+
+it("keeps project 404 as the existing page error", async () => {
+  vi.mocked(projectService.getProjectById).mockRejectedValueOnce(Object.assign(new Error("Projeto não encontrado."), { status: 404 }));
+  const { result } = renderHook(() => useProjectDetailsPage(), { wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter> });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.error).toBe("Projeto não encontrado.");
+  expect(result.current.project).toBeNull();
+  expect(result.current.capabilities).toEqual([]);
+});
 
 function Harness() {
   const { activeTab, setActiveTab } = useProjectDetailsPage();
