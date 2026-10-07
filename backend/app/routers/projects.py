@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.database import get_db
 from app.models.user import User
 from app.models.project import Project
 from app.models.article import Article
+from app.models.collaboration import ProjectMember
 from app.schemas.project import (
     ProjectCreate,
     ProjectUpdate,
@@ -21,6 +22,14 @@ from app.schemas.project import (
     ProjectPrismaStats,
 )
 from app.core.dependencies import get_current_user
+from app.services.project_access_service import (
+    CAP_DELETE_PROJECT,
+    CAP_EDIT_PROJECT,
+    ProjectAccess,
+    capabilities_for_role,
+    require_capability,
+    resolve_project_access,
+)
 from app.frameworks import FRAMEWORK_INFO, FRAMEWORK_COMPONENTS, FrameworkType
 from app.services.evidence_service import (
     recalculate_project_article_quality,
@@ -63,11 +72,18 @@ def _build_prisma_stats(articles: list[Article]) -> ProjectPrismaStats:
     )
 
 
-def _build_project_response(project: Project, articles: list[Article] | None = None) -> ProjectResponse:
+def _build_project_response(
+    project: Project,
+    articles: list[Article] | None = None,
+    access: ProjectAccess | None = None,
+) -> ProjectResponse:
     project_articles = articles or []
     response_data = ProjectResponse.model_validate(project).model_dump()
     response_data["articleCount"] = len(project_articles)
     response_data["prismaStats"] = _build_prisma_stats(project_articles)
+    if access:
+        response_data["role"] = access.role
+        response_data["capabilities"] = sorted(access.capabilities)
     return ProjectResponse(**response_data)
 
 
@@ -285,7 +301,17 @@ async def get_all_projects(
     db: AsyncSession = Depends(get_db)
 ):
     """Listar projetos do usuário logado com busca, filtro e paginação."""
-    query = select(Project).where(Project.ownerId == current_user.id)
+    query = (
+        select(Project)
+        .outerjoin(
+            ProjectMember,
+            (ProjectMember.projectId == Project.id)
+            & (ProjectMember.userId == current_user.id)
+            & (ProjectMember.status == "active"),
+        )
+        .where(or_(Project.ownerId == current_user.id, ProjectMember.id.is_not(None)))
+        .distinct()
+    )
 
     if search:
         query = query.where(Project.title.ilike(f"%{search}%"))
@@ -314,10 +340,27 @@ async def get_all_projects(
     for article in articles_result.scalars().all():
         articles_by_project.setdefault(article.projectId, []).append(article)
     
-    projectsWithCount = [
-        _build_project_response(project, articles_by_project.get(project.id, []))
-        for project in projects
-    ]
+    membership_result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.userId == current_user.id,
+            ProjectMember.status == "active",
+            ProjectMember.projectId.in_([project.id for project in projects]),
+        )
+    )
+    memberships = {member.projectId: member for member in membership_result.scalars().all()}
+    projectsWithCount = []
+    for project in projects:
+        if project.ownerId == current_user.id:
+            access = ProjectAccess(project, "owner", capabilities_for_role("owner", participates_in_review=True), True)
+        else:
+            member = memberships[project.id]
+            access = ProjectAccess(
+                project,
+                member.role,
+                capabilities_for_role(member.role, participates_in_review=member.participatesInReview),
+                member.participatesInReview,
+            )
+        projectsWithCount.append(_build_project_response(project, articles_by_project.get(project.id, []), access))
     
     return ProjectListResponse(projects=projectsWithCount, total=total)
 
@@ -352,7 +395,13 @@ async def create_project(
     await db.commit()
     await db.refresh(project)
     
-    return ProjectResponse.model_validate(project)
+    owner_access = ProjectAccess(
+        project,
+        "owner",
+        capabilities_for_role("owner", participates_in_review=True),
+        True,
+    )
+    return _build_project_response(project, access=owner_access)
 
 
 @router.get("/{projectId}", response_model=ProjectResponse)
@@ -362,27 +411,13 @@ async def get_project_by_id(
     db: AsyncSession = Depends(get_db)
 ):
     """Buscar projeto específico."""
-    result = await db.execute(
-        select(Project).where(
-            Project.id == projectId,
-            Project.ownerId == current_user.id
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "Projeto não encontrado",
-                "message": "Projeto inexistente ou você não tem permissão para acessá-lo"
-            }
-        )
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    project = access.project
     
     articles_result = await db.execute(
         select(Article).where(Article.projectId == project.id)
     )
-    return _build_project_response(project, articles_result.scalars().all())
+    return _build_project_response(project, articles_result.scalars().all(), access)
 
 
 @router.get("/{projectId}/overview", response_model=ProjectOverviewResponse)
@@ -392,27 +427,12 @@ async def get_project_overview(
     db: AsyncSession = Depends(get_db)
 ):
     """Resumo operacional da visao geral do projeto."""
-    result = await db.execute(
-        select(Project).where(
-            Project.id == projectId,
-            Project.ownerId == current_user.id
-        )
-    )
-    project = result.scalar_one_or_none()
-
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "Projeto nao encontrado",
-                "message": "Projeto inexistente ou voce nao tem permissao para acessa-lo"
-            }
-        )
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    project = access.project
 
     articles_result = await db.execute(
         select(Article).where(
             Article.projectId == project.id,
-            Article.ownerId == current_user.id,
         )
     )
     return _build_project_overview(project, articles_result.scalars().all())
@@ -426,22 +446,9 @@ async def update_project(
     db: AsyncSession = Depends(get_db)
 ):
     """Atualizar projeto."""
-    result = await db.execute(
-        select(Project).where(
-            Project.id == projectId,
-            Project.ownerId == current_user.id
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "Projeto não encontrado",
-                "message": "Projeto inexistente ou você não tem permissão para acessá-lo"
-            }
-        )
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
+    project = access.project
     
     # Update only provided fields
     updateData = data.model_dump(exclude_unset=True)
@@ -459,7 +466,7 @@ async def update_project(
 
     if quality_schema_changed:
         articles_result = await db.execute(
-            select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+            select(Article).where(Article.projectId == projectId)
         )
         recalculate_project_article_quality(
             articles_result.scalars().all(),
@@ -472,7 +479,7 @@ async def update_project(
     articles_result = await db.execute(
         select(Article).where(Article.projectId == project.id)
     )
-    return _build_project_response(project, articles_result.scalars().all())
+    return _build_project_response(project, articles_result.scalars().all(), access)
 
 
 @router.delete("/{projectId}", status_code=status.HTTP_204_NO_CONTENT)
@@ -482,22 +489,9 @@ async def delete_project(
     db: AsyncSession = Depends(get_db)
 ):
     """Deletar projeto."""
-    result = await db.execute(
-        select(Project).where(
-            Project.id == projectId,
-            Project.ownerId == current_user.id
-        )
-    )
-    project = result.scalar_one_or_none()
-    
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "Projeto não encontrado",
-                "message": "Projeto inexistente ou você não tem permissão para acessá-lo"
-            }
-        )
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_DELETE_PROJECT)
+    project = access.project
     
     await db.delete(project)
     await db.commit()

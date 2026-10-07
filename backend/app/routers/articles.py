@@ -23,6 +23,7 @@ from app.models.article import Article
 from app.models.project import Project
 from app.models.user import User
 from app.services.ai_service import AIService
+from app.services.project_access_service import get_project_article, resolve_project_access
 from app.schemas.article import (
     ArticleCreate,
     ArticleEvidenceUpdate,
@@ -99,33 +100,12 @@ def _graph_sync_http_error(message: str = "Falha ao sincronizar corpus incluído
 
 
 async def get_project_or_404(projectId: int, ownerId: int, db: AsyncSession) -> Project:
-    result = await db.execute(
-        select(Project).where(Project.id == projectId, Project.ownerId == ownerId)
-    )
-    project = result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "Projeto não encontrado", "message": "Projeto inexistente ou sem permissão"},
-        )
-    return project
+    return (await resolve_project_access(db, project_id=projectId, user_id=ownerId)).project
 
 
 async def get_article_or_404(articleId: int, projectId: int, ownerId: int, db: AsyncSession) -> Article:
-    result = await db.execute(
-        select(Article).where(
-            Article.id == articleId,
-            Article.projectId == projectId,
-            Article.ownerId == ownerId,
-        )
-    )
-    article = result.scalar_one_or_none()
-    if not article:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "Artigo não encontrado", "message": "Artigo inexistente ou sem permissão"},
-        )
-    return article
+    await resolve_project_access(db, project_id=projectId, user_id=ownerId)
+    return await get_project_article(db, project_id=projectId, article_id=articleId)
 
 
 def _normalize_paper_id(paper_id: str | None) -> str | None:
@@ -1270,7 +1250,7 @@ async def get_articles_by_project(
 ):
     await get_project_or_404(projectId, current_user.id, db)
 
-    query = select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+    query = select(Article).where(Article.projectId == projectId)
 
     if search:
         search_filter = f"%{search}%"
@@ -1323,7 +1303,7 @@ async def get_project_selection_summary(
 ):
     await get_project_or_404(projectId, current_user.id, db)
     result = await db.execute(
-        select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+        select(Article).where(Article.projectId == projectId)
     )
     articles = result.scalars().all()
     return _selection_summary_from_articles(projectId, articles)
@@ -1347,7 +1327,7 @@ async def get_project_selection_report(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     result = await db.execute(
-        select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+        select(Article).where(Article.projectId == projectId)
     )
     articles = result.scalars().all()
     return _selection_report_from_articles(project, articles)
@@ -1447,7 +1427,7 @@ async def analyze_duplicates(
 ):
     await get_project_or_404(projectId, current_user.id, db)
     result = await db.execute(
-        select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+        select(Article).where(Article.projectId == projectId)
     )
     articles = result.scalars().all()
     candidates = _build_duplicate_candidates_from_articles(articles)
@@ -1471,7 +1451,6 @@ async def get_duplicate_candidates(
     result = await db.execute(
         select(Article).where(
             Article.projectId == projectId,
-            Article.ownerId == current_user.id,
             Article.reviewOutcome == "active",
             Article.duplicateGroupKey.is_not(None),
         )
@@ -1593,7 +1572,6 @@ async def promote_unique_articles_to_screening(
     result = await db.execute(
         select(Article).where(
             Article.projectId == projectId,
-            Article.ownerId == current_user.id,
             Article.currentPhase == "identification",
             Article.reviewOutcome == "active",
         )
@@ -1682,7 +1660,6 @@ async def batch_evaluate_screening(
         select(Article)
         .where(
             Article.projectId == projectId,
-            Article.ownerId == current_user.id,
             Article.currentPhase == "screening",
             Article.reviewOutcome == "active",
         )
@@ -1894,7 +1871,7 @@ async def get_project_synthesis_report(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     result = await db.execute(
-        select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+        select(Article).where(Article.projectId == projectId)
     )
     articles = result.scalars().all()
     return _build_synthesis_report(project, articles)
@@ -2233,7 +2210,7 @@ async def reprocess_project_graph(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     result = await db.execute(
-        select(Article).where(Article.projectId == projectId, Article.ownerId == current_user.id)
+        select(Article).where(Article.projectId == projectId)
     )
     all_articles = result.scalars().all()
     if not all_articles:

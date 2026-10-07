@@ -23,6 +23,7 @@ from app.schemas.ai import (
 from app.services.ai_service import AIService
 from app.services.graph_query_agent_service import get_graph_query_agent_service
 from app.services.rag_service import get_rag_service
+from app.services.project_access_service import resolve_project_access
 from app.core.dependencies import get_current_user, get_user_ai_service
 from app.database import get_db
 
@@ -329,23 +330,11 @@ async def project_chat(
         rag_service = get_rag_service()
         graph_agent = get_graph_query_agent_service()
 
-        project = await db.get(Project, data.projectId)
-        if project is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail={
-                    "error": "Projeto não encontrado",
-                    "message": f"Projeto {data.projectId} não encontrado"
-                }
+        project = (
+            await resolve_project_access(
+                db, project_id=data.projectId, user_id=current_user.id
             )
-        if project.ownerId != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={
-                    "error": "Acesso negado",
-                    "message": "Você não tem permissão para consultar este projeto"
-                }
-            )
+        ).project
         
         # Get last user message
         last_message = ""
@@ -446,7 +435,7 @@ async def project_chat(
                 project_id=data.projectId,
                 db=db,
                 top_k=5,
-                owner_id=current_user.id,
+                owner_id=None,
             )
 
             response = await ai_service.chat_project(

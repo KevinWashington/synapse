@@ -148,6 +148,8 @@ class ProjectResponse(BaseModel):
     updatedAt: datetime
     articleCount: int | None = None
     prismaStats: ProjectPrismaStats = Field(default_factory=ProjectPrismaStats)
+    role: Literal["owner", "coordinator", "reviewer"] = "owner"
+    capabilities: list[str] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

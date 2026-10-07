@@ -13,6 +13,7 @@ from app.services.rag_service import get_rag_service
 from app.services.neo4j_service import Neo4jService
 from app.services.postgres_mcp_service import PostgresMCPService
 from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
+from app.services.project_access_service import accessible_project_ids_query, resolve_project_access
 
 
 router = APIRouter()
@@ -47,21 +48,22 @@ async def get_stats(
 ):
     """Obter estatísticas do usuário."""
     userId = current_user.id
+    project_ids = accessible_project_ids_query(userId)
     
     # Total projects
     totalProjects = await db.scalar(
-        select(func.count(Project.id)).where(Project.ownerId == userId)
+        select(func.count()).select_from(project_ids.subquery())
     )
     
     # Total articles
     totalArticles = await db.scalar(
-        select(func.count(Article.id)).where(Article.ownerId == userId)
+        select(func.count(Article.id)).where(Article.projectId.in_(project_ids))
     )
     
     # Reviewed articles
     totalArticlesReviewed = await db.scalar(
         select(func.count(Article.id)).where(
-            Article.ownerId == userId,
+            Article.projectId.in_(project_ids),
             Article.status == "analisado"
         )
     )
@@ -69,7 +71,7 @@ async def get_stats(
     # Pending articles
     textsToReview = await db.scalar(
         select(func.count(Article.id)).where(
-            Article.ownerId == userId,
+            Article.projectId.in_(project_ids),
             Article.status == "pendente"
         )
     )
@@ -78,7 +80,7 @@ async def get_stats(
     todayStart = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     textsReviewedToday = await db.scalar(
         select(func.count(Article.id)).where(
-            Article.ownerId == userId,
+            Article.projectId.in_(project_ids),
             Article.status == "analisado",
             Article.updatedAt >= todayStart
         )
@@ -87,7 +89,7 @@ async def get_stats(
     # Last project
     lastProjectResult = await db.execute(
         select(Project)
-        .where(Project.ownerId == userId)
+        .where(Project.id.in_(project_ids))
         .order_by(Project.createdAt.desc())
         .limit(1)
     )
@@ -97,7 +99,7 @@ async def get_stats(
     pendingArticlesResult = await db.execute(
         select(Article, Project.title.label("project_title"))
         .join(Project, Article.projectId == Project.id)
-        .where(Article.ownerId == userId, Article.status == "pendente")
+        .where(Article.projectId.in_(project_ids), Article.status == "pendente")
         .order_by(Article.createdAt.desc())
         .limit(10)
     )
@@ -122,7 +124,7 @@ async def get_stats(
         
         count = await db.scalar(
             select(func.count(Article.id)).where(
-                Article.ownerId == userId,
+                Article.projectId.in_(project_ids),
                 Article.status == "analisado",
                 Article.updatedAt >= date,
                 Article.updatedAt < next_date
@@ -209,18 +211,7 @@ async def get_anchor_consistency_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Return paper_id consistency metrics across relational and vector boundaries."""
-    project_result = await db.execute(
-        select(Project).where(Project.id == projectId, Project.ownerId == current_user.id)
-    )
-    project = project_result.scalar_one_or_none()
-    if not project:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "error": "Projeto não encontrado",
-                "message": "Projeto inexistente ou sem permissão",
-            },
-        )
+    await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
 
     postgres_metrics = await sql.paper_id_counts(project_id=projectId)
     qdrant = get_qdrant_retrieval_service()

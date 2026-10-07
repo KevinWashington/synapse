@@ -16,6 +16,7 @@ from app.services.credential_vault import (
 from app.services.mcp_host_service import MCPHostService
 from app.services.neo4j_service import Neo4jService, get_neo4j_service
 from app.services.postgres_mcp_service import PostgresMCPService, get_postgres_mcp_service
+from app.services.project_access_service import ProjectAccess, resolve_project_access
 
 
 async def get_current_user(
@@ -72,6 +73,14 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
             }
         )
     return current_user
+
+
+async def get_project_access(
+    projectId: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ProjectAccess:
+    return await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
 
 
 class DeepSeekKeyRequiredError(HTTPException):
