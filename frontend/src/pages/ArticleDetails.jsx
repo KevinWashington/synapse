@@ -3,7 +3,7 @@ import {
   AlertTriangleIcon,
   ArrowLeftIcon,
   CheckCircle2Icon,
-  ExternalLinkIcon,
+  ChevronDownIcon,
   FileIcon,
   FileTextIcon,
   LoaderIcon,
@@ -32,6 +32,7 @@ const ArticleEvidenceEditor = lazy(() =>
   import("@features/articles/components/ArticleEvidenceEditor")
 );
 const PdfViewer = lazy(() => import("@features/articles/components/PdfViewer"));
+const NotesEditor = lazy(() => import("@features/articles/components/NotesEditor"));
 
 function ArticlePanelLoader() {
   return <LoadingState message="Carregando conteudo..." />;
@@ -98,11 +99,13 @@ function PrismaExtractionWorkspace({
   isSavingEvidence,
   navigate,
   onSaveEvidence,
+  onSaveNotes,
   pdfData,
   project,
   projectId,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [leftTab, setLeftTab] = useState("pdf");
   const extractionSchema = project?.dataExtractionSchema || [];
   const filteredArticles = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -282,20 +285,36 @@ function PrismaExtractionWorkspace({
                     {article.authors} ({article.year}) - {article.journal}
                   </p>
                 </div>
-                <Button variant="outline" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => navigate(`/projetos/${projectId}/artigos/${articleId}?flow=included&workspace=notas`)}>
-                    Ver detalhes do artigo
-                    <ExternalLinkIcon className="h-4 w-4" />
-                  </Button>
               </div>
 
               <div className="mb-4 flex shrink-0 gap-6 border-b border-[#edf0f7] text-sm font-semibold">
-                <span className="relative pb-3 text-[#6259ff] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t after:bg-[#6259ff]">PDF</span>
-                <span className="pb-3 text-[#56627f]">Notas</span>
+                {[{ key: "pdf", label: "PDF" }, { key: "notas", label: "Notas" }].map((tab) => {
+                  const active = leftTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setLeftTab(tab.key)}
+                      className={cn(
+                        "relative pb-3",
+                        active
+                          ? "text-[#6259ff] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-t after:bg-[#6259ff]"
+                          : "text-[#56627f] hover:text-[#182344]"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="min-h-[420px] flex-1 overflow-hidden">
                 <Suspense fallback={<ArticlePanelLoader />}>
-                  <PdfViewer article={article} articleId={articleId} pdfData={pdfData} projectId={projectId} />
+                  {leftTab === "pdf" ? (
+                    <PdfViewer article={article} articleId={articleId} pdfData={pdfData} projectId={projectId} />
+                  ) : (
+                    <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} />
+                  )}
                 </Suspense>
               </div>
             </section>
@@ -806,6 +825,7 @@ function ArticleDetails() {
       isSavingEvidence={isSavingEvidence}
       navigate={navigate}
       onSaveEvidence={handleSaveEvidence}
+      onSaveNotes={handleSaveNotes}
       pdfData={pdfData}
       project={project}
       projectId={projectId}
