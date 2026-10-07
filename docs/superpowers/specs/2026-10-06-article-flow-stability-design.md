@@ -14,7 +14,10 @@ Esta mudança cobre:
 - conteúdo do painel de detalhes do artigo;
 - preenchimento opcional da justificativa de triagem com a sugestão da IA;
 - ferramentas disponíveis na revisão de triagem e elegibilidade;
-- navegação entre PDF, notas e formulário na extração de dados.
+- navegação entre PDF, notas e formulário na extração de dados;
+- confirmação de ações destrutivas, coletivas ou que encerram uma etapa;
+- consistência do header, perfil e breadcrumbs nas páginas internas;
+- navegação em um clique entre as abas principais do projeto.
 
 Não serão redesenhados o relatório PRISMA, os critérios científicos, o modelo de decisão ou o formulário configurável de extração.
 
@@ -68,11 +71,41 @@ A extração permanece em uma única tela. O botão `Ver detalhes do artigo` ser
 
 Trocar para Notas e voltar para PDF não desmonta o formulário de extração nem perde os valores ainda não enviados. Salvar notas usa a operação existente e não interfere no rascunho da extração. A troca entre artigos mantém `flow=included&workspace=extracao` e abre o artigo seguinte no mesmo contexto.
 
+### Conclusão da extração
+
+`Salvar rascunho` continua salvando imediatamente. `Marcar como concluído` abre um modal antes de enviar os dados, informando que o estudo será contabilizado como extraído. Cancelar mantém o formulário aberto e não chama a API; confirmar envia o conteúdo atual com `markExtractionComplete=true`.
+
+Será criado um diálogo de confirmação reutilizável e acessível para ações destrutivas, coletivas ou que encerram uma etapa. Nesta rodada ele será aplicado a `Marcar como concluído`, remoção de artigo ou projeto, envio de todos os únicos e confirmação coletiva da revisão de duplicatas. Decisões de triagem e elegibilidade já possuem diálogo próprio e não receberão uma segunda confirmação. Salvamentos comuns, navegação e seleção não exigem modal.
+
+## Header e breadcrumbs
+
+As páginas internas usarão a linguagem visual atualmente presente nos workspaces detalhados: header de 72 pixels e breadcrumb textual com chevrons, primeiro item clicável em roxo e níveis seguintes em cor secundária. O componente será compartilhado, evitando uma versão no layout e outra codificada dentro da tela de artigo.
+
+Nos projetos, o breadcrumb será `Projetos > nome do projeto > seção atual`. Nas telas de artigo, será `Projetos > nome do projeto > Triagem`, `Elegibilidade` ou `Extração de dados`. Dashboard e listas de primeiro nível não inventarão um breadcrumb sem nível pai.
+
+Os controles de tema e conta permanecerão à direita em toda página autenticada, inclusive screening, elegibilidade e extração. O avatar, nome, e-mail e ação de sair sempre virão do usuário autenticado; o círculo fixo com as letras `JS` será removido. O workspace pode continuar sem o menu lateral para preservar a área de leitura, mas não terá um header visualmente incompatível.
+
+## Navegação entre abas do projeto
+
+A URL será a fonte única de verdade para a aba principal (`tab`) e para a etapa de artigos (`flow`). Não haverá estado local espelhando `tab` e depois tentando reconciliá-lo por efeito.
+
+Cada clique produzirá uma única atualização de URL:
+
+- `tab=artigos` preserva um `flow` válido ou usa `identification` como padrão;
+- sair de Artigos remove `flow` e parâmetros exclusivos dessa área;
+- mudar apenas a etapa de artigos preserva `tab=artigos`;
+- abrir Visão Geral remove `tab` por ser o valor padrão;
+- parâmetros não relacionados e válidos não serão sobrescritos por um efeito de um componente que está sendo desmontado.
+
+Assim, qualquer transição entre Visão Geral, Planejamento, Artigos, Fluxo, Síntese e Gráficos deve acontecer com um único clique, sem piscar ou retornar temporariamente à aba anterior.
+
 ## Organização do frontend
 
 `useProjectArticles` será a fonte dos filtros enviados ao servidor e dos totais da fila. `ProjectArticles` apenas renderizará os números recebidos e não calculará totais globais a partir dos artigos da página atual.
 
 `ArticleWorkspacePanel` receberá a etapa ativa e derivará as abas permitidas. O workspace dedicado de extração terá estado local para `PDF`/`Notas`; ele não reutilizará uma rota de revisão para simular detalhes.
+
+Um componente compartilhado de header receberá uma lista de itens de breadcrumb e reutilizará os controles reais de conta. Um componente compartilhado de confirmação receberá título, descrição, rótulos das ações, tom e callback de confirmação. Ambos permanecerão sem dependências novas.
 
 O código seguirá os componentes e serviços existentes. Não será criada uma nova camada global de estado nem adicionada dependência de interface.
 
@@ -83,6 +116,8 @@ O código seguirá os componentes e serviços existentes. Não será criada uma 
 - Uma página que fique vazia após uma decisão recua para a última página válida ou atualiza a fila para o primeiro resultado disponível.
 - A ausência de sugestão da IA simplesmente oculta a ação de cópia.
 - A ausência de PDF mantém o comportamento atual da etapa, sem expor extração antecipadamente.
+- Cancelar um modal de confirmação nunca executa a ação nem descarta dados digitados.
+- Uma URL com `tab` ou `flow` inválido volta diretamente ao padrão correspondente, sem ciclo de atualizações.
 
 ## Testes e critérios de aceite
 
@@ -97,7 +132,13 @@ O código seguirá os componentes e serviços existentes. Não será criada uma 
 - triagem e elegibilidade não exibem a aba de extração;
 - elegibilidade não exibe o botão redundante de Assistente IA;
 - extração alterna PDF/Notas e preserva o formulário montado;
-- promoção em massa move mais de uma página de únicos, preserva duplicatas e é idempotente.
+- promoção em massa move mais de uma página de únicos, preserva duplicatas e é idempotente;
+- concluir extração exige confirmação e cancelar não chama `onSave`;
+- ações destrutivas ou coletivas incluídas no escopo usam o diálogo compartilhado, não `window.confirm`;
+- workspaces detalhados exibem o avatar e o menu do usuário autenticado;
+- breadcrumbs de projeto e artigo usam a mesma estrutura e o mesmo estilo;
+- cada aba principal abre no primeiro clique, inclusive Visão Geral → Planejamento, Planejamento → Artigos e Fluxo → Artigos;
+- `tab` e `flow` permanecem consistentes ao usar voltar/avançar do navegador.
 
 ### Playwright
 
@@ -109,7 +150,10 @@ O fluxo será exercitado com dados temporários:
 4. usar a sugestão da IA como justificativa, editar e salvar;
 5. repetir a verificação da fila na elegibilidade;
 6. abrir um incluído na extração, alternar PDF/Notas, salvar nota e continuar preenchendo a extração;
-7. navegar entre artigos incluídos e confirmar que o workspace continua funcional.
+7. navegar entre artigos incluídos e confirmar que o workspace continua funcional;
+8. cancelar e confirmar a conclusão de uma extração, verificando que somente a confirmação chama a API;
+9. percorrer todas as abas principais com um clique e testar voltar/avançar do navegador;
+10. confirmar que screening, elegibilidade e extração mantêm breadcrumb, tema e conta do usuário no header.
 
 O teste não reutilizará nem modificará o projeto 7. Dados temporários serão removidos pelos mecanismos já usados na suíte ou ficarão isolados no banco de teste.
 
