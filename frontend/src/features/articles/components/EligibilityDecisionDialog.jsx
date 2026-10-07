@@ -308,6 +308,11 @@ function EligibilityDecisionDialog({
     }));
   }
 
+  function selectDecision(nextDecision) {
+    setDecision(nextDecision);
+    setError("");
+  }
+
   async function resolveArticleContent() {
     if (pdfData instanceof ArrayBuffer) {
       return extractPdfContent(pdfData);
@@ -415,7 +420,7 @@ function EligibilityDecisionDialog({
         : checklistSuggestion.decision;
 
     if (suggestedDecision === "included" || suggestedDecision === "excluded") {
-      setDecision(suggestedDecision);
+      selectDecision(suggestedDecision);
     }
 
     if (!reasonText.trim() && suggestedDecision === "excluded") {
@@ -433,8 +438,13 @@ function EligibilityDecisionDialog({
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (decision !== "included" && !reasonText.trim()) {
-      setError("A justificativa e obrigatoria para exclusoes e full text indisponivel.");
+    if (decision === "excluded" && !reasonText.trim()) {
+      setError("A justificativa da exclusão é obrigatória.");
+      return;
+    }
+
+    if (decision === "full_text_unavailable" && !reasonText.trim()) {
+      setError("O motivo da indisponibilidade é obrigatório.");
       return;
     }
 
@@ -444,12 +454,14 @@ function EligibilityDecisionDialog({
     }
 
     setError("");
-    const checklistAnswers = Object.fromEntries(
-      checklistEntries.map((entry) => [
-        entry.key,
-        formatChecklistAnswer(answerStatuses[entry.key], answers[entry.key]),
-      ])
-    );
+    const checklistAnswers = decision === "full_text_unavailable"
+      ? {}
+      : Object.fromEntries(
+          checklistEntries.map((entry) => [
+            entry.key,
+            formatChecklistAnswer(answerStatuses[entry.key], answers[entry.key]),
+          ])
+        );
 
     await onSubmit({
       decision,
@@ -469,29 +481,29 @@ function EligibilityDecisionDialog({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2 md:grid-cols-3">
-            <Button type="button" variant={decision === "included" ? "default" : "outline"} onClick={() => setDecision("included")} disabled={isSaving}>
+            <Button type="button" variant={decision === "included" ? "default" : "outline"} onClick={() => selectDecision("included")} disabled={isSaving}>
               Incluir no corpus
             </Button>
-            <Button type="button" variant={decision === "excluded" ? "default" : "outline"} onClick={() => setDecision("excluded")} disabled={isSaving}>
+            <Button type="button" variant={decision === "excluded" ? "default" : "outline"} onClick={() => selectDecision("excluded")} disabled={isSaving}>
               Excluir
             </Button>
             <Button
               type="button"
               variant={decision === "full_text_unavailable" ? "default" : "outline"}
-              onClick={() => setDecision("full_text_unavailable")}
+              onClick={() => selectDecision("full_text_unavailable")}
               disabled={isSaving}
             >
-              Full text indisponivel
+              Texto completo indisponível
             </Button>
           </div>
 
-          {checklistEntries.length ? (
+          {decision !== "full_text_unavailable" && checklistEntries.length ? (
             <div className="space-y-4 rounded-md border border-[var(--syn-border)] p-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-[var(--syn-text-primary)]">Checklist assistido</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--syn-text-secondary)]">
-                    A IA pode preencher evidencias como rascunho. A decisao final continua humana.
+                    A IA pode preencher evidências como rascunho. A decisão final continua humana.
                   </p>
                 </div>
                 <Button
@@ -520,7 +532,7 @@ function EligibilityDecisionDialog({
                     onClick={applyChecklistSuggestion}
                     disabled={isSaving || checklistSuggestion.decision === "review"}
                   >
-                    Usar sugestao
+                    Usar sugestão
                   </Button>
                 </div>
                 <p className="mt-2">
@@ -578,7 +590,7 @@ function EligibilityDecisionDialog({
             </div>
           ) : null}
 
-          {researchQuestions.length ? (
+          {decision === "included" && researchQuestions.length ? (
             <div className="space-y-2">
               <Label>RQs respondidas</Label>
               <div className="flex flex-wrap gap-2">
@@ -590,7 +602,7 @@ function EligibilityDecisionDialog({
                       key={rqNumber}
                       type="button"
                       onClick={() => toggleRQ(rqNumber)}
-                      disabled={isSaving || decision !== "included"}
+                      disabled={isSaving}
                       className={`rounded-md border px-2 py-1 text-xs ${
                         active
                           ? "border-[var(--syn-sidebar-accent)] bg-[var(--syn-bg-secondary)]"
@@ -606,14 +618,33 @@ function EligibilityDecisionDialog({
             </div>
           ) : null}
 
+          {decision === "full_text_unavailable" ? (
+            <p className="rounded-md border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] p-3 text-sm leading-6 text-[var(--syn-text-secondary)]">
+              Informe por que não foi possível acessar o texto completo deste artigo.
+            </p>
+          ) : null}
+
           <div className="space-y-2">
-            <Label htmlFor="eligibility-reason">Justificativa</Label>
+            <Label htmlFor="eligibility-reason">
+              {decision === "excluded"
+                ? "Justificativa da exclusão"
+                : decision === "full_text_unavailable"
+                  ? "Motivo da indisponibilidade"
+                  : "Justificativa"}
+            </Label>
             <Textarea
               id="eligibility-reason"
               value={reasonText}
               onChange={(event) => setReasonText(event.target.value)}
               rows={4}
-              placeholder="Obrigatoria para exclusao ou texto completo indisponivel."
+              placeholder={
+                decision === "excluded"
+                  ? "Descreva por que o artigo deve ser excluído."
+                  : decision === "full_text_unavailable"
+                    ? "Descreva por que o texto completo não está disponível."
+                    : "Opcional: registre observações sobre a inclusão."
+              }
+              required={decision !== "included"}
               disabled={isSaving}
             />
             {error ? <p className="text-sm text-red-500">{error}</p> : null}
