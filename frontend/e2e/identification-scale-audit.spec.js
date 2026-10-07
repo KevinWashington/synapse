@@ -102,13 +102,15 @@ test.describe("identification at scale", () => {
       await page.getByRole("button", { name: "Artigos", exact: true }).click();
       await expect(page.getByRole("button", { name: "Enviar todos os únicos para triagem" })).toBeVisible();
       await expect(page.getByText("105 na fila", { exact: true })).toBeVisible();
-      await expect(page.getByText("100 exibidos de 105", { exact: true })).toBeVisible();
-      await expect(page.getByText("Página 1 de 2", { exact: true })).toBeVisible();
+      await expect(page.getByText("20 exibidos de 105", { exact: true })).toBeVisible();
+      await expect(page.getByText("Página 1 de 6", { exact: true })).toBeVisible();
+      const stageListHeight = (await page.getByTestId("stage-list-scroll").boundingBox()).height;
+      expect(stageListHeight).toBeLessThan(700);
       await page.screenshot({ path: path.join(evidenceDir, "02-identification-page-1.png"), fullPage: true });
 
       await page.getByRole("button", { name: "Próxima página" }).click();
-      await expect(page.getByText("5 exibidos de 105", { exact: true })).toBeVisible();
-      await expect(page.getByText("Página 2 de 2", { exact: true })).toBeVisible();
+      await expect(page.getByText("20 exibidos de 105", { exact: true })).toBeVisible();
+      await expect(page.getByText("Página 2 de 6", { exact: true })).toBeVisible();
 
       await page.getByRole("button", { name: "Enviar todos os únicos para triagem" }).click();
       await expect(page.getByRole("heading", { name: "Revisar duplicatas" })).toBeVisible({ timeout: 30_000 });
@@ -130,7 +132,7 @@ test.describe("identification at scale", () => {
       await expect(page.getByText("0 na fila", { exact: true })).toBeVisible({ timeout: 30_000 });
       await page.getByRole("button", { name: /Triagem/ }).first().click();
       await expect(page.getByText("104 na fila", { exact: true })).toBeVisible();
-      await expect(page.getByText("100 exibidos de 104", { exact: true })).toBeVisible();
+      await expect(page.getByText("20 exibidos de 104", { exact: true })).toBeVisible();
       await page.screenshot({ path: path.join(evidenceDir, "04-screening-all-unique.png"), fullPage: true });
 
       expect(browserErrors.filter((message) => !message.includes("favicon"))).toEqual([]);

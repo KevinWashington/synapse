@@ -1,11 +1,13 @@
 import {
   Bot,
+  ChevronLeft,
   ChevronRight,
   FileText,
   MessageSquare,
   Paperclip,
   Search,
 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
   Select,
@@ -22,8 +24,145 @@ import {
 } from "@/features/articles";
 import { usePageTitle } from "@hooks/usePageTitle";
 
+function formatNumber(value) {
+  return new Intl.NumberFormat("pt-BR").format(value || 0);
+}
+
+function getSourceInitial(sourceName) {
+  return (sourceName || "Artigo")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+export function ArticleLibraryList({
+  articles,
+  loading,
+  onOpenArticle,
+  onPageChange,
+  page,
+  pageSize,
+  total,
+}) {
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const rangeStart = total ? ((page - 1) * pageSize) + 1 : 0;
+  const rangeEnd = total ? rangeStart + articles.length - 1 : 0;
+
+  return (
+    <section className="flex h-[calc(100dvh-15rem)] min-h-[420px] flex-col overflow-hidden rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] shadow-[var(--syn-shadow-card)] sm:h-[calc(100dvh-10rem)]">
+      <div className="flex shrink-0 items-center justify-between border-b border-[var(--syn-border)] px-5 py-4">
+        <div>
+          <h2 className="text-sm font-semibold text-[var(--syn-text-primary)]">Artigos do projeto</h2>
+          <p className="mt-1 text-xs text-[var(--syn-text-secondary)]">{formatNumber(total)} registros encontrados</p>
+        </div>
+        <span className="rounded-full bg-[var(--syn-badge-blue-bg)] px-3 py-1 text-xs font-semibold text-[var(--syn-badge-blue-text)]">
+          {formatNumber(total)}
+        </span>
+      </div>
+
+      <div data-testid="library-list-scroll" className="min-h-0 flex-1 overflow-y-auto bg-[var(--syn-bg-secondary)] p-3">
+        {loading ? (
+          <LoadingState message="Carregando artigos..." />
+        ) : articles.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="Nenhum artigo encontrado"
+            description="Selecione um projeto ou importe artigos via BibTeX"
+          />
+        ) : (
+          <div className="grid gap-2">
+            {articles.map((article) => (
+              <article
+                key={article.id}
+                data-testid="library-article-card"
+                className="group grid gap-3 rounded-lg border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] p-4 transition-colors hover:border-[#c9c3ff] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              >
+                <button
+                  type="button"
+                  onClick={() => onOpenArticle(article)}
+                  className="flex min-w-0 items-start gap-3 text-left"
+                  aria-label={`Abrir ${article.title}`}
+                >
+                  <span className="grid h-10 min-w-10 shrink-0 place-items-center rounded-lg bg-[#eef1ff] text-xs font-bold text-[#6259ff]">
+                    {getSourceInitial(article.sourceName)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block line-clamp-2 text-sm font-semibold leading-5 text-[var(--syn-text-primary)] group-hover:text-[#6259ff]">
+                      {article.title}
+                    </span>
+                    <span className="mt-1 block truncate text-xs text-[var(--syn-text-secondary)]">
+                      {article.authors || "Autoria não informada"}
+                    </span>
+                    <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--syn-text-secondary)]">
+                      <span className="font-medium text-[#6259ff]">{article.sourceName || "Fonte não informada"}</span>
+                      {article.year ? <span>{article.year}</span> : null}
+                      {article.journal ? <span className="max-w-[360px] truncate">{article.journal}</span> : null}
+                    </span>
+                  </span>
+                </button>
+
+                <div className="flex items-center justify-between gap-3 border-t border-[var(--syn-border)] pt-3 sm:justify-end sm:border-0 sm:pt-0">
+                  <div className="flex items-center gap-2 text-[var(--syn-text-secondary)]">
+                    {article.hasPdf ? <Paperclip className="h-4 w-4" aria-label="PDF disponível" /> : null}
+                    {article.aiRelevanceScore != null ? <Bot className="h-4 w-4 text-[var(--syn-badge-blue-text)]" aria-label="Avaliação por IA" /> : null}
+                    {article.notas ? <MessageSquare className="h-4 w-4" aria-label="Possui notas" /> : null}
+                  </div>
+                  <StatusBadge status={article.status} />
+                  <button
+                    type="button"
+                    onClick={() => onOpenArticle(article)}
+                    aria-label={`Abrir detalhes de ${article.title}`}
+                    className="grid h-8 w-8 place-items-center rounded-full text-[var(--syn-text-secondary)] transition-colors hover:bg-[#eef1ff] hover:text-[#6259ff]"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--syn-border)] px-5 py-3 text-xs text-[var(--syn-text-secondary)]">
+        <span>Mostrando {formatNumber(rangeStart)}–{formatNumber(rangeEnd)} de {formatNumber(total)} artigos</span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Página anterior"
+            className="h-8 w-8 rounded-lg"
+            disabled={page <= 1 || loading}
+            onClick={() => onPageChange(page - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="min-w-24 text-center">Página {page} de {pageCount}</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Próxima página"
+            className="h-8 w-8 rounded-lg"
+            disabled={page >= pageCount || loading}
+            onClick={() => onPageChange(page + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </footer>
+    </section>
+  );
+}
+
 function Articles() {
   const {
+    articlePage,
+    articlePageSize,
+    articleTotal,
     articles,
     filterStatus,
     loading,
@@ -33,6 +172,7 @@ function Articles() {
     searchTerm,
     selectedArticle,
     selectedProjectId,
+    setArticlePage,
     setFilterStatus,
     setPanelOpen,
     setSearchTerm,
@@ -78,52 +218,15 @@ function Articles() {
         </Select>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        {loading ? (
-          <LoadingState message="Carregando artigos..." />
-        ) : articles.length === 0 ? (
-          <EmptyState
-            icon={FileText}
-            title="Nenhum artigo encontrado"
-            description="Selecione um projeto ou importe artigos via BibTeX"
-          />
-        ) : (
-          <div className="grid gap-3">
-            {articles.map((article) => (
-              <div
-                key={article.id}
-                onClick={() => openDetail(article)}
-                className="group flex cursor-pointer items-center gap-4 rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] p-4 shadow-[var(--syn-shadow-card)] syn-transition hover:shadow-[var(--syn-shadow-card-hover)] dark:bg-[var(--syn-bg-primary)]"
-              >
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--syn-badge-blue-bg)]">
-                  <FileText className="h-5 w-5 text-[var(--syn-badge-blue-text)]" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="truncate text-sm font-semibold text-[var(--syn-text-primary)]">
-                    {article.title}
-                  </h3>
-                  <p className="mt-0.5 truncate text-xs text-[var(--syn-text-secondary)]">
-                    {article.authors} • {article.year} • {article.journal}
-                  </p>
-                </div>
-                <div className="flex flex-shrink-0 items-center gap-2">
-                  {article.hasPdf && (
-                    <Paperclip className="h-3.5 w-3.5 text-[var(--syn-text-secondary)]" />
-                  )}
-                  {article.aiRelevanceScore != null && (
-                    <Bot className="h-3.5 w-3.5 text-[var(--syn-badge-blue-text)]" />
-                  )}
-                  {article.notas && (
-                    <MessageSquare className="h-3.5 w-3.5 text-[var(--syn-text-secondary)]" />
-                  )}
-                  <StatusBadge status={article.status} />
-                  <ChevronRight className="h-4 w-4 text-[var(--syn-text-secondary)] opacity-0 transition-opacity group-hover:opacity-100" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <ArticleLibraryList
+        articles={articles}
+        loading={loading}
+        onOpenArticle={openDetail}
+        onPageChange={setArticlePage}
+        page={articlePage}
+        pageSize={articlePageSize}
+        total={articleTotal}
+      />
 
       <ArticleLibraryDetailPanel
         article={selectedArticle}

@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { projectService } from "@features/projects/services/projectService";
 import { articleService } from "@features/articles/services/articleService";
+
+const ARTICLE_PAGE_SIZE = 20;
 
 function useArticlesLibraryPage() {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("all");
   const [articles, setArticles] = useState([]);
+  const [articlePage, setArticlePage] = useState(1);
+  const [articleTotal, setArticleTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("todos");
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const latestArticleRequest = useRef(0);
 
   const loadProjects = useCallback(async () => {
     try {
@@ -27,15 +32,18 @@ function useArticlesLibraryPage() {
   }, []);
 
   const loadArticles = useCallback(async () => {
+    const requestId = ++latestArticleRequest.current;
+
     if (!selectedProjectId || selectedProjectId === "all") {
       setArticles([]);
+      setArticleTotal(0);
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      const params = {};
+      const params = { page: articlePage, limit: ARTICLE_PAGE_SIZE };
       if (filterStatus !== "todos") {
         params.status = filterStatus;
       }
@@ -44,14 +52,24 @@ function useArticlesLibraryPage() {
       }
 
       const response = await articleService.getArticlesByProject(selectedProjectId, params);
+      if (requestId !== latestArticleRequest.current) {
+        return;
+      }
       setArticles(response.articles || []);
+      setArticleTotal(response.total || 0);
     } catch (error) {
+      if (requestId !== latestArticleRequest.current) {
+        return;
+      }
       console.error("Error loading articles:", error);
       setArticles([]);
+      setArticleTotal(0);
     } finally {
-      setLoading(false);
+      if (requestId === latestArticleRequest.current) {
+        setLoading(false);
+      }
     }
-  }, [filterStatus, searchTerm, selectedProjectId]);
+  }, [articlePage, filterStatus, searchTerm, selectedProjectId]);
 
   useEffect(() => {
     loadProjects();
@@ -66,7 +84,25 @@ function useArticlesLibraryPage() {
     setPanelOpen(true);
   }, []);
 
+  const changeProject = useCallback((projectId) => {
+    setArticlePage(1);
+    setSelectedProjectId(projectId);
+  }, []);
+
+  const changeStatus = useCallback((status) => {
+    setArticlePage(1);
+    setFilterStatus(status);
+  }, []);
+
+  const changeSearch = useCallback((value) => {
+    setArticlePage(1);
+    setSearchTerm(value);
+  }, []);
+
   return {
+    articlePage,
+    articlePageSize: ARTICLE_PAGE_SIZE,
+    articleTotal,
     articles,
     filterStatus,
     loading,
@@ -76,10 +112,11 @@ function useArticlesLibraryPage() {
     searchTerm,
     selectedArticle,
     selectedProjectId,
-    setFilterStatus,
+    setArticlePage,
+    setFilterStatus: changeStatus,
     setPanelOpen,
-    setSearchTerm,
-    setSelectedProjectId,
+    setSearchTerm: changeSearch,
+    setSelectedProjectId: changeProject,
   };
 }
 

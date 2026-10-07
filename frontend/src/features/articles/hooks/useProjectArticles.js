@@ -18,7 +18,7 @@ const FLOW_TABS = new Set([
   "included",
   "report",
 ]);
-const ARTICLE_PAGE_SIZE = 100;
+const ARTICLE_PAGE_SIZE = 20;
 
 export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   const [searchParams, setSearchParams] = useSearchParams();

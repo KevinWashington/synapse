@@ -362,7 +362,7 @@ export function StageListPanel({
   activeFilter,
   activeStage,
   articlePage = 1,
-  articlePageSize = 100,
+  articlePageSize = 20,
   articleTotal,
   articles,
   duplicateIds,
@@ -482,7 +482,7 @@ export function StageListPanel({
         </div>
       </div>
 
-      <div className="min-h-[420px]">
+      <div data-testid="stage-list-scroll" className="min-h-[420px] max-h-[560px] overflow-y-auto">
         {isLoading ? (
           <div className="flex h-64 items-center justify-center gap-2 text-sm text-[#667391]">
             <LoaderIcon className="h-4 w-4 animate-spin" />

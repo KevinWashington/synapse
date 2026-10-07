@@ -27,7 +27,7 @@ function renderList(overrides = {}) {
       activeFilter="all"
       activeStage="identification"
       articlePage={1}
-      articlePageSize={100}
+      articlePageSize={20}
       articleTotal={1093}
       articles={[article]}
       duplicateIds={new Set()}
@@ -67,14 +67,14 @@ describe("ProjectArticles work queue", () => {
     expect(screen.getByRole("checkbox", { name: "Selecionar todos os artigos visiveis" })).toBeInTheDocument();
   });
 
-  it("navigates pages without pretending the first 100 are the whole queue", () => {
+  it("navigates pages without pretending the first 20 are the whole queue", () => {
     const onPageChange = vi.fn();
     renderList({ onPageChange });
 
     screen.getByRole("button", { name: "Próxima página" }).click();
 
     expect(onPageChange).toHaveBeenCalledWith(2);
-    expect(screen.getByText("Página 1 de 11")).toBeInTheDocument();
+    expect(screen.getByText("Página 1 de 55")).toBeInTheDocument();
   });
 
   it("does not render selection checkboxes outside identification", () => {
