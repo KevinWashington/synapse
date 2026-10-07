@@ -1015,12 +1015,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     : "identification";
 
   useEffect(() => {
-    if (activeFlowTab === "overview" || activeFlowTab === "report") {
-      setActiveFlowTab("identification");
-    }
-  }, [activeFlowTab, setActiveFlowTab]);
-
-  useEffect(() => {
     if (searchParams.get("action") !== "import") {
       return;
     }

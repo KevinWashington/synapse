@@ -9,6 +9,7 @@ const INITIAL_EDIT_DATA = {
   status: "",
 };
 const PROJECT_DETAIL_TABS = new Set(["overview", "planejamento", "artigos", "fluxo", "grafo", "sintese"]);
+const ARTICLE_FLOWS = new Set(["identification", "screening", "eligibility", "included"]);
 
 function useProjectDetailsPage() {
   const { id } = useParams();
@@ -17,10 +18,8 @@ function useProjectDetailsPage() {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTabState] = useState(() => {
-    const requestedTab = searchParams.get("tab");
-    return PROJECT_DETAIL_TABS.has(requestedTab) ? requestedTab : "overview";
-  });
+  const requestedTab = searchParams.get("tab");
+  const activeTab = PROJECT_DETAIL_TABS.has(requestedTab) ? requestedTab : "overview";
   const [editOpen, setEditOpen] = useState(false);
   const [editData, setEditData] = useState(INITIAL_EDIT_DATA);
   const [editLoading, setEditLoading] = useState(false);
@@ -43,32 +42,26 @@ function useProjectDetailsPage() {
     fetchProject();
   }, [fetchProject]);
 
-  useEffect(() => {
-    const requestedTab = searchParams.get("tab");
-    const nextTab = PROJECT_DETAIL_TABS.has(requestedTab)
-      ? requestedTab
-      : "overview";
-
-    setActiveTabState((current) => (current === nextTab ? current : nextTab));
-  }, [searchParams]);
-
   const setActiveTab = useCallback(
     (nextTab) => {
       const resolvedTab = PROJECT_DETAIL_TABS.has(nextTab) ? nextTab : "overview";
-      const defaultTab = "overview";
-
-      setActiveTabState(resolvedTab);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
 
-        if (resolvedTab === defaultTab) {
+        if (resolvedTab === "overview") {
           next.delete("tab");
         } else {
           next.set("tab", resolvedTab);
         }
 
-        if (resolvedTab !== "fluxo") {
+        if (resolvedTab === "artigos") {
+          if (!ARTICLE_FLOWS.has(next.get("flow"))) {
+            next.set("flow", "identification");
+          }
+          next.delete("action");
+        } else {
           next.delete("flow");
+          next.delete("action");
         }
 
         return next;

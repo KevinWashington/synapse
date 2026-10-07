@@ -10,21 +10,14 @@ const PHASE_FILTERS = {
   eligibility: { phase: "eligibility" },
   included: { outcome: "included" },
 };
-const FLOW_TABS = new Set([
-  "overview",
-  "identification",
-  "screening",
-  "eligibility",
-  "included",
-  "report",
-]);
+const FLOW_TABS = new Set(["identification", "screening", "eligibility", "included"]);
 const ARTICLE_PAGE_SIZE = 20;
 
 export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeFlowTab, setActiveFlowTabState] = useState(() => {
     const requestedFlow = searchParams.get("flow");
-    return FLOW_TABS.has(requestedFlow) ? requestedFlow : "overview";
+    return FLOW_TABS.has(requestedFlow) ? requestedFlow : "identification";
   });
   const [articles, setArticles] = useState([]);
   const [articlePage, setArticlePage] = useState(1);
@@ -50,25 +43,22 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
 
   useEffect(() => {
     const requestedFlow = searchParams.get("flow");
-    const nextFlow = FLOW_TABS.has(requestedFlow) ? requestedFlow : "overview";
+    const nextFlow = FLOW_TABS.has(requestedFlow) ? requestedFlow : "identification";
 
     setActiveFlowTabState((current) => (current === nextFlow ? current : nextFlow));
   }, [searchParams]);
 
   const setActiveFlowTab = useCallback(
     (nextFlowTab) => {
-      const resolvedFlowTab = FLOW_TABS.has(nextFlowTab) ? nextFlowTab : "overview";
+      const resolvedFlowTab = FLOW_TABS.has(nextFlowTab) ? nextFlowTab : "identification";
 
       setActiveFlowTabState(resolvedFlowTab);
       setArticlePage(1);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
 
-        if (resolvedFlowTab === "overview") {
-          next.delete("flow");
-        } else {
-          next.set("flow", resolvedFlowTab);
-        }
+        next.set("tab", "artigos");
+        next.set("flow", resolvedFlowTab);
 
         return next;
       });
