@@ -84,6 +84,7 @@ export default function DistributionPanel({ collaboration }) {
   const [phase, setPhase] = useState("screening");
   const [preview, setPreview] = useState(null);
   const [previewTeam, setPreviewTeam] = useState(null);
+  const [previewAssignmentSet, setPreviewAssignmentSet] = useState(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -93,7 +94,10 @@ export default function DistributionPanel({ collaboration }) {
   const teamKey = JSON.stringify(
     reviewers.map((member) => [member.userId, member.role]),
   );
-  const validPreview = preview?.phase === phase && previewTeam === teamKey;
+  const validPreview =
+    preview?.phase === phase &&
+    previewTeam === teamKey &&
+    previewAssignmentSet === assignments;
   if (!capabilities.includes("manage_distribution")) return null;
   async function run(confirm) {
     if (pending) return;
@@ -109,6 +113,7 @@ export default function DistributionPanel({ collaboration }) {
         const result = await previewAssignments({ phase });
         setPreview(result);
         setPreviewTeam(teamKey);
+        setPreviewAssignmentSet(assignments);
       }
     } catch (failure) {
       setError(failure.message || "Não foi possível distribuir os artigos.");
@@ -116,6 +121,11 @@ export default function DistributionPanel({ collaboration }) {
     } finally {
       setPending(false);
     }
+  }
+  async function reassign(...args) {
+    const response = await reassignAssignment(...args);
+    setPreview(null);
+    return response;
   }
   const unavailable = assignments.filter(
     (assignment) => assignment.status === "needs_reassignment",
@@ -219,7 +229,7 @@ export default function DistributionPanel({ collaboration }) {
                   assignment={assignment}
                   reviewers={reviewers}
                   assignments={assignments}
-                  onReassign={reassignAssignment}
+                  onReassign={reassign}
                 />
               ))}
             </ul>

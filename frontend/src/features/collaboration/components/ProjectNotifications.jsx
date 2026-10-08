@@ -10,8 +10,22 @@ import {
   DialogTrigger,
 } from "@/components/ui/Dialog";
 
-function destination(projectId, notification) {
+function destination(projectId, notification, conflicts) {
   const base = `/projetos/${projectId}`;
+  if (
+    notification.type === "review_conflict" &&
+    notification.entityType === "article"
+  ) {
+    const conflict = conflicts.find(
+      (item) =>
+        item.status === "open" &&
+        item.articleId === notification.entityId &&
+        item.phase === notification.payload?.phase,
+    );
+    return conflict
+      ? `${base}?tab=equipe&conflict=${conflict.id}`
+      : `${base}?tab=equipe`;
+  }
   if (
     notification.entityType === "article" &&
     Number.isInteger(notification.entityId)
@@ -32,6 +46,7 @@ export default function ProjectNotifications({
 }) {
   const {
     notifications,
+    conflicts,
     unreadCount,
     loading,
     error,
@@ -116,7 +131,7 @@ export default function ProjectNotifications({
                   className={`min-w-0 rounded-lg border p-4 ${notification.readAt ? "" : "bg-muted/40"}`}
                 >
                   <a
-                    href={destination(projectId, notification)}
+                    href={destination(projectId, notification, conflicts)}
                     className="block break-words font-medium text-[#6259ff] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]"
                     onClick={(event) => {
                       if (
@@ -129,7 +144,9 @@ export default function ProjectNotifications({
                         return;
                       event.preventDefault();
                       setOpen(false);
-                      onNavigate(destination(projectId, notification));
+                      onNavigate(
+                        destination(projectId, notification, conflicts),
+                      );
                     }}
                   >
                     {notification.title}

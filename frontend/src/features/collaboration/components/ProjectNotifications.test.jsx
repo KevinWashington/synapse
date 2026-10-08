@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import ProjectNotifications from "./ProjectNotifications";
 import { collaboration } from "./testFixtures";
+import { apiService } from "@/services/api";
+import { useProjectCollaboration } from "../hooks/useProjectCollaboration";
+
+afterEach(() => vi.restoreAllMocks());
 
 const notifications = [
   {
@@ -16,8 +20,10 @@ const notifications = [
     id: 6,
     title: "Discordância",
     body: "Arbitre",
-    entityType: "conflict",
-    entityId: 8,
+    type: "review_conflict",
+    entityType: "article",
+    entityId: 7,
+    payload: { phase: "screening" },
     readAt: null,
   },
 ];
@@ -103,5 +109,74 @@ describe("project notifications", () => {
       screen.getByRole("button", { name: /Notificações do projeto,/ }),
     );
     expect(screen.getByText(text)).toBeInTheDocument();
+  });
+  it.each([
+    [
+      [{ id: 8, articleId: 7, phase: "screening", status: "open" }],
+      "/projetos/7?tab=equipe&conflict=8",
+    ],
+    [
+      [
+        { id: 9, articleId: 7, phase: "screening", status: "resolved" },
+        { id: 10, articleId: 7, phase: "eligibility", status: "open" },
+      ],
+      "/projetos/7?tab=equipe",
+    ],
+    [[], "/projetos/7?tab=equipe"],
+  ])(
+    "routes a backend review_conflict article event to its open conflict or team fallback",
+    (conflicts, target) => {
+      const navigate = vi.fn();
+      render(
+        <ProjectNotifications
+          projectId={7}
+          collaboration={collaboration({
+            notifications: [notifications[1]],
+            conflicts,
+          })}
+          onNavigate={navigate}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: /Notificações do projeto,/ }),
+      );
+      expect(
+        screen.getByRole("link", { name: "Discordância" }),
+      ).toHaveAttribute("href", target);
+      fireEvent.click(screen.getByRole("link", { name: "Discordância" }));
+      expect(navigate).toHaveBeenCalledWith(target);
+    },
+  );
+  it("recovers the real notification hook error and shows the empty state after retry", async () => {
+    let failNotifications = true;
+    vi.spyOn(apiService, "get").mockImplementation(async (url) => {
+      if (url.endsWith("/members")) return { members: [], invitations: [] };
+      if (failNotifications) throw new Error("Falha nas notificações");
+      return [];
+    });
+    const project = { id: 7, capabilities: ["read_project"] };
+    function Harness() {
+      const state = useProjectCollaboration(project);
+      return (
+        <ProjectNotifications
+          projectId={7}
+          collaboration={state}
+          onNavigate={vi.fn()}
+        />
+      );
+    }
+    render(<Harness />);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Notificações do projeto,/ }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Falha nas notificações",
+    );
+    failNotifications = false;
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(
+      await screen.findByText("Nenhuma notificação neste projeto."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

@@ -56,7 +56,20 @@ describe("controlled distribution", () => {
         },
       ],
     });
+    state.previewAssignments.mockResolvedValue({
+      phase: "screening",
+      articleCount: 1,
+      reviewerCount: 2,
+      loads: { 1: 1, 2: 1 },
+      assignments: [{ articleId: 7 }],
+    });
     render(<DistributionPanel collaboration={state} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pré-visualizar distribuição" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Confirmar distribuição" }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/precisa de reatribuição/)).toBeInTheDocument();
     fireEvent.keyDown(
       screen.getByRole("combobox", {
@@ -73,6 +86,17 @@ describe("controlled distribution", () => {
         reviewerUserId: 2,
       }),
     );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Confirmar distribuição" }),
+      ).not.toBeInTheDocument(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pré-visualizar distribuição" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Confirmar distribuição" }),
+    ).toBeInTheDocument();
   });
   it("invalidates preview when reviewers change", async () => {
     const state = collaboration();
@@ -93,6 +117,43 @@ describe("controlled distribution", () => {
     rerender(
       <DistributionPanel
         collaboration={{ ...state, members: state.members.slice(0, 1) }}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Confirmar distribuição" }),
+    ).not.toBeInTheDocument();
+  });
+  it("invalidates preview when assignment load changes without a team change", async () => {
+    const state = collaboration();
+    state.previewAssignments.mockResolvedValue({
+      phase: "screening",
+      articleCount: 1,
+      reviewerCount: 2,
+      loads: { 1: 1, 2: 1 },
+      assignments: [{ articleId: 7 }],
+    });
+    const { rerender } = render(<DistributionPanel collaboration={state} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pré-visualizar distribuição" }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Confirmar distribuição" }),
+    ).toBeInTheDocument();
+    rerender(
+      <DistributionPanel
+        collaboration={{
+          ...state,
+          assignments: [
+            {
+              id: 12,
+              reviewerUserId: 2,
+              articleId: 10,
+              phase: "screening",
+              slot: 1,
+              status: "pending",
+            },
+          ],
+        }}
       />,
     );
     expect(
