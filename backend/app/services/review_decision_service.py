@@ -6,7 +6,6 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.models.article import Article
 from app.models.collaboration import ProjectMember, ReviewAssignment, ReviewConflict, ReviewDecision
 from app.services.evidence_service import apply_quality_metrics
@@ -14,6 +13,7 @@ from app.services.invitation_service import create_audit_event
 from app.services.notification_service import create_notification
 from app.services.project_access_service import (
     CAP_REOPEN_REVIEW,
+    CAP_REVIEW_ASSIGNED,
     CAP_RESOLVE_CONFLICTS,
     ProjectAccess,
     require_capability,
@@ -64,8 +64,6 @@ def visible_decision_payloads(
 
 
 async def has_active_assignments(db: AsyncSession, *, article_id: int, phase: str) -> bool:
-    if not get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
-        return False
     result = await db.execute(
         select(ReviewAssignment.id)
         .where(
@@ -159,8 +157,38 @@ def apply_canonical_decision(article: Article, *, phase: str, decision: ReviewDe
     _apply_legacy_state(article)
 
 
+def _reset_canonical_state_for_reopen(article: Article, *, phase: str) -> None:
+    """Return the article to a coherent pending state for the reopened phase."""
+    article.currentPhase = phase
+    article.reviewOutcome = "active"
+    if phase == "screening":
+        article.screeningDecision = "pending"
+        article.screeningReasonText = None
+        article.screeningReviewedAt = None
+    article.fullTextStatus = "uploaded" if article.pdfData is not None else (
+        "pending_upload" if phase == "eligibility" else "not_requested"
+    )
+    article.eligibilityDecision = "pending"
+    article.eligibilityReasonText = None
+    article.eligibilityReviewedAt = None
+    article.eligibilityChecklistAnswers = {}
+    article.answeringRQs = []
+    article.includedAt = None
+    article.extractionData = {}
+    article.extractionCompletedAt = None
+    article.qualityAssessmentAnswers = {}
+    article.qualityScore = None
+    article.qualityRating = "unrated"
+    _apply_legacy_state(article)
+
+
 async def _inherit_eligibility_assignments(
-    db: AsyncSession, *, article: Article, assignments: list[ReviewAssignment], actor_user_id: int
+    db: AsyncSession,
+    *,
+    article: Article,
+    assignments: list[ReviewAssignment],
+    actor_user_id: int,
+    owner_user_id: int,
 ) -> None:
     existing_result = await db.execute(
         select(ReviewAssignment).where(
@@ -172,11 +200,28 @@ async def _inherit_eligibility_assignments(
         assignment.reviewerUserId: assignment
         for assignment in existing_result.scalars().all()
     }
+    reviewer_ids = {assignment.reviewerUserId for assignment in assignments}
+    project_id = assignments[0].projectId if assignments else article.projectId
+    member_result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.projectId == project_id,
+            ProjectMember.userId.in_(reviewer_ids),
+            ProjectMember.status == "active",
+        )
+    )
+    active_reviewer_ids = {owner_user_id}
+    active_reviewer_ids.update(
+        member.userId
+        for member in member_result.scalars().all()
+        if member.role == "reviewer" or (member.role == "coordinator" and member.participatesInReview)
+    )
+    inactive_reviewer_ids = reviewer_ids - active_reviewer_ids
     for assignment in assignments:
+        inherited_status = "pending" if assignment.reviewerUserId in active_reviewer_ids else "needs_reassignment"
         existing = existing_by_reviewer.get(assignment.reviewerUserId)
         if existing is not None:
             existing.slot = assignment.slot
-            existing.status = "pending"
+            existing.status = inherited_status
             existing.submittedAt = None
             existing.cancelledAt = None
             existing.assignedByUserId = actor_user_id
@@ -189,11 +234,40 @@ async def _inherit_eligibility_assignments(
                 phase="eligibility",
                 reviewerUserId=assignment.reviewerUserId,
                 slot=assignment.slot,
-                status="pending",
+                status=inherited_status,
                 assignedByUserId=actor_user_id,
                 inheritedFromAssignmentId=assignment.id,
             )
         )
+    if inactive_reviewer_ids:
+        coordinators_result = await db.execute(
+            select(ProjectMember.userId).where(
+                ProjectMember.projectId == project_id,
+                ProjectMember.role == "coordinator",
+                ProjectMember.status == "active",
+            )
+        )
+        create_audit_event(
+            db,
+            project_id=project_id,
+            actor_user_id=actor_user_id,
+            action="eligibility_assignment_needs_reassignment",
+            entity_type="article",
+            entity_id=article.id,
+            payload={"reviewerUserIds": sorted(inactive_reviewer_ids)},
+        )
+        for recipient_id in {owner_user_id, *coordinators_result.scalars().all()}:
+            create_notification(
+                db,
+                project_id=project_id,
+                recipient_user_id=recipient_id,
+                type="assignment_needs_reassignment",
+                title="Redistribuição necessária",
+                body="Uma atribuição de elegibilidade precisa ser redistribuída.",
+                entity_type="article",
+                entity_id=article.id,
+                payload={"phase": "eligibility", "reviewerUserIds": sorted(inactive_reviewer_ids)},
+            )
 
 
 async def submit_review_decision(
@@ -205,6 +279,7 @@ async def submit_review_decision(
     payload,
     reviewer_user_id: int,
 ) -> ReviewSubmissionResult:
+    require_capability(access, CAP_REVIEW_ASSIGNED)
     article_result = await db.execute(
         select(Article)
         .where(Article.id == article_id, Article.projectId == access.project.id)
@@ -266,7 +341,13 @@ async def submit_review_decision(
     if state == "consolidated":
         apply_canonical_decision(article, phase=phase, decision=decisions[0])
         if phase == "screening" and decisions[0].decision == "included":
-            await _inherit_eligibility_assignments(db, article=article, assignments=assignments, actor_user_id=reviewer_user_id)
+            await _inherit_eligibility_assignments(
+                db,
+                article=article,
+                assignments=assignments,
+                actor_user_id=reviewer_user_id,
+                owner_user_id=access.project.ownerId,
+            )
         return ReviewSubmissionResult(state, article, decision)
 
     conflict = ReviewConflict(
@@ -305,7 +386,7 @@ async def list_visible_decisions(
 async def require_assigned_write_if_managed(
     db: AsyncSession, *, article_id: int, user_id: int, phase: str, access: ProjectAccess
 ) -> None:
-    if not get_settings().ASSIGNED_REVIEW_FLOW_ENABLED or access.role != "reviewer":
+    if access.role != "reviewer":
         return
     assignments_result = await db.execute(
         select(ReviewAssignment).where(
@@ -314,7 +395,7 @@ async def require_assigned_write_if_managed(
         )
     )
     assignments = assignments_result.scalars().all()
-    if assignments and not any(item.reviewerUserId == user_id and item.phase == phase and item.status != "needs_reassignment" for item in assignments):
+    if not any(item.reviewerUserId == user_id and item.phase == phase and item.status not in {"needs_reassignment", "cancelled"} for item in assignments):
         raise HTTPException(status_code=403, detail={"code": "REVIEW_NOT_ASSIGNED", "message": "Este artigo não foi atribuído a você."})
 
 
@@ -364,6 +445,7 @@ async def resolve_conflict(
             article=article,
             assignments=assignments,
             actor_user_id=resolved_by_user_id,
+            owner_user_id=access.project.ownerId,
         )
     for assignment in assignments:
         create_notification(db, project_id=access.project.id, recipient_user_id=assignment.reviewerUserId, type="review_conflict_resolved", title="Discordância resolvida", body="A decisão final do artigo foi registrada.", entity_type="article", entity_id=conflict.articleId, payload={"phase": conflict.phase, "decision": decision_value})
@@ -401,8 +483,6 @@ async def reopen_review(
         conflict.resolutionReason = "Revisão reaberta: " + reason.strip()
         conflict.resolvedByUserId = actor_user_id
         conflict.resolvedAt = datetime.now(timezone.utc)
-    article.currentPhase = phase
-    article.reviewOutcome = "active"
     if phase == "screening":
         eligibility_result = await db.execute(
             select(ReviewAssignment).where(
@@ -416,14 +496,28 @@ async def reopen_review(
             eligibility_assignment.status = "cancelled"
             eligibility_assignment.cancelledAt = now
             eligibility_assignment.submittedAt = None
-        article.screeningDecision = "pending"
-        article.screeningReasonText = None
-        article.screeningReviewedAt = None
-    else:
-        article.eligibilityDecision = "pending"
-        article.eligibilityReasonText = None
-        article.eligibilityReviewedAt = None
-        article.includedAt = None
+        downstream_decisions = await db.execute(
+            select(ReviewDecision).where(
+                ReviewDecision.articleId == article_id,
+                ReviewDecision.phase == "eligibility",
+                ReviewDecision.status.in_(("draft", "submitted")),
+            )
+        )
+        for decision in downstream_decisions.scalars().all():
+            decision.status = "superseded"
+        downstream_conflicts = await db.execute(
+            select(ReviewConflict).where(
+                ReviewConflict.articleId == article_id,
+                ReviewConflict.phase == "eligibility",
+                ReviewConflict.status == "open",
+            )
+        )
+        for conflict in downstream_conflicts.scalars().all():
+            conflict.status = "resolved"
+            conflict.resolutionReason = "Triagem reaberta: " + reason.strip()
+            conflict.resolvedByUserId = actor_user_id
+            conflict.resolvedAt = now
+    _reset_canonical_state_for_reopen(article, phase=phase)
     create_audit_event(db, project_id=access.project.id, actor_user_id=actor_user_id, action="review_reopened", entity_type="article", entity_id=article_id, reason=reason.strip(), payload={"phase": phase})
     for assignment in assignments:
         create_notification(db, project_id=access.project.id, recipient_user_id=assignment.reviewerUserId, type="review_reopened", title="Revisão reaberta", body="Uma revisão atribuída a você foi reaberta.", entity_type="article", entity_id=article_id, payload={"phase": phase})

@@ -86,6 +86,7 @@ async def _activate_member(
             )
             member = concurrent_result.scalar_one()
             created = False
+            changed = False
 
     changed = changed or any(
         (
@@ -197,26 +198,26 @@ async def invite_project_member(
             )
             invitation = concurrent_result.scalar_one()
             created = False
-            invitation.role = role
-            invitation.participatesInReview = True if role == "reviewer" else participates_in_review
-            invitation.expiresAt = now + timedelta(days=7)
-    else:
+    desired_participation = True if role == "reviewer" else participates_in_review
+    changed = created or invitation.role != role or invitation.participatesInReview != desired_participation
+    if changed:
         invitation.role = role
-        invitation.participatesInReview = True if role == "reviewer" else participates_in_review
+        invitation.participatesInReview = desired_participation
         invitation.expiresAt = now + timedelta(days=7)
     await db.flush()
-    create_audit_event(
-        db,
-        project_id=access.project.id,
-        actor_user_id=invited_by_user_id,
-        action="invitation_created" if created else "invitation_updated",
-        entity_type="invitation",
-        entity_id=invitation.id,
-        payload={
-            "role": role,
-            "participatesInReview": invitation.participatesInReview,
-        },
-    )
+    if changed:
+        create_audit_event(
+            db,
+            project_id=access.project.id,
+            actor_user_id=invited_by_user_id,
+            action="invitation_created" if created else "invitation_updated",
+            entity_type="invitation",
+            entity_id=invitation.id,
+            payload={
+                "role": role,
+                "participatesInReview": invitation.participatesInReview,
+            },
+        )
     return invitation
 
 

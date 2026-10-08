@@ -92,7 +92,7 @@ DNS, TLS e o login Google real permanecem pré-requisitos externos até serem co
 - Monitorar PostgreSQL, Neo4j e Qdrant, além de uso e custo do provedor de IA.
 - Aplicar limites de requisição no proxy e restringir os painéis administrativos dos bancos.
 - Manter a imagem anterior identificada por tag e o dump verificado disponível.
-- Em qualquer rollback, primeiro definir `ASSIGNED_REVIEW_FLOW_ENABLED=false`. Isso preserva o fluxo solo legado e mantém intactos o histórico, as atribuições e as decisões colaborativas já gravadas.
+- Em qualquer rollback operacional, primeiro definir `ASSIGNED_REVIEW_FLOW_ENABLED=false`. A flag impede novas distribuições, mas atribuições já existentes continuam autoritativas: revisores seguem restritos aos próprios artigos e decisões pendentes não voltam ao fluxo legado. Para retornar integralmente ao modo solo, conclua ou cancele as atribuições de forma administrativa antes de desligar a funcionalidade.
 - Em seguida, retirar tráfego conforme necessário e restaurar a imagem anterior da aplicação.
 - Não executar downgrade nem remover o schema de colaboração enquanto houver linhas novas nas tabelas colaborativas.
 - Restaurar o dump somente para um rollback em nível de banco, dentro de janela de manutenção, aceitando explicitamente a perda de dados posteriores ao dump.

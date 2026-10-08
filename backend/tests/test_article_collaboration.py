@@ -1,5 +1,6 @@
 """Article query and authorization contracts against a disposable PostgreSQL database."""
 import asyncio
+from datetime import datetime, timezone
 from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -8,7 +9,7 @@ import asyncpg
 import pytest
 import pytest_asyncio
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import event
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from starlette.datastructures import Headers
 
@@ -19,6 +20,8 @@ from app.models.collaboration import ProjectMember, ReviewAssignment, ReviewConf
 from app.models.project import Project
 from app.models.user import User
 from app.routers import articles, projects
+from app.services.project_access_service import resolve_project_access
+from app.services.review_decision_service import reopen_review
 from app.schemas.article import (
     ArticleCreate, ArticleEvidenceUpdate, ArticleNotesUpdate, ArticleUpdate, BatchEvaluateRequest,
     DedupApplyRequest, ImportBibTeXRequest, PromoteToScreeningRequest,
@@ -206,8 +209,6 @@ async def test_metadata_queries_are_batched_for_a_page(scene):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("enabled", [True, False])
 async def test_no_assignment_and_disabled_rollout_preserve_solo_flow(scene, monkeypatch, enabled):
-    if not enabled:
-        await assign(scene, scene.peer)
     monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", enabled)
     response = await articles.get_article_by_id(scene.project.id, scene.article.id, scene.owner, scene.db)
     assert response.hasActiveReviewAssignments is False
@@ -216,6 +217,54 @@ async def test_no_assignment_and_disabled_rollout_preserve_solo_flow(scene, monk
     result = await articles.screening_decision(scene.project.id, scene.article.id, ScreeningDecisionRequest(decision="included"), scene.owner, scene.db)
     assert result.currentPhase == "eligibility"
     assert result.reviewState is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_existing_assignments_remain_authoritative_when_rollout_is_disabled(scene, monkeypatch, enabled):
+    await assign(scene, scene.reviewer)
+    await assign(scene, scene.peer, slot=2)
+    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", enabled)
+
+    response = await articles.get_article_by_id(scene.project.id, scene.article.id, scene.reviewer, scene.db)
+    assert response.hasActiveReviewAssignments is True
+    assert response.myReviewAssignment.reviewerUserId == scene.reviewer.id
+
+    with pytest.raises(HTTPException) as denied:
+        await articles.screening_decision(
+            scene.project.id,
+            scene.article.id,
+            ScreeningDecisionRequest(decision="included"),
+            scene.owner,
+            scene.db,
+        )
+    assert denied.value.status_code == 403
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_reviewer_without_assignment_cannot_use_legacy_write_path(scene, monkeypatch, enabled):
+    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", enabled)
+
+    with pytest.raises(HTTPException) as denied_decision:
+        await articles.screening_decision(
+            scene.project.id,
+            scene.article.id,
+            ScreeningDecisionRequest(decision="included"),
+            scene.reviewer,
+            scene.db,
+        )
+    assert denied_decision.value.status_code == 403
+
+    with pytest.raises(HTTPException) as denied_notes:
+        await articles.update_article_notes(
+            scene.project.id,
+            scene.article.id,
+            ArticleNotesUpdate(notas="forbidden"),
+            scene.reviewer,
+            scene.db,
+        )
+    assert denied_notes.value.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -304,7 +353,7 @@ async def test_assigned_reviewers_cannot_administer_articles(scene, operation):
 
 
 @pytest.mark.asyncio
-async def test_solo_articles_keep_write_access_on_a_mixed_managed_page(scene):
+async def test_unassigned_reviewers_remain_read_only_on_solo_article_in_mixed_page(scene):
     await assign(scene, scene.peer)
     solo = Article(projectId=scene.project.id, ownerId=scene.owner.id, title="Solo", authors="Author", year=2025,
                    journal="Journal", currentPhase="screening")
@@ -313,7 +362,7 @@ async def test_solo_articles_keep_write_access_on_a_mixed_managed_page(scene):
     result = await articles.get_articles_by_project(scene.project.id, current_user=scene.reviewer, db=scene.db)
     response = next(row for row in result.articles if row.id == solo.id)
     assert response.hasActiveReviewAssignments is False
-    assert response.canWriteReview is True
+    assert response.canWriteReview is False
 
 
 @pytest.mark.asyncio
@@ -410,16 +459,17 @@ async def test_disabled_rollout_preserves_solo_full_text_status_with_existing_as
     await assign(scene, scene.peer, phase="eligibility")
     monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", False)
 
-    result = await articles.update_full_text_status(
-        scene.project.id,
-        scene.article.id,
-        FullTextStatusUpdate(fullTextStatus="pending_upload"),
-        scene.owner,
-        scene.db,
-    )
+    with pytest.raises(HTTPException) as denied:
+        await articles.update_full_text_status(
+            scene.project.id,
+            scene.article.id,
+            FullTextStatusUpdate(fullTextStatus="pending_upload"),
+            scene.owner,
+            scene.db,
+        )
 
-    assert result.fullTextStatus == "pending_upload"
-    assert result.currentPhase == "eligibility"
+    assert denied.value.status_code == 409
+    assert denied.value.detail["code"] == "MANAGED_REVIEW"
 
 
 @pytest.mark.asyncio
@@ -432,3 +482,91 @@ async def test_previous_phase_assignment_does_not_grant_eligibility_writes_or_qu
     with pytest.raises(HTTPException) as denied:
         await articles.update_article_notes(scene.project.id, scene.article.id, ArticleNotesUpdate(notas="forbidden"), scene.reviewer, scene.db)
     assert denied.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_submission_requires_current_review_capability(scene):
+    assignment = await assign(scene, scene.coordinator)
+    member = await scene.db.scalar(
+        select(ProjectMember).where(
+            ProjectMember.projectId == scene.project.id,
+            ProjectMember.userId == scene.coordinator.id,
+        )
+    )
+    member.participatesInReview = False
+    await scene.db.flush()
+
+    with pytest.raises(HTTPException) as denied:
+        await articles.screening_decision(
+            scene.project.id,
+            scene.article.id,
+            ScreeningDecisionRequest(decision="included"),
+            scene.coordinator,
+            scene.db,
+        )
+
+    assert assignment.status == "pending"
+    assert denied.value.status_code == 403
+    assert denied.value.detail["code"] == "PROJECT_PERMISSION_DENIED"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["screening", "eligibility"])
+async def test_reopen_clears_canonical_and_downstream_article_state(scene, phase):
+    scene.article.currentPhase = "included"
+    scene.article.reviewOutcome = "included"
+    scene.article.screeningDecision = "included"
+    scene.article.screeningReasonText = "screening reason"
+    scene.article.screeningReviewedAt = datetime.now(timezone.utc)
+    scene.article.eligibilityDecision = "included"
+    scene.article.eligibilityReasonText = "eligibility reason"
+    scene.article.eligibilityReviewedAt = scene.article.screeningReviewedAt
+    scene.article.eligibilityChecklistAnswers = {"criterion": True}
+    scene.article.answeringRQs = [1]
+    scene.article.includedAt = scene.article.screeningReviewedAt
+    scene.article.extractionData = {"method": "stale"}
+    scene.article.extractionCompletedAt = scene.article.screeningReviewedAt
+    scene.article.qualityAssessmentAnswers = {"quality": True}
+    scene.article.qualityScore = 1.0
+    scene.article.qualityRating = "high"
+    scene.article.manualDecision = "incluido"
+    scene.article.manualDecisionReason = "stale"
+    scene.article.decisionUpdatedAt = scene.article.screeningReviewedAt
+    scene.article.exclusionCriteria = ["stale"]
+    await assign(scene, scene.reviewer, phase=phase, status="submitted", value="included")
+    if phase == "screening":
+        await assign(scene, scene.reviewer, phase="eligibility", status="submitted", value="included")
+    await scene.db.flush()
+    access = await resolve_project_access(scene.db, project_id=scene.project.id, user_id=scene.owner.id)
+
+    await reopen_review(
+        scene.db,
+        access=access,
+        article_id=scene.article.id,
+        phase=phase,
+        reason="Correção necessária",
+        actor_user_id=scene.owner.id,
+    )
+
+    assert scene.article.currentPhase == phase
+    assert scene.article.reviewOutcome == "active"
+    if phase == "screening":
+        assert scene.article.screeningDecision == "pending"
+        assert scene.article.screeningReasonText is None
+        assert scene.article.screeningReviewedAt is None
+    else:
+        assert scene.article.screeningDecision == "included"
+    assert scene.article.eligibilityDecision == "pending"
+    assert scene.article.eligibilityReasonText is None
+    assert scene.article.eligibilityReviewedAt is None
+    assert scene.article.eligibilityChecklistAnswers == {}
+    assert scene.article.answeringRQs == []
+    assert scene.article.includedAt is None
+    assert scene.article.extractionData == {}
+    assert scene.article.extractionCompletedAt is None
+    assert scene.article.qualityAssessmentAnswers == {}
+    assert scene.article.qualityScore is None
+    assert scene.article.qualityRating == "unrated"
+    assert scene.article.manualDecision is None
+    assert scene.article.manualDecisionReason is None
+    assert scene.article.exclusionCriteria == []

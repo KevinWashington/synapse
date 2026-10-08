@@ -68,15 +68,48 @@ async def test_eligibility_inheritance_reuses_historical_assignment_rows():
         SimpleNamespace(id=2, projectId=7, articleId=10, reviewerUserId=22, slot=2),
     ]
     existing = SimpleNamespace(reviewerUserId=21, status="cancelled", slot=1, submittedAt="old", inheritedFromAssignmentId=None)
+    active_member = SimpleNamespace(userId=22, role="reviewer", participatesInReview=True)
     db = SimpleNamespace(
-        execute=AsyncMock(return_value=SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [existing]))),
+        execute=AsyncMock(side_effect=[
+            SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [existing])),
+            SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [active_member])),
+        ]),
         add=Mock(),
     )
 
-    await _inherit_eligibility_assignments(db, article=SimpleNamespace(id=10), assignments=screening, actor_user_id=9)
+    await _inherit_eligibility_assignments(
+        db,
+        article=SimpleNamespace(id=10),
+        assignments=screening,
+        actor_user_id=9,
+        owner_user_id=21,
+    )
 
     assert existing.status == "pending"
     assert existing.submittedAt is None
     assert existing.inheritedFromAssignmentId == 1
-    assert db.add.call_count == 1
-    assert db.add.call_args.args[0].reviewerUserId == 22
+    added_assignment = next(call.args[0] for call in db.add.call_args_list if hasattr(call.args[0], "reviewerUserId"))
+    assert added_assignment.reviewerUserId == 22
+
+
+@pytest.mark.asyncio
+async def test_eligibility_inheritance_marks_inactive_reviewer_for_reassignment():
+    screening = [SimpleNamespace(id=1, projectId=7, articleId=10, reviewerUserId=21, slot=1)]
+    results = [
+        SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [])),
+        SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [])),
+        SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [])),
+    ]
+    db = SimpleNamespace(execute=AsyncMock(side_effect=results), add=Mock())
+
+    await _inherit_eligibility_assignments(
+        db,
+        article=SimpleNamespace(id=10),
+        assignments=screening,
+        actor_user_id=9,
+        owner_user_id=99,
+    )
+
+    inherited = next(call.args[0] for call in db.add.call_args_list if hasattr(call.args[0], "reviewerUserId"))
+    assert inherited.reviewerUserId == 21
+    assert inherited.status == "needs_reassignment"

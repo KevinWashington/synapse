@@ -25,7 +25,13 @@ from app.models.collaboration import ReviewAssignment, ReviewConflict, ReviewDec
 from app.models.project import Project
 from app.models.user import User
 from app.services.ai_service import AIService
-from app.services.project_access_service import CAP_EDIT_PROJECT, get_project_article, require_capability, resolve_project_access
+from app.services.project_access_service import (
+    CAP_EDIT_PROJECT,
+    CAP_REVIEW_ASSIGNED,
+    get_project_article,
+    require_capability,
+    resolve_project_access,
+)
 from app.services.review_decision_service import (
     has_active_assignments,
     require_assigned_write_if_managed,
@@ -252,7 +258,7 @@ def _build_article_response(article: Article) -> ArticleResponse:
     response = ArticleResponse.model_validate({
         name: getattr(article, name)
         for name in ArticleResponse.model_fields
-        if name not in {"reviewState", "reviewDecisions", "hasActiveReviewAssignments", "myReviewAssignment", "reviewAssignments", "canWriteReview", "canManageArticle", "hasPdf"}
+        if name not in {"reviewState", "reviewDecisions", "hasActiveReviewAssignments", "myReviewAssignment", "reviewAssignments", "canWriteReview", "canDecideReview", "canManageArticle", "hasPdf"}
         and hasattr(article, name)
     })
     response.hasPdf = article.pdfData is not None
@@ -286,7 +292,9 @@ async def _article_responses(db, rows, *, access, user_id, phase=None):
     responses = [_build_article_response(row) for row in rows]
     for response in responses:
         response.canManageArticle = CAP_EDIT_PROJECT in access.capabilities
-    if not rows or not get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
+        response.canWriteReview = response.canManageArticle if access.role != "reviewer" else False
+        response.canDecideReview = access.role == "owner"
+    if not rows:
         return responses
     ids = [row.id for row in rows]
     assignments = (await db.execute(select(ReviewAssignment).where(
@@ -307,8 +315,14 @@ async def _article_responses(db, rows, *, access, user_id, phase=None):
         response.hasActiveReviewAssignments = bool(active)
         response.myReviewAssignment = ArticleReviewAssignment.model_validate(own) if own else None
         response.reviewAssignments = [ArticleReviewAssignment.model_validate(item) for item in active]
-        row_assignments = [item for item in assignments if item.articleId == row.id]
-        response.canWriteReview = not row_assignments or response.canManageArticle or bool(own and own.status != "needs_reassignment")
+        response.canWriteReview = response.canManageArticle or bool(
+            own and own.status not in {"needs_reassignment", "cancelled"}
+        )
+        response.canDecideReview = bool(
+            own
+            and own.status == "pending"
+            and CAP_REVIEW_ASSIGNED in access.capabilities
+        )
         if not active:
             continue
         active_ids = {item.id for item in active}
@@ -1353,7 +1367,7 @@ async def get_articles_by_project(
     if phase:
         query = query.where(Article.currentPhase == phase)
 
-    if assignedToMe and get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
+    if assignedToMe:
         relevant_phase = phase if phase in {"screening", "eligibility"} else case(
             (Article.currentPhase.in_(["identification", "screening"]), "screening"), else_="eligibility"
         )
@@ -1698,9 +1712,9 @@ async def screening_decision(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
 
     if await has_active_assignments(db, article_id=articleId, phase="screening"):
-        access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
         result = await submit_review_decision(
             db,
             access=access,
@@ -1716,6 +1730,12 @@ async def screening_decision(
         if result.state == "consolidated":
             await _sync_article_indexes(result.article, db)
         return await _caller_article_response(db, result.article, current_user.id, phase="screening")
+
+    if access.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "REVIEW_NOT_ASSIGNED", "message": "Este artigo não foi atribuído a você."},
+        )
 
     if article.reviewOutcome != "active":
         article.reviewOutcome = "active"
@@ -1858,13 +1878,11 @@ async def update_full_text_status(
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
     # Protect managed outcomes after consolidation while the collaborative rollout is active.
-    managed = None
-    if get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
-        managed = await db.scalar(select(ReviewAssignment.id).where(
-            ReviewAssignment.articleId == articleId,
-            ReviewAssignment.phase == "eligibility",
-            ReviewAssignment.status != "cancelled",
-        ).limit(1))
+    managed = await db.scalar(select(ReviewAssignment.id).where(
+        ReviewAssignment.articleId == articleId,
+        ReviewAssignment.phase == "eligibility",
+        ReviewAssignment.status != "cancelled",
+    ).limit(1))
     if managed is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
             "code": "MANAGED_REVIEW",
@@ -1911,8 +1929,8 @@ async def eligibility_decision(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     if await has_active_assignments(db, article_id=articleId, phase="eligibility"):
-        access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
         result = await submit_review_decision(
             db,
             access=access,
@@ -1929,6 +1947,12 @@ async def eligibility_decision(
         if result.state == "consolidated":
             await _sync_article_indexes(result.article, db)
         return await _caller_article_response(db, result.article, current_user.id, phase="eligibility")
+
+    if access.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "REVIEW_NOT_ASSIGNED", "message": "Este artigo não foi atribuído a você."},
+        )
     if article.currentPhase not in {"eligibility", "included"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -115,6 +115,50 @@ async def test_repeated_existing_member_invite_has_no_duplicate_side_effects():
 
 
 @pytest.mark.asyncio
+async def test_concurrent_existing_member_invite_reloads_without_duplicate_side_effects():
+    existing_user = SimpleNamespace(id=22, email="person@example.com", name="Person")
+    concurrent_member = ProjectMember(
+        projectId=7,
+        userId=22,
+        role="reviewer",
+        status="active",
+        participatesInReview=True,
+        invitedByUserId=1,
+        joinedAt=datetime.now(timezone.utc),
+    )
+    savepoint = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+    duplicate = IntegrityError("insert", {}, Exception("duplicate member"))
+    db = SimpleNamespace(
+        execute=AsyncMock(
+            side_effect=[
+                ScalarResult(existing_user),
+                ScalarResult(None),
+                ScalarResult(concurrent_member),
+            ]
+        ),
+        add=Mock(),
+        flush=AsyncMock(side_effect=[duplicate, None]),
+        begin_nested=AsyncMock(return_value=savepoint),
+    )
+
+    result = await invite_project_member(
+        db,
+        access=owner_access(),
+        invited_by_user_id=1,
+        email="person@example.com",
+        role="reviewer",
+        participates_in_review=True,
+    )
+
+    assert result is concurrent_member
+    savepoint.rollback.assert_awaited_once()
+    assert not any(
+        isinstance(call.args[0], (ProjectNotification, ProjectAuditEvent))
+        for call in db.add.call_args_list
+    )
+
+
+@pytest.mark.asyncio
 async def test_unknown_user_invite_is_pending_for_seven_days_and_idempotent():
     invitation = ProjectInvitation(
         projectId=7,
@@ -267,3 +311,41 @@ async def test_concurrent_pending_invite_reloads_the_winning_row():
         if isinstance(call.args[0], ProjectAuditEvent)
     )
     assert audit.action == "invitation_updated"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_identical_pending_invite_has_no_duplicate_audit():
+    concurrent = ProjectInvitation(
+        projectId=7,
+        emailNormalized="new@example.com",
+        role="reviewer",
+        participatesInReview=True,
+        status="pending",
+        invitedByUserId=9,
+        expiresAt=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    concurrent.id = 42
+    savepoint = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+    duplicate = IntegrityError("insert", {}, Exception("duplicate pending invite"))
+    db = SimpleNamespace(
+        execute=AsyncMock(
+            side_effect=[ScalarResult(None), ScalarResult(None), ScalarResult(concurrent)]
+        ),
+        add=Mock(),
+        flush=AsyncMock(side_effect=[duplicate, None]),
+        begin_nested=AsyncMock(return_value=savepoint),
+    )
+
+    result = await invite_project_member(
+        db,
+        access=owner_access(),
+        invited_by_user_id=1,
+        email="new@example.com",
+        role="reviewer",
+        participates_in_review=True,
+    )
+
+    assert result is concurrent
+    assert not any(
+        isinstance(call.args[0], ProjectAuditEvent) for call in db.add.call_args_list
+    )

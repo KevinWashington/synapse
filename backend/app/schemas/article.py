@@ -317,6 +317,7 @@ class ArticleResponse(BaseModel):
     myReviewAssignment: ArticleReviewAssignment | None = None
     reviewAssignments: list[ArticleReviewAssignment] = Field(default_factory=list)
     canWriteReview: bool | None = None
+    canDecideReview: bool | None = None
     canManageArticle: bool | None = None
 
     class Config:

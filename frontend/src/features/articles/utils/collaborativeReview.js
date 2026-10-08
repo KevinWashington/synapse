@@ -25,8 +25,10 @@ export function collaborativeReview(article) {
       label = "Aguardando revisores";
     }
   }
-  const canDecide = !managed || (own?.status === "pending" && state !== "conflict" && state !== "consolidated");
   const canWrite = article?.canWriteReview ?? (!managed || Boolean(own && own.status !== "needs_reassignment"));
+  const canDecide = (article?.canDecideReview ?? canWrite) && (!managed || (
+    own?.status === "pending" && state !== "conflict" && state !== "consolidated"
+  ));
   return {
     managed, label, canDecide, canWrite,
     explanation: managed && !own ? UNASSIGNED_REVIEW_MESSAGE : explanation,
