@@ -88,6 +88,13 @@ describe("ArticleDetails extraction workspace", () => {
   beforeEach(() => {
     navigate.mockClear();
     handleSaveNotes.mockClear();
+    delete article.hasActiveReviewAssignments;
+    delete article.myReviewAssignment;
+    delete article.canWriteReview;
+    delete article.canManageArticle;
+    article.currentPhase = "eligibility";
+    article.reviewOutcome = "included";
+    article.hasPdf = true;
   });
 
   it("switches between PDF and notes without losing extraction values", async () => {
@@ -130,6 +137,29 @@ describe("ArticleDetails extraction workspace", () => {
     expect(navigate).toHaveBeenCalledWith(
       "/projetos/7/artigos/3?flow=included&workspace=extracao"
     );
+  });
+
+  it("keeps an unassigned extraction workspace readable with all write controls disabled", async () => {
+    Object.assign(article, { hasActiveReviewAssignments: true, myReviewAssignment: null, canWriteReview: false, canManageArticle: false });
+    renderPage();
+    const field = await screen.findByPlaceholderText("Digite resultado...");
+    expect(field).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salvar rascunho" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Marcar como concluído/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Notas" }));
+    expect(await screen.findByPlaceholderText("Digite suas notas aqui...")).toHaveAttribute("readonly");
+    expect(screen.getAllByText("Este artigo não foi atribuído a você.").length).toBeGreaterThan(0);
+  });
+
+  it("disables eligibility, PDF and administrative actions for an unassigned reviewer", async () => {
+    Object.assign(article, { currentPhase: "eligibility", reviewOutcome: "active", hasPdf: false,
+      hasActiveReviewAssignments: true, myReviewAssignment: null, canWriteReview: false, canManageArticle: false });
+    window.history.pushState({}, "", "/projetos/7/artigos/2?flow=eligibility");
+    render(<MemoryRouter><ArticleDetails /></MemoryRouter>);
+    expect(await screen.findByRole("button", { name: "Registrar elegibilidade" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Enviar PDF" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remover" })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Estudo atual" })).toBeInTheDocument();
   });
 
   it("keeps breadcrumbs, account controls, and shell alignment in extraction", async () => {

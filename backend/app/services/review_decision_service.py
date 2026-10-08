@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models.article import Article
 from app.models.collaboration import ProjectMember, ReviewAssignment, ReviewConflict, ReviewDecision
 from app.services.evidence_service import apply_quality_metrics
@@ -63,6 +64,8 @@ def visible_decision_payloads(
 
 
 async def has_active_assignments(db: AsyncSession, *, article_id: int, phase: str) -> bool:
+    if not get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
+        return False
     result = await db.execute(
         select(ReviewAssignment.id)
         .where(
@@ -300,8 +303,10 @@ async def list_visible_decisions(
 
 
 async def require_assigned_write_if_managed(
-    db: AsyncSession, *, article_id: int, user_id: int
+    db: AsyncSession, *, article_id: int, user_id: int, phase: str, access: ProjectAccess
 ) -> None:
+    if not get_settings().ASSIGNED_REVIEW_FLOW_ENABLED or access.role != "reviewer":
+        return
     assignments_result = await db.execute(
         select(ReviewAssignment).where(
             ReviewAssignment.articleId == article_id,
@@ -309,7 +314,7 @@ async def require_assigned_write_if_managed(
         )
     )
     assignments = assignments_result.scalars().all()
-    if assignments and not any(item.reviewerUserId == user_id for item in assignments):
+    if assignments and not any(item.reviewerUserId == user_id and item.phase == phase and item.status != "needs_reassignment" for item in assignments):
         raise HTTPException(status_code=403, detail={"code": "REVIEW_NOT_ASSIGNED", "message": "Este artigo não foi atribuído a você."})
 
 

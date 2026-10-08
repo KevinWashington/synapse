@@ -250,6 +250,7 @@ function ProjectDetails() {
           {activeTab === "artigos" && (
             <ProjectArticles
               project={project}
+              collaboration={collaboration}
               onNavigate={navigate}
               onGraphNeedsRefresh={handleGraphNeedsRefresh}
               onViewFlow={() => navigate(`/projetos/${project.id}?tab=fluxo`)}

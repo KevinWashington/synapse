@@ -3,6 +3,7 @@ import { DatabaseIcon, MessageSquareIcon, PenLineIcon } from "lucide-react";
 import { ArticleChatPanel } from "@features/ai";
 import ArticleEvidenceEditor from "@features/articles/components/ArticleEvidenceEditor";
 import NotesEditor from "@features/articles/components/NotesEditor";
+import { collaborativeReview } from "../utils/collaborativeReview";
 
 const REVIEW_TABS = [
   {
@@ -40,6 +41,7 @@ function ArticleWorkspacePanel({
   isSavingEvidence,
 }) {
   const workspaceTabs = activeFlow === "included" ? INCLUDED_TABS : REVIEW_TABS;
+  const review = collaborativeReview(article);
   const effectiveRightTab = workspaceTabs.some((tab) => tab.key === rightTab)
     ? rightTab
     : "notas";
@@ -78,20 +80,22 @@ function ArticleWorkspacePanel({
         })}
       </div>
 
+      {review.writeExplanation ? <p className="border-b border-[var(--syn-border)] p-3 text-xs text-[var(--syn-text-secondary)]">{review.writeExplanation}</p> : null}
       <div className="min-h-0 flex-1 overflow-hidden">
         {effectiveRightTab === "notas" ? (
-          <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} />
+          <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} readOnly={!review.canWrite} />
         ) : effectiveRightTab === "extracao" ? (
           <ArticleEvidenceEditor
             article={article}
             project={project}
             isSaving={isSavingEvidence}
             onSave={onSaveEvidence}
+            readOnly={!review.canWrite}
           />
         ) : (
           <ArticleChatPanel
             article={article}
-            onAddNote={onAddNote}
+            onAddNote={review.canWrite ? onAddNote : undefined}
             pdfData={pdfData}
           />
         )}

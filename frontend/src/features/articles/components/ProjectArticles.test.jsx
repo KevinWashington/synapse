@@ -101,10 +101,11 @@ describe("ProjectArticles work queue", () => {
   });
 
   it.each(["screening", "eligibility"])(
-    "shows one server-backed work queue filter for %s",
+    "offers an assigned queue without deriving its total from the page for %s",
     (stage) => {
       expect(getFilterOptions(stage, new Set(), [article], 124)).toEqual([
         { key: "all", label: "Na fila", count: 124 },
+        { key: "assigned", label: "Atribuídos a mim" },
       ]);
     }
   );
@@ -166,6 +167,50 @@ describe("ProjectArticles work queue", () => {
     expect(screen.getByRole("button", { name: "Incluir" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Pular por agora" })).toBeInTheDocument();
     expect(screen.getByText(/Envie o PDF para liberar a decisão de inclusão/)).toBeInTheDocument();
+  });
+});
+
+describe("collaborative article review", () => {
+  function renderDetail(overrides) {
+    return render(<ArticleDetailPanel activeStage="screening" article={{ ...article, currentPhase: "screening", hasActiveReviewAssignments: true, ...overrides }}
+      currentIndex={0} onClose={vi.fn()} onNext={vi.fn()} onOpenArticle={vi.fn()} onOpenEligibility={vi.fn()}
+      onOpenScreening={vi.fn()} onOpenUploadPdf={vi.fn()} onPrevious={vi.fn()} onSkip={vi.fn()} project={{}} total={1} />);
+  }
+
+  it.each([
+    ["pending", "waiting_for_reviewer", "Aguardando minha decisão", true],
+    ["submitted", "waiting_for_reviewer", "Aguardando outro revisor", false],
+    ["submitted", "conflict", "Em discordância", false],
+    ["submitted", "consolidated", "Consolidado", false],
+  ])("shows %s / %s and gates decision actions", (status, reviewState, label, canDecide) => {
+    renderDetail({ myReviewAssignment: { reviewerUserId: 1, status }, reviewState });
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    if (canDecide) expect(screen.getByRole("button", { name: "Incluir" })).toBeEnabled();
+    else expect(screen.getByRole("button", { name: "Incluir" })).toBeDisabled();
+  });
+
+  it("does not invent included or extraction filter totals from a single page", () => {
+    expect(getFilterOptions("included", new Set(), [article], 124)).toEqual([
+      { key: "all", label: "Todos", count: 124 },
+      { key: "pending_extraction", label: "Aguarda extração" },
+    ]);
+  });
+
+  it("keeps an unassigned article readable and hides peer payloads", () => {
+    renderDetail({ myReviewAssignment: null, reviewState: "waiting_for_reviewer",
+      reviewAssignments: [{ reviewerUserId: 2, status: "submitted" }, { reviewerUserId: 3, status: "pending" }],
+      reviewDecisions: [{ reviewerUserId: 2, status: "submitted", reasonText: "PRIVATE PEER REASON" }] });
+    expect(screen.getByText(article.title)).toBeInTheDocument();
+    expect(screen.getByText("Este artigo não foi atribuído a você.")).toBeInTheDocument();
+    expect(screen.getByText("1 de 2 revisores concluíram")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Incluir" })).toBeDisabled();
+    expect(screen.queryByText("PRIVATE PEER REASON")).not.toBeInTheDocument();
+  });
+
+  it("requires an administrator's own assignment for decision submission", () => {
+    renderDetail({ myReviewAssignment: null, canWriteReview: true, canManageArticle: true });
+    expect(screen.getByRole("button", { name: "Incluir" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeDisabled();
   });
 });
 

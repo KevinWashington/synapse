@@ -239,6 +239,17 @@ class LegacyArticleDecisionUpdate(BaseModel):
     useSuggestedRQs: bool = True
 
 
+class ArticleReviewAssignment(BaseModel):
+    id: int
+    phase: Literal["screening", "eligibility"]
+    reviewerUserId: int
+    slot: int
+    status: Literal["pending", "submitted", "needs_reassignment"]
+
+    class Config:
+        from_attributes = True
+
+
 class ArticleResponse(BaseModel):
     id: int
     paperId: str | None = None
@@ -301,6 +312,11 @@ class ArticleResponse(BaseModel):
     updatedAt: datetime
     reviewState: Literal["waiting_for_reviewer", "consolidated", "conflict"] | None = None
     reviewDecisions: list[dict] = Field(default_factory=list)
+    hasActiveReviewAssignments: bool = False
+    myReviewAssignment: ArticleReviewAssignment | None = None
+    reviewAssignments: list[ArticleReviewAssignment] = Field(default_factory=list)
+    canWriteReview: bool | None = None
+    canManageArticle: bool | None = None
 
     class Config:
         from_attributes = True

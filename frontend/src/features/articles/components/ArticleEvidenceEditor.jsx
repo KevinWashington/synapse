@@ -65,6 +65,7 @@ function ArticleEvidenceEditor({
   isSaving,
   onSave,
   showFooterActions = true,
+  readOnly = false,
   variant = "default",
 }) {
   const extractionSchema = project?.dataExtractionSchema || [];
@@ -91,6 +92,7 @@ function ArticleEvidenceEditor({
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (readOnly) return;
     const submitterValue = event.nativeEvent?.submitter?.value;
     const payload = {
       extractionData: buildExtractionPayload(extractionSchema, extractionValues),
@@ -107,7 +109,7 @@ function ArticleEvidenceEditor({
   }
 
   async function confirmCompletion() {
-    if (!pendingCompletion) return;
+    if (readOnly || !pendingCompletion) return;
     await onSave(pendingCompletion);
     setPendingCompletion(null);
   }
@@ -133,6 +135,7 @@ function ArticleEvidenceEditor({
   return (
     <>
     <form id={formId} onSubmit={handleSubmit} className={cn("flex h-full flex-col", className)}>
+      <fieldset disabled={readOnly} className="contents">
       <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", isWorkspaceVariant ? "space-y-5" : "space-y-4")}>
         {!isWorkspaceVariant ? (
         <div className="grid gap-3 md:grid-cols-2">
@@ -401,7 +404,7 @@ function ArticleEvidenceEditor({
 
       {showFooterActions ? (
       <div className="flex items-center justify-end gap-2 border-t border-[var(--syn-border)] px-4 py-3">
-        <Button type="submit" value="draft" disabled={isSaving} className="gap-2">
+        <Button type="submit" value="draft" disabled={isSaving || readOnly} className="gap-2">
           {isSaving ? (
             <>
               <LoaderIcon className="h-4 w-4 animate-spin" />
@@ -416,6 +419,7 @@ function ArticleEvidenceEditor({
         </Button>
       </div>
       ) : null}
+      </fieldset>
     </form>
     <ConfirmationDialog
       open={Boolean(pendingCompletion)}

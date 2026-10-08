@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
 import { toggleVisibleSelection } from "@features/articles/utils/reviewFlow";
@@ -13,7 +13,7 @@ const PHASE_FILTERS = {
 const FLOW_TABS = new Set(["identification", "screening", "eligibility", "included"]);
 const ARTICLE_PAGE_SIZE = 20;
 
-export const useProjectArticles = (project, onGraphNeedsRefresh) => {
+export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeFlowTab, setActiveFlowTabState] = useState(() => {
     const requestedFlow = searchParams.get("flow");
@@ -22,6 +22,8 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
   const [articles, setArticles] = useState([]);
   const [articlePage, setArticlePage] = useState(1);
   const [articleTotal, setArticleTotal] = useState(0);
+  const [assignedToMe, setAssignedToMeState] = useState(false);
+  const articleRequest = useRef(0);
   const [searchTermsByFlow, setSearchTermsByFlow] = useState({});
   const [summary, setSummary] = useState(null);
   const [report, setReport] = useState(null);
@@ -45,8 +47,12 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     const requestedFlow = searchParams.get("flow");
     const nextFlow = FLOW_TABS.has(requestedFlow) ? requestedFlow : "identification";
 
-    setActiveFlowTabState((current) => (current === nextFlow ? current : nextFlow));
-  }, [searchParams]);
+    if (activeFlowTab !== nextFlow) {
+      setActiveFlowTabState(nextFlow);
+      setAssignedToMeState(false);
+      setArticlePage(1);
+    }
+  }, [activeFlowTab, searchParams]);
 
   const setActiveFlowTab = useCallback(
     (nextFlowTab) => {
@@ -54,6 +60,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
 
       setActiveFlowTabState(resolvedFlowTab);
       setArticlePage(1);
+      setAssignedToMeState(false);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
 
@@ -76,6 +83,11 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     },
     [activeFlowTab]
   );
+
+  const setAssignedToMe = useCallback((value) => {
+    setAssignedToMeState(value);
+    setArticlePage(1);
+  }, []);
 
   const loadSummary = useCallback(async () => {
     if (!project?.id) {
@@ -135,6 +147,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
       return;
     }
     const resolvedFlowTab = FLOW_TABS.has(flowOverride) ? flowOverride : activeFlowTab;
+    const request = ++articleRequest.current;
     const currentSearchTerm = searchTermsByFlow[resolvedFlowTab] || "";
 
     if (!PHASE_FILTERS[resolvedFlowTab]) {
@@ -150,7 +163,9 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         search: currentSearchTerm || undefined,
         page: pageOverride,
         limit: ARTICLE_PAGE_SIZE,
+        ...(assignedToMe && ["screening", "eligibility"].includes(resolvedFlowTab) ? { assignedToMe: true } : {}),
       });
+      if (request !== articleRequest.current) return;
       const nextArticles = response.articles || [];
       const nextTotal = response.total || 0;
       const lastPage = Math.max(1, Math.ceil(nextTotal / ARTICLE_PAGE_SIZE));
@@ -166,13 +181,14 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         setSelectedIdentificationIds([]);
       }
     } catch (error) {
+      if (request !== articleRequest.current) return;
       console.error("Erro ao carregar artigos:", error);
       setArticles([]);
       setArticleTotal(0);
     } finally {
-      setIsLoadingArticles(false);
+      if (request === articleRequest.current) setIsLoadingArticles(false);
     }
-  }, [activeFlowTab, articlePage, project?.id, searchTermsByFlow]);
+  }, [activeFlowTab, articlePage, assignedToMe, project?.id, searchTermsByFlow]);
 
   useEffect(() => {
     loadSummary();
@@ -182,6 +198,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
 
   useEffect(() => {
     loadArticles(activeFlowTab);
+    return () => { articleRequest.current += 1; };
   }, [activeFlowTab, loadArticles]);
 
   const refreshAll = useCallback(
@@ -353,6 +370,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         toast.success("Decisão de triagem registrada.");
         setScreeningArticle(null);
         await refreshAll();
+        await collaboration?.refreshAssignments?.();
       } catch (error) {
         toast.error("Erro ao salvar triagem: " + error.message);
         throw error;
@@ -360,7 +378,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         setIsSavingDecision(false);
       }
     },
-    [project?.id, refreshAll, screeningArticle]
+    [collaboration, project?.id, refreshAll, screeningArticle]
   );
 
   const submitEligibilityDecision = useCallback(
@@ -375,6 +393,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         onGraphNeedsRefresh?.();
         setEligibilityArticle(null);
         await refreshAll({ refreshSynthesisReport: true });
+        await collaboration?.refreshAssignments?.();
       } catch (error) {
         toast.error("Erro ao salvar elegibilidade: " + error.message);
         throw error;
@@ -382,7 +401,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
         setIsSavingDecision(false);
       }
     },
-    [eligibilityArticle, onGraphNeedsRefresh, project?.id, refreshAll]
+    [collaboration, eligibilityArticle, onGraphNeedsRefresh, project?.id, refreshAll]
   );
 
   const updateFullTextStatus = useCallback(
@@ -446,6 +465,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     articlePage,
     articlePageSize: ARTICLE_PAGE_SIZE,
     articleTotal,
+    assignedToMe,
     articles,
     changeArticlePage,
     duplicateCandidates,
@@ -472,6 +492,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh) => {
     selectedDuplicateMap,
     selectedIdentificationIds,
     setActiveFlowTab,
+    setAssignedToMe,
     setEligibilityArticle,
     setScreeningArticle,
     setSearchTerm,

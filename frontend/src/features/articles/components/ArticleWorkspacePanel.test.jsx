@@ -15,6 +15,26 @@ const defaultProps = {
 };
 
 describe("ArticleWorkspacePanel stage tools", () => {
+  it("lets unassigned reviewers read notes without editing them", () => {
+    render(<ArticleWorkspacePanel {...defaultProps} activeFlow="screening"
+      article={{ ...defaultProps.article, notas: "Existing notes", hasActiveReviewAssignments: true, myReviewAssignment: null, canWriteReview: false }} />);
+    expect(screen.getByDisplayValue("Existing notes")).toHaveAttribute("readonly");
+    expect(screen.getByText("Este artigo não foi atribuído a você.")).toBeInTheDocument();
+  });
+
+  it("disables extraction controls for an unassigned reviewer while showing saved data", () => {
+    render(<ArticleWorkspacePanel {...defaultProps} activeFlow="included" rightTab="extracao"
+      project={{ dataExtractionSchema: [{ key: "method", label: "Method", type: "text" }] }}
+      article={{ ...defaultProps.article, reviewOutcome: "included", extractionData: { method: "Saved method" }, hasActiveReviewAssignments: true, myReviewAssignment: null, canWriteReview: false }} />);
+    expect(screen.getByDisplayValue("Saved method")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Salvar/ })).toBeDisabled();
+  });
+
+  it("allows owner/coordinator ancillary writes without an assignment", () => {
+    render(<ArticleWorkspacePanel {...defaultProps} activeFlow="screening"
+      article={{ ...defaultProps.article, hasActiveReviewAssignments: true, myReviewAssignment: null, canWriteReview: true }} />);
+    expect(screen.getByPlaceholderText("Digite suas notas aqui...")).not.toHaveAttribute("readonly");
+  });
   it.each(["screening", "eligibility"])(
     "hides extraction tools during %s",
     (activeFlow) => {

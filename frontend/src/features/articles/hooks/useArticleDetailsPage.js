@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
 import { projectService } from "@features/projects/services/projectService";
+import { collaborationService } from "@features/collaboration/services/collaborationService";
 import { toast } from "@/lib/toast";
 
 const WORKSPACE_TABS = new Set(["notas", "extracao", "chat"]);
@@ -13,6 +14,7 @@ function useArticleDetailsPage() {
   const [article, setArticle] = useState(null);
   const [project, setProject] = useState(null);
   const [articleList, setArticleList] = useState([]);
+  const [myAssignments, setMyAssignments] = useState([]);
   const [articleListLoading, setArticleListLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,12 +36,13 @@ function useArticleDetailsPage() {
 
   const listFlow = returnFlow || (requestedWorkspace === "extracao" ? "included" : null);
 
-  const fetchArticle = useCallback(async () => {
+  const fetchArticle = useCallback(async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       setError(null);
       const articleData = await articleService.getArticleById(projectId, articleId);
       setArticle(articleData);
+      return articleData;
     } catch (currentError) {
       setError(currentError.message || "Erro ao carregar artigo");
     } finally {
@@ -161,34 +164,46 @@ function useArticleDetailsPage() {
     await fetchPdfData();
   }, [fetchArticle, fetchPdfData]);
 
+  const refreshAfterDecision = useCallback(async (updated) => {
+    setArticle(updated);
+    if (!article?.hasActiveReviewAssignments && !updated.hasActiveReviewAssignments) return updated;
+    const [reloaded, assignments] = await Promise.all([
+      fetchArticle(false),
+      collaborationService.getMyAssignments(projectId),
+      fetchArticleList(),
+    ]);
+    setMyAssignments(assignments || []);
+    return reloaded || updated;
+  }, [article?.hasActiveReviewAssignments, fetchArticle, fetchArticleList, projectId]);
+
   const handleScreeningDecision = useCallback(
     async (payload) => {
       try {
         const updated = await articleService.submitScreeningDecision(projectId, articleId, payload);
-        setArticle(updated);
+        const reloaded = await refreshAfterDecision(updated);
         toast.success("Decisão de triagem registrada.");
-        return updated;
+        return reloaded;
       } catch (currentError) {
         toast.error("Erro ao registrar screening: " + currentError.message);
         throw currentError;
       }
     },
-    [articleId, projectId]
+    [articleId, projectId, refreshAfterDecision]
   );
 
   const handleEligibilityDecision = useCallback(
     async (payload) => {
       try {
         const updated = await articleService.submitEligibilityDecision(projectId, articleId, payload);
-        setArticle(updated);
+        const reloaded = await refreshAfterDecision(updated);
         toast.success("Decisão de elegibilidade registrada.");
-        return updated;
+        return reloaded;
       } catch (currentError) {
         toast.error("Erro ao registrar elegibilidade: " + currentError.message);
         throw currentError;
       }
     },
-    [articleId, projectId]
+    [articleId, projectId, refreshAfterDecision]
   );
 
   const handleSaveNotes = useCallback(
@@ -260,6 +275,7 @@ function useArticleDetailsPage() {
     handleScreeningDecision,
     isSavingEvidence,
     loading,
+    myAssignments,
     navigate,
     pdfData,
     project,

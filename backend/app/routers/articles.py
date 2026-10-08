@@ -10,7 +10,7 @@ from difflib import SequenceMatcher
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -19,16 +19,19 @@ from app.core.dependencies import (
     get_user_ai_service,
 )
 from app.database import get_db
+from app.config import get_settings
 from app.models.article import Article
+from app.models.collaboration import ReviewAssignment, ReviewConflict, ReviewDecision
 from app.models.project import Project
 from app.models.user import User
 from app.services.ai_service import AIService
-from app.services.project_access_service import get_project_article, resolve_project_access
+from app.services.project_access_service import CAP_EDIT_PROJECT, get_project_article, require_capability, resolve_project_access
 from app.services.review_decision_service import (
     has_active_assignments,
-    list_visible_decisions,
     require_assigned_write_if_managed,
+    resolution_state,
     submit_review_decision,
+    visible_decision_payloads,
 )
 from app.schemas.article import (
     ArticleCreate,
@@ -36,6 +39,7 @@ from app.schemas.article import (
     ArticleListResponse,
     ArticleNotesUpdate,
     ArticleResponse,
+    ArticleReviewAssignment,
     ArticleUpdate,
     BatchEvaluateRequest,
     BatchEvaluateResponse,
@@ -244,7 +248,13 @@ def _set_legacy_state_from_workflow(article: Article) -> None:
 
 def _build_article_response(article: Article) -> ArticleResponse:
     _set_legacy_state_from_workflow(article)
-    response = ArticleResponse.model_validate(article)
+    # reviewDecisions is also an ORM relationship; never lazily load or expose it.
+    response = ArticleResponse.model_validate({
+        name: getattr(article, name)
+        for name in ArticleResponse.model_fields
+        if name not in {"reviewState", "reviewDecisions", "hasActiveReviewAssignments", "myReviewAssignment", "reviewAssignments", "canWriteReview", "canManageArticle", "hasPdf"}
+        and hasattr(article, name)
+    })
     response.hasPdf = article.pdfData is not None
     response.eligibilityChecklistAnswers = article.eligibilityChecklistAnswers or {}
     response.extractionData = article.extractionData or {}
@@ -255,6 +265,71 @@ def _build_article_response(article: Article) -> ArticleResponse:
     response.answeringRQs = article.answeringRQs or []
     response.qualityRating = article.qualityRating or "unrated"
     return response
+
+
+def _review_phase(article: Article) -> str:
+    return "screening" if article.currentPhase in {"identification", "screening"} else "eligibility"
+
+
+async def _require_article_write(db, article, user_id, *, administrative=False):
+    access = await resolve_project_access(db, project_id=article.projectId, user_id=user_id)
+    if administrative or access.role != "reviewer":
+        require_capability(access, CAP_EDIT_PROJECT)
+    else:
+        await require_assigned_write_if_managed(
+            db, article_id=article.id, user_id=user_id, phase=_review_phase(article), access=access
+        )
+    return access
+
+
+async def _article_responses(db, rows, *, access, user_id, phase=None):
+    responses = [_build_article_response(row) for row in rows]
+    for response in responses:
+        response.canManageArticle = CAP_EDIT_PROJECT in access.capabilities
+    if not rows or not get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
+        return responses
+    ids = [row.id for row in rows]
+    assignments = (await db.execute(select(ReviewAssignment).where(
+        ReviewAssignment.articleId.in_(ids), ReviewAssignment.status != "cancelled"
+    ).order_by(ReviewAssignment.slot))).scalars().all()
+    if not assignments:
+        return responses
+    decisions = (await db.execute(select(ReviewDecision).where(
+        ReviewDecision.assignmentId.in_([item.id for item in assignments]), ReviewDecision.status == "submitted"
+    ))).scalars().all()
+    conflicts = (await db.execute(select(ReviewConflict).where(
+        ReviewConflict.articleId.in_(ids)
+    ))).scalars().all()
+    for row, response in zip(rows, responses):
+        relevant_phase = phase if phase in {"screening", "eligibility"} else _review_phase(row)
+        active = [item for item in assignments if item.articleId == row.id and item.phase == relevant_phase]
+        own = next((item for item in active if item.reviewerUserId == user_id), None)
+        response.hasActiveReviewAssignments = bool(active)
+        response.myReviewAssignment = ArticleReviewAssignment.model_validate(own) if own else None
+        response.reviewAssignments = [ArticleReviewAssignment.model_validate(item) for item in active]
+        row_assignments = [item for item in assignments if item.articleId == row.id]
+        response.canWriteReview = not row_assignments or response.canManageArticle or bool(own and own.status != "needs_reassignment")
+        if not active:
+            continue
+        active_ids = {item.id for item in active}
+        submitted = [item for item in decisions if item.assignmentId in active_ids]
+        complete = len(submitted) == len(active) and all(item.status == "submitted" for item in active)
+        phase_conflicts = [item for item in conflicts if item.articleId == row.id and item.phase == relevant_phase]
+        if not complete:
+            response.reviewState = "waiting_for_reviewer"
+        elif any(item.status == "open" for item in phase_conflicts):
+            response.reviewState = "conflict"
+        elif any(item.status == "resolved" for item in phase_conflicts):
+            response.reviewState = "consolidated"
+        else:
+            response.reviewState = resolution_state(submitted, assignment_count=len(active))
+        response.reviewDecisions = visible_decision_payloads(submitted, current_user_id=user_id, complete=complete)
+    return responses
+
+
+async def _caller_article_response(db, article, user_id, *, phase=None):
+    access = await resolve_project_access(db, project_id=article.projectId, user_id=user_id)
+    return (await _article_responses(db, [article], access=access, user_id=user_id, phase=phase))[0]
 
 
 def _is_included_for_synthesis(article: Article) -> bool:
@@ -1249,12 +1324,13 @@ async def get_articles_by_project(
     outcome: str | None = None,
     sourceCategory: str | None = None,
     hasPdf: bool | None = None,
+    assignedToMe: bool = False,
     page: int = 1,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
 
     query = select(Article).where(Article.projectId == projectId)
 
@@ -1270,6 +1346,18 @@ async def get_articles_by_project(
 
     if phase:
         query = query.where(Article.currentPhase == phase)
+
+    if assignedToMe and get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
+        relevant_phase = phase if phase in {"screening", "eligibility"} else case(
+            (Article.currentPhase.in_(["identification", "screening"]), "screening"), else_="eligibility"
+        )
+        query = query.where(select(ReviewAssignment.id).where(
+            ReviewAssignment.articleId == Article.id,
+            ReviewAssignment.projectId == projectId,
+            ReviewAssignment.reviewerUserId == current_user.id,
+            ReviewAssignment.phase == relevant_phase,
+            ReviewAssignment.status != "cancelled",
+        ).exists())
 
     if outcome:
         query = query.where(Article.reviewOutcome == outcome)
@@ -1294,7 +1382,7 @@ async def get_articles_by_project(
     articles = result.scalars().all()
 
     return ArticleListResponse(
-        articles=[_build_article_response(article) for article in articles],
+        articles=await _article_responses(db, articles, access=access, user_id=current_user.id, phase=phase),
         total=total,
         page=page,
         limit=limit,
@@ -1613,12 +1701,7 @@ async def screening_decision(
         await db.refresh(result.article)
         if result.state == "consolidated":
             await _sync_article_indexes(result.article, db)
-        response = _build_article_response(result.article)
-        response.reviewState = result.state
-        response.reviewDecisions = await list_visible_decisions(
-            db, article_id=articleId, phase="screening", current_user_id=current_user.id
-        )
-        return response
+        return await _caller_article_response(db, result.article, current_user.id, phase="screening")
 
     if article.reviewOutcome != "active":
         article.reviewOutcome = "active"
@@ -1669,6 +1752,7 @@ async def evaluate_single_article(
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     project = await get_project_or_404(projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id, administrative=True)
     await _evaluate_article_if_possible(article, project, ai_service)
     await db.commit()
     await db.refresh(article)
@@ -1685,6 +1769,8 @@ async def batch_evaluate_screening(
     ai_service: AIService = Depends(get_user_ai_service),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
     query = (
         select(Article)
         .where(
@@ -1756,6 +1842,7 @@ async def update_full_text_status(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id)
     if article.currentPhase != "eligibility":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1784,7 +1871,7 @@ async def update_full_text_status(
     await db.commit()
     await db.refresh(article)
     await _sync_article_indexes(article, db)
-    return _build_article_response(article)
+    return await _caller_article_response(db, article, current_user.id)
 
 
 @router.post("/{projectId}/artigos/{articleId}/eligibility-decision", response_model=ArticleResponse)
@@ -1797,7 +1884,6 @@ async def eligibility_decision(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
     if await has_active_assignments(db, article_id=articleId, phase="eligibility"):
         access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
         result = await submit_review_decision(
@@ -1815,12 +1901,7 @@ async def eligibility_decision(
         await db.refresh(result.article)
         if result.state == "consolidated":
             await _sync_article_indexes(result.article, db)
-        response = _build_article_response(result.article)
-        response.reviewState = result.state
-        response.reviewDecisions = await list_visible_decisions(
-            db, article_id=articleId, phase="eligibility", current_user_id=current_user.id
-        )
-        return response
+        return await _caller_article_response(db, result.article, current_user.id, phase="eligibility")
     if article.currentPhase not in {"eligibility", "included"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1884,7 +1965,7 @@ async def update_article_evidence(
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
+    await _require_article_write(db, article, current_user.id)
 
     if not _is_included_for_synthesis(article):
         raise HTTPException(
@@ -1914,7 +1995,7 @@ async def update_article_evidence(
 
     await db.commit()
     await db.refresh(article)
-    return _build_article_response(article)
+    return await _caller_article_response(db, article, current_user.id)
 
 
 @router.get("/{projectId}/artigos/synthesis-report")
@@ -1957,7 +2038,8 @@ async def get_article_by_id(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    return _build_article_response(article)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    return (await _article_responses(db, [article], access=access, user_id=current_user.id))[0]
 
 
 @router.put("/{projectId}/artigos/{articleId}", response_model=ArticleResponse)
@@ -1971,6 +2053,7 @@ async def update_article(
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     project = await get_project_or_404(projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id, administrative=True)
 
     update_data = data.model_dump(exclude_unset=True)
     anchor_fields_changed = any(key in update_data for key in ("paperId", "doi", "title", "year"))
@@ -2006,6 +2089,7 @@ async def update_article_status(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id, administrative=True)
     article.status = data.status
     await db.commit()
     await db.refresh(article)
@@ -2021,6 +2105,9 @@ async def update_article_decision(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id)
+    if data.decision == "pendente" and await has_active_assignments(db, article_id=articleId, phase=_review_phase(article)):
+        raise HTTPException(status_code=409, detail={"code": "ASSIGNED_REVIEW_ACTIVE", "message": "Reabra a revisão pelo fluxo de coordenação."})
     if article.currentPhase in {"identification", "screening"}:
         decision_payload = ScreeningDecisionRequest(
             decision="excluded" if data.decision == "excluido" else "included",
@@ -2066,20 +2153,12 @@ async def update_article_notes(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    managed_phase = "screening" if article.currentPhase in {"identification", "screening"} else "eligibility"
-    if data.decision == "pendente" and await has_active_assignments(
-        db, article_id=articleId, phase=managed_phase
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"code": "ASSIGNED_REVIEW_ACTIVE", "message": "Reabra a revisão pelo fluxo de coordenação."},
-        )
-    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
+    await _require_article_write(db, article, current_user.id)
     article.notas = data.notas
     await db.commit()
     await db.refresh(article)
     await _sync_article_indexes(article, db)
-    return _build_article_response(article)
+    return await _caller_article_response(db, article, current_user.id)
 
 
 @router.delete("/{projectId}/artigos/{articleId}")
@@ -2090,6 +2169,7 @@ async def delete_article(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id, administrative=True)
     try:
         await _sync_article_graph_state(article, db)
     except HTTPException:
@@ -2115,7 +2195,7 @@ async def upload_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    await require_assigned_write_if_managed(db, article_id=articleId, user_id=current_user.id)
+    await _require_article_write(db, article, current_user.id)
     if article.currentPhase != "eligibility":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -2148,7 +2228,7 @@ async def upload_pdf(
     _set_legacy_state_from_workflow(article)
     await db.commit()
     await db.refresh(article)
-    return _build_article_response(article)
+    return await _caller_article_response(db, article, current_user.id)
 
 
 @router.get("/{projectId}/artigos/{articleId}/pdf")
@@ -2202,6 +2282,7 @@ async def add_relationship(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id, administrative=True)
     related = await get_article_or_404(data.relatedArticleId, projectId, current_user.id, db)
     if related not in article.relatedArticles:
         article.relatedArticles.append(related)
@@ -2218,6 +2299,7 @@ async def remove_relationship(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
+    await _require_article_write(db, article, current_user.id, administrative=True)
     related = await get_article_or_404(relatedId, projectId, current_user.id, db)
     if related in article.relatedArticles:
         article.relatedArticles.remove(related)
@@ -2273,6 +2355,8 @@ async def reprocess_project_graph(
     ai_service: AIService = Depends(get_user_ai_service),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
     result = await db.execute(
         select(Article).where(Article.projectId == projectId)
     )

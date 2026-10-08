@@ -41,6 +41,8 @@ import ImportBibTeXModal from "./ImportBibTeXModal";
 import NewArticleModal from "./NewArticleModal";
 import ScreeningDecisionDialog from "./ScreeningDecisionDialog";
 import UploadPDFModal from "./UploadPDFModal";
+import ReviewAssignmentStatus from "./ReviewAssignmentStatus";
+import { collaborativeReview } from "../utils/collaborativeReview";
 
 const STAGES = [
   {
@@ -125,6 +127,9 @@ function getArticleBadge(article, stageKey, duplicateIds) {
     return { label: "-", className: "bg-[#edf1f7] text-[#667391]", dot: "bg-[#a4adc2]" };
   }
 
+  const review = collaborativeReview(article);
+  if (review.label) return { label: review.label, className: review.className, dot: "bg-[#a4adc2]", tooltip: review.explanation };
+
   if (stageKey === "identification") {
     const duplicate = duplicateIds.has(article.id) || article.duplicateGroupKey || article.reviewOutcome === "duplicate_removed";
     return duplicate
@@ -163,15 +168,14 @@ export function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = 
   }
 
   if (stageKey === "screening" || stageKey === "eligibility") {
-    return [{ key: "all", label: "Na fila", count: stageTotal }];
+    return [{ key: "all", label: "Na fila", count: stageTotal }, { key: "assigned", label: "Atribuídos a mim" }];
   }
 
   return [
-    { key: "all", label: "Todos", count: articles.length },
+    { key: "all", label: "Todos", count: stageTotal },
     {
       key: "pending_extraction",
       label: "Aguarda extração",
-      count: articles.filter((article) => !Object.keys(article.extractionData || {}).length).length,
     },
   ];
 }
@@ -452,7 +456,7 @@ export function StageListPanel({
                 )}
               >
                 {option.label}
-                <span className="ml-2 rounded-full bg-[#f0f2fb] px-2 py-0.5 text-xs text-[#667391]">{formatNumber(option.count)}</span>
+                {option.count !== undefined ? <span className="ml-2 rounded-full bg-[#f0f2fb] px-2 py-0.5 text-xs text-[#667391]">{formatNumber(option.count)}</span> : null}
                 {active ? <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[#6259ff]" /> : null}
               </button>
             );
@@ -538,7 +542,7 @@ export function StageListPanel({
                   </span>
                 </button>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  <span className={cn("rounded-full px-3 py-1 text-xs font-semibold", badge.className)}>{badge.label}</span>
+                  <span title={badge.tooltip || badge.label} className={cn("max-w-44 rounded-full px-3 py-1 text-right text-xs font-semibold", badge.className)}>{badge.label}</span>
                   <span className="text-xs text-[#56627f]">{formatDate(article.updatedAt || article.createdAt)}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -639,6 +643,7 @@ export function ArticleDetailPanel({
   }
 
   const badge = getArticleBadge(article, activeStage, new Set());
+  const review = collaborativeReview(article);
   const isIncludedStage = activeStage === "included";
   const extractionSchema = project?.dataExtractionSchema || [];
   const extractionData = article.extractionData || {};
@@ -666,9 +671,11 @@ export function ArticleDetailPanel({
 
       <div className="p-5">
         <div className="mb-4">
+          {review.managed ? <ReviewAssignmentStatus article={article} /> : (
           <span className={cn("inline-flex rounded-full px-3 py-1 text-xs font-semibold", badge.className)}>
             {badge.label}
           </span>
+          )}
         </div>
         <h2 className="text-xl font-semibold leading-8 text-[#111936]">{article.title}</h2>
         <p className="mt-3 text-sm leading-6 text-[#56627f]">{article.authors}</p>
@@ -727,7 +734,7 @@ export function ArticleDetailPanel({
               <div className="rounded-lg border border-[#edf0f7] bg-[#fbfcff] p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-[#111936]">{article.hasPdf ? "PDF disponível" : "Texto completo pendente"}</span>
-                  <Button variant="outline" size="sm" className="h-8 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => article.hasPdf ? onOpenArticle(article.id) : onOpenUploadPdf(article)}>
+                  <Button variant="outline" size="sm" disabled={!article.hasPdf && !review.canWrite} title={!article.hasPdf ? review.writeExplanation : undefined} className="h-8 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={() => article.hasPdf ? onOpenArticle(article.id) : onOpenUploadPdf(article)}>
                     {article.hasPdf ? <ExternalLinkIcon className="h-3.5 w-3.5" /> : <UploadIcon className="h-3.5 w-3.5" />}
                     {article.hasPdf ? "Abrir artigo" : "Enviar PDF"}
                   </Button>
@@ -765,11 +772,11 @@ export function ArticleDetailPanel({
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[#111936]">Sua decisão</h3>
                 <div className="grid gap-3 md:grid-cols-3">
-                  <Button className="h-12 gap-2 rounded-lg border border-[#27a363] bg-[#eefaf3] text-[#19884f] hover:bg-[#e3f6eb]" onClick={() => onOpenScreening(article, "included")}>
+                  <Button disabled={!review.canDecide} title={review.explanation} className="h-12 gap-2 rounded-lg border border-[#27a363] bg-[#eefaf3] text-[#19884f] hover:bg-[#e3f6eb]" onClick={() => onOpenScreening(article, "included")}>
                     <CheckCircle2Icon className="h-5 w-5" />
                     Incluir
                   </Button>
-                  <Button className="h-12 gap-2 rounded-lg border border-[#ef6262] bg-[#fff0f0] text-[#d94343] hover:bg-[#ffe4e4]" onClick={() => onOpenScreening(article, "excluded")}>
+                  <Button disabled={!review.canDecide} title={review.explanation} className="h-12 gap-2 rounded-lg border border-[#ef6262] bg-[#fff0f0] text-[#d94343] hover:bg-[#ffe4e4]" onClick={() => onOpenScreening(article, "excluded")}>
                     <XCircleIcon className="h-5 w-5" />
                     Excluir
                   </Button>
@@ -787,13 +794,14 @@ export function ArticleDetailPanel({
                 <div className="grid gap-3 md:grid-cols-3">
                   <Button
                     className="h-12 gap-2 rounded-lg border border-[#27a363] bg-[#eefaf3] text-[#19884f] hover:bg-[#e3f6eb]"
-                    disabled={!article.hasPdf && article.fullTextStatus !== "uploaded"}
+                    disabled={!review.canDecide || (!article.hasPdf && article.fullTextStatus !== "uploaded")}
+                    title={review.explanation}
                     onClick={() => onOpenEligibility(article, "included")}
                   >
                     <CheckCircle2Icon className="h-5 w-5" />
                     Incluir
                   </Button>
-                  <Button className="h-12 gap-2 rounded-lg border border-[#ef6262] bg-[#fff0f0] text-[#d94343] hover:bg-[#ffe4e4]" onClick={() => onOpenEligibility(article, "excluded")}>
+                  <Button disabled={!review.canDecide} title={review.explanation} className="h-12 gap-2 rounded-lg border border-[#ef6262] bg-[#fff0f0] text-[#d94343] hover:bg-[#ffe4e4]" onClick={() => onOpenEligibility(article, "excluded")}>
                     <XCircleIcon className="h-5 w-5" />
                     Excluir
                   </Button>
@@ -806,7 +814,7 @@ export function ArticleDetailPanel({
                   <p className="mt-3 text-xs text-[#d48700]">Envie o PDF para liberar a decisão de inclusão.</p>
                 ) : null}
                 {!article.hasPdf ? (
-                  <Button variant="outline" className="mt-3 h-10 rounded-lg border-[#dfe4ef] bg-white" onClick={() => onOpenEligibility(article, "full_text_unavailable")}>
+                  <Button disabled={!review.canDecide} title={review.explanation} variant="outline" className="mt-3 h-10 rounded-lg border-[#dfe4ef] bg-white" onClick={() => onOpenEligibility(article, "full_text_unavailable")}>
                     Marcar texto completo indisponível
                   </Button>
                 ) : null}
@@ -981,7 +989,7 @@ export function StageSidebar({
   );
 }
 
-function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow }) {
+function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow, collaboration }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showNewArticleModal, setShowNewArticleModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -999,6 +1007,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     articlePage,
     articlePageSize,
     articleTotal,
+    assignedToMe,
     articles,
     changeArticlePage,
     duplicateCandidates,
@@ -1019,6 +1028,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     selectedIdentificationIds,
     selectedDuplicateMap,
     setActiveFlowTab,
+    setAssignedToMe,
     setEligibilityArticle,
     setScreeningArticle,
     setSearchTerm,
@@ -1028,7 +1038,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
     summary,
     toggleAllIdentificationSelection,
     toggleIdentificationSelection,
-  } = useProjectArticles(project, onGraphNeedsRefresh);
+  } = useProjectArticles(project, onGraphNeedsRefresh, collaboration);
 
   const activeStage = STAGES.some((stage) => stage.key === activeFlowTab)
     ? activeFlowTab
@@ -1064,8 +1074,12 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
   const stageArticles = activeStage === "identification" ? identificationArticles : articles;
 
   const filterOptions = useMemo(
-    () => getFilterOptions(activeStage, duplicateIds, stageArticles, articleTotal),
-    [activeStage, articleTotal, duplicateIds, stageArticles]
+    () => getFilterOptions(activeStage, duplicateIds, stageArticles, articleTotal).map((option) => {
+      if (assignedToMe && option.key === "all") return { ...option, count: undefined };
+      if (assignedToMe && option.key === "assigned") return { ...option, count: articleTotal };
+      return option;
+    }),
+    [activeStage, articleTotal, assignedToMe, duplicateIds, stageArticles]
   );
 
   const filteredArticles = useMemo(
@@ -1186,7 +1200,10 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow 
             setIsDetailClosed(false);
             setSelectedArticleId(article.id);
           }}
-          onFilterChange={setActiveFilter}
+          onFilterChange={(filter) => {
+            setActiveFilter(filter);
+            setAssignedToMe(filter === "assigned");
+          }}
           onOpenArticle={(articleId) => {
             const params = new URLSearchParams({ flow: activeStage });
             if (activeStage === "included") {

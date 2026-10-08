@@ -3,7 +3,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 
-function NotesEditor({ valorInicial = "", onSalvar }) {
+function NotesEditor({ valorInicial = "", onSalvar, readOnly = false }) {
   const [texto, setTexto] = useState(valorInicial || "");
   const [linhas, setLinhas] = useState([1]);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved
@@ -27,7 +27,7 @@ function NotesEditor({ valorInicial = "", onSalvar }) {
   // Debounced auto-save
   const saveNotas = useCallback(
     async (value) => {
-      if (!onSalvar || value === lastSavedRef.current) return;
+      if (readOnly || !onSalvar || value === lastSavedRef.current) return;
 
       setSaveStatus("saving");
       try {
@@ -40,10 +40,11 @@ function NotesEditor({ valorInicial = "", onSalvar }) {
         setSaveStatus("idle");
       }
     },
-    [onSalvar]
+    [onSalvar, readOnly]
   );
 
   const handleChange = (e) => {
+    if (readOnly) return;
     const newValue = e.target.value;
     setTexto(newValue);
 
@@ -91,6 +92,7 @@ function NotesEditor({ valorInicial = "", onSalvar }) {
         <Textarea
           ref={textareaRef}
           value={texto}
+          readOnly={readOnly}
           onChange={handleChange}
           onScroll={handleScroll}
           placeholder="Digite suas notas aqui..."
@@ -119,7 +121,7 @@ function NotesEditor({ valorInicial = "", onSalvar }) {
             </>
           )}
           {saveStatus === "idle" && (
-            <span>Salvamento automático</span>
+            <span>{readOnly ? "Somente leitura" : "Salvamento automático"}</span>
           )}
         </div>
       </div>

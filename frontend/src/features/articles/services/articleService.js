@@ -50,6 +50,7 @@ class ArtigosService {
     if (filters.outcome) params.outcome = filters.outcome;
     if (filters.sourceCategory) params.sourceCategory = filters.sourceCategory;
     if (filters.hasPdf !== undefined) params.hasPdf = String(filters.hasPdf);
+    if (filters.assignedToMe !== undefined) params.assignedToMe = String(filters.assignedToMe);
     if (filters.page) params.page = filters.page;
     if (filters.limit) params.limit = filters.limit;
 

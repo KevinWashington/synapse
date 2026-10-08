@@ -23,3 +23,14 @@ describe("articleService bulk identification flow", () => {
     expect(response.unresolvedDuplicateRecords).toBe(13);
   });
 });
+
+it("sends the assigned queue filter to the server with pagination", async () => {
+  vi.spyOn(apiService, "get").mockResolvedValue({ articles: [], total: 41 });
+  const result = await articleService.getArticlesByProject(7, {
+    phase: "screening", assignedToMe: true, page: 2, limit: 20,
+  });
+  expect(apiService.get).toHaveBeenCalledWith("/api/projetos/7/artigos", {
+    phase: "screening", assignedToMe: "true", page: 2, limit: 20,
+  });
+  expect(result.total).toBe(41);
+});

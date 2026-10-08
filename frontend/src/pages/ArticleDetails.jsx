@@ -24,6 +24,8 @@ import EligibilityDecisionDialog from "@/features/articles/components/Eligibilit
 import ScreeningDecisionDialog from "@/features/articles/components/ScreeningDecisionDialog";
 import UploadPDFModal from "@/features/articles/components/UploadPDFModal";
 import { cn } from "@/lib/utils";
+import { collaborativeReview } from "@features/articles/utils/collaborativeReview";
+import ReviewAssignmentStatus from "@features/articles/components/ReviewAssignmentStatus";
 
 const ArticleWorkspacePanel = lazy(() =>
   import("@features/articles/components/ArticleWorkspacePanel")
@@ -106,6 +108,7 @@ function PrismaExtractionWorkspace({
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [leftTab, setLeftTab] = useState("pdf");
+  const review = collaborativeReview(article);
   const extractionSchema = project?.dataExtractionSchema || [];
   const filteredArticles = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -257,7 +260,7 @@ function PrismaExtractionWorkspace({
                 value="draft"
                 variant="outline"
                 className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white px-6 text-[#182344]"
-                disabled={isSavingEvidence}
+                disabled={isSavingEvidence || !review.canWrite}
               >
                 <SaveIcon className="h-4 w-4" />
                 Salvar rascunho
@@ -267,7 +270,7 @@ function PrismaExtractionWorkspace({
                 form="article-extraction-form"
                 value="complete"
                 className="h-11 gap-2 rounded-lg bg-[#6259ff] px-6 text-white shadow-[0_12px_24px_rgba(98,89,255,0.18)] hover:bg-[#5148ee]"
-                disabled={isSavingEvidence}
+                disabled={isSavingEvidence || !review.canWrite}
               >
                 <CheckCircle2Icon className="h-4 w-4" />
                 Marcar como concluído
@@ -276,6 +279,7 @@ function PrismaExtractionWorkspace({
             </div>
           </div>
 
+          <ReviewAssignmentStatus article={article} />
           <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(500px,570px)]">
             <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white p-5">
               <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -313,7 +317,7 @@ function PrismaExtractionWorkspace({
                   {leftTab === "pdf" ? (
                     <PdfViewer article={article} articleId={articleId} pdfData={pdfData} projectId={projectId} />
                   ) : (
-                    <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} />
+                    <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} readOnly={!review.canWrite} />
                   )}
                 </Suspense>
               </div>
@@ -339,6 +343,7 @@ function PrismaExtractionWorkspace({
                     onSave={onSaveEvidence}
                     project={project}
                     showFooterActions={false}
+                    readOnly={!review.canWrite}
                     variant="workspace"
                   />
                 </Suspense>
@@ -443,6 +448,7 @@ function PrismaArticleReviewWorkspace({
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const extractionSchema = project?.dataExtractionSchema || [];
+  const review = collaborativeReview(article);
   const stage = REVIEW_STAGE_CONFIG[activeFlow] || REVIEW_STAGE_CONFIG.screening;
   const listSource = articleList?.length ? articleList : [article].filter(Boolean);
   const filteredArticles = useMemo(() => {
@@ -593,6 +599,8 @@ function PrismaArticleReviewWorkspace({
                 <Button
                   className="h-11 gap-2 rounded-lg bg-[#6259ff] px-5 text-white hover:bg-[#5148ee]"
                   onClick={() => onOpenScreening(article.aiSuggestedStatus ? suggestedDecision : "included")}
+                  disabled={!review.canDecide}
+                  title={review.explanation}
                 >
                   <CheckCircle2Icon className="h-4 w-4" />
                   Registrar triagem
@@ -600,7 +608,7 @@ function PrismaArticleReviewWorkspace({
               ) : null}
 
               {article.currentPhase === "eligibility" && !article.hasPdf ? (
-                <Button variant="outline" className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onOpenUpload}>
+                <Button variant="outline" disabled={!review.canWrite} title={review.writeExplanation} className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onOpenUpload}>
                   <UploadIcon className="h-4 w-4" />
                   Enviar PDF
                 </Button>
@@ -610,6 +618,8 @@ function PrismaArticleReviewWorkspace({
                 <Button
                   className="h-11 gap-2 rounded-lg bg-[#6259ff] px-5 text-white hover:bg-[#5148ee]"
                   onClick={() => onOpenEligibility("included")}
+                  disabled={!review.canDecide}
+                  title={review.explanation}
                 >
                   <CheckCircle2Icon className="h-4 w-4" />
                   Registrar elegibilidade
@@ -626,13 +636,14 @@ function PrismaArticleReviewWorkspace({
                 </Button>
               ) : null}
 
-              <Button variant="outline" className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onRequestDelete}>
+              <Button variant="outline" disabled={article.canManageArticle === false} className="h-11 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onRequestDelete}>
                 <TrashIcon className="h-4 w-4 text-red-500" />
                 Remover
               </Button>
             </div>
           </div>
 
+          <ReviewAssignmentStatus article={article} />
           <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(460px,540px)]">
             <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white p-5">
               <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -798,11 +809,13 @@ function ArticleDetails() {
   }
 
   function openScreeningDialog(initialDecision = "included") {
+    if (!collaborativeReview(article).canDecide) return;
     setScreeningInitialDecision(initialDecision);
     setScreeningDialogOpen(true);
   }
 
   function openEligibilityDialog(initialDecision = "included") {
+    if (!collaborativeReview(article).canDecide) return;
     setEligibilityInitialDecision(initialDecision);
     setEligibilityDialogOpen(true);
   }

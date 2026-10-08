@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useSearchParams } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useProjectArticles } from "./useProjectArticles";
 
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getSelectionReport: vi.fn(),
   getSelectionSummary: vi.fn(),
   promoteAllUniqueToScreening: vi.fn(),
+  submitScreeningDecision: vi.fn(),
   toastError: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock("@features/articles/services/articleService", () => ({
     getSelectionReport: mocks.getSelectionReport,
     getSelectionSummary: mocks.getSelectionSummary,
     promoteAllUniqueToScreening: mocks.promoteAllUniqueToScreening,
+    submitScreeningDecision: mocks.submitScreeningDecision,
   },
 }));
 
@@ -92,6 +94,64 @@ describe("useProjectArticles work queues", () => {
       expect(result.current.articles).toHaveLength(1);
       expect(result.current.articles[0].title).toBe("Último artigo");
     });
+  });
+
+  it("resets pagination and uses the server total when assigned filtering changes", async () => {
+    mocks.getArticlesByProject.mockImplementation((_id, filters) => Promise.resolve({
+      articles: [{ id: 11, currentPhase: "screening" }], total: filters.assignedToMe ? 41 : 120,
+    }));
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }), {
+      wrapper: wrapperAt("/projetos/7?tab=artigos&flow=screening"),
+    });
+    await waitFor(() => expect(result.current.articleTotal).toBe(120));
+    act(() => result.current.changeArticlePage(3));
+    await waitFor(() => expect(result.current.articlePage).toBe(3));
+    act(() => result.current.setAssignedToMe(true));
+    await waitFor(() => expect(result.current.articleTotal).toBe(41));
+    expect(result.current.articlePage).toBe(1);
+    expect(mocks.getArticlesByProject).toHaveBeenLastCalledWith(7, {
+      phase: "screening", outcome: "active", search: undefined, page: 1, limit: 20, assignedToMe: true,
+    });
+  });
+
+  it("refreshes collaboration assignments after screening creates eligibility work", async () => {
+    const refreshAssignments = vi.fn().mockResolvedValue(undefined);
+    mocks.submitScreeningDecision.mockResolvedValue({ reviewState: "consolidated", currentPhase: "eligibility" });
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }, undefined, { refreshAssignments }), {
+      wrapper: wrapperAt("/projetos/7?tab=artigos&flow=screening"),
+    });
+    await waitFor(() => expect(result.current.isLoadingArticles).toBe(false));
+    act(() => result.current.setScreeningArticle({ id: 11 }));
+    await act(async () => result.current.submitScreeningDecision({ decision: "included" }));
+    expect(refreshAssignments).toHaveBeenCalledOnce();
+  });
+
+  it("ignores a late unfiltered page after switching to assigned articles", async () => {
+    let resolveUnfiltered;
+    const oldPage = new Promise((resolve) => { resolveUnfiltered = resolve; });
+    mocks.getArticlesByProject.mockImplementation((_id, filters) => filters.assignedToMe
+      ? Promise.resolve({ articles: [{ id: 11, currentPhase: "screening" }], total: 41 }) : oldPage);
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }), {
+      wrapper: wrapperAt("/projetos/7?tab=artigos&flow=screening"),
+    });
+    await waitFor(() => expect(mocks.getArticlesByProject).toHaveBeenCalledOnce());
+    act(() => result.current.setAssignedToMe(true));
+    await waitFor(() => expect(result.current.articleTotal).toBe(41));
+    await act(async () => resolveUnfiltered({ articles: [{ id: 99, currentPhase: "screening" }], total: 120 }));
+    expect(result.current.articleTotal).toBe(41);
+    expect(result.current.articles.map((item) => item.id)).toEqual([11]);
+  });
+
+  it("clears the assigned filter when browser navigation changes the review phase", async () => {
+    const { result } = renderHook(() => {
+      const [, setParams] = useSearchParams();
+      return { ...useProjectArticles({ id: 7 }), setParams };
+    }, { wrapper: wrapperAt("/projetos/7?tab=artigos&flow=screening") });
+    await waitFor(() => expect(result.current.isLoadingArticles).toBe(false));
+    act(() => result.current.setAssignedToMe(true));
+    act(() => result.current.setParams({ tab: "artigos", flow: "eligibility" }));
+    await waitFor(() => expect(result.current.activeFlowTab).toBe("eligibility"));
+    expect(result.current.assignedToMe).toBe(false);
   });
 
   it("keeps the identification queue and reports an unavailable server on connection failure", async () => {
