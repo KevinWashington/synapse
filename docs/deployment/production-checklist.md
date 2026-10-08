@@ -33,11 +33,12 @@ QDRANT_COLLECTION=articles
 DEEPSEEK_MODEL=deepseek-chat
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 HF_TOKEN=<token-quando-necessario>
+ASSIGNED_REVIEW_FLOW_ENABLED=false
 ```
 
 Não definir `DEEPSEEK_API_KEY` no backend. A chave pertence ao usuário, é opcional e fica no cofre criptografado da aplicação.
 
-O valor de `ALLOWED_ORIGINS` deve ser uma lista exata de origens permitidas, sem curinga. Guarde uma cópia segura da `CREDENTIAL_ENCRYPTION_KEY`: perdê-la torna as credenciais existentes irrecuperáveis.
+O valor de `ALLOWED_ORIGINS` deve ser uma lista exata de origens permitidas, sem curinga. Guarde uma cópia segura da `CREDENTIAL_ENCRYPTION_KEY`: perdê-la torna as credenciais existentes irrecuperáveis. `ASSIGNED_REVIEW_FLOW_ENABLED` é booleano, assume `false` quando omitido e deve continuar `false` no início do rollout; equipe e convites podem ser verificados antes de ativar o fluxo de revisão distribuída.
 
 ## Build do frontend
 
@@ -55,13 +56,14 @@ O container serve a SPA com Nginx na porta 3000 e possui fallback para rotas do 
 
 ## Ordem segura de implantação
 
-1. Executar e verificar um dump do PostgreSQL antes da implantação.
-2. Validar a restauração do dump em uma base isolada.
-3. Implantar a infraestrutura e os segredos sem liberar tráfego.
+1. Criar o dump pré-migração do PostgreSQL e conferir manifesto e checksum.
+2. Restaurar e verificar o dump em uma base isolada nova `synapse_restore_check_*`; exigir `integrityPassed=true` no relatório.
+3. Implantar schema e código com `ASSIGNED_REVIEW_FLOW_ENABLED=false`, sem liberar tráfego.
 4. Executar `alembic upgrade head` exatamente uma vez.
-5. Subir backend e frontend e conferir `/health` e `/ready`.
-6. Executar os testes de fumaça abaixo.
-7. Liberar tráfego e acompanhar erros, latência e consumo dos serviços.
+5. Subir backend e frontend, conferir `/health` e `/ready` e testar equipe e convite interno com a flag ainda desligada.
+6. Ativar `ASSIGNED_REVIEW_FLOW_ENABLED=true` e reiniciar apenas os processos que leem a configuração no startup.
+7. Testar distribuição e decisões colaborativas conforme a seção abaixo.
+8. Liberar tráfego gradualmente e monitorar erros, latência, conflitos, filas de reatribuição e consumo dos serviços.
 
 ## Testes de fumaça
 
@@ -72,10 +74,17 @@ O container serve a SPA com Nginx na porta 3000 e possui fallback para rotas do 
 - Mensagem orientativa ao tentar usar IA sem chave.
 - Cadastro, mascaramento, substituição e exclusão da chave por usuário.
 - Isolamento: um usuário nunca enxerga chave, projeto ou artigo de outro.
+- Autorização compartilhada: proprietário, coordenador e revisor conseguem consultar todo o projeto; usuário sem vínculo recebe acesso negado; revisor só altera revisões atribuídas a ele.
+- Projeto com 1 revisor: distribuição, decisão e avanço do fluxo legado/individual continuam funcionando.
+- Projeto com 2 ou mais revisores: distribuição automática mantém os dois slots distintos e balanceados.
+- Revisão cega: a primeira decisão submetida não revela a decisão do outro revisor.
+- Concordância e conflito: duas decisões iguais avançam o artigo; decisões diferentes abrem conflito para arbitragem do proprietário/coordenador.
+- Reatribuição: remoção ou indisponibilidade de revisor sinaliza e permite redistribuir atribuições sem perder o histórico.
+- Central de notificações: convite, lote atribuído/redistribuído e conflito aparecem dentro do projeto e podem ser marcados como lidos.
 - Layout desktop e mobile sem rolagem horizontal inesperada.
 - Ausência de erros no console e de respostas 5xx.
 
-O teste real do login Google e uma chamada real ao DeepSeek permanecem externos ao ambiente local até existirem Client ID, DNS/TLS e uma chave de teste.
+DNS, TLS e o login Google real permanecem pré-requisitos externos até serem configurados. O teste real do login Google e uma chamada real ao DeepSeek também permanecem externos ao ambiente local até existirem Client ID, DNS/TLS e uma chave de teste.
 
 ## Operação e rollback
 
@@ -83,4 +92,7 @@ O teste real do login Google e uma chamada real ao DeepSeek permanecem externos 
 - Monitorar PostgreSQL, Neo4j e Qdrant, além de uso e custo do provedor de IA.
 - Aplicar limites de requisição no proxy e restringir os painéis administrativos dos bancos.
 - Manter a imagem anterior identificada por tag e o dump verificado disponível.
-- Em rollback, retirar tráfego, restaurar a versão anterior e restaurar o banco apenas quando a migração não for retrocompatível.
+- Em qualquer rollback, primeiro definir `ASSIGNED_REVIEW_FLOW_ENABLED=false`. Isso preserva o fluxo solo legado e mantém intactos o histórico, as atribuições e as decisões colaborativas já gravadas.
+- Em seguida, retirar tráfego conforme necessário e restaurar a imagem anterior da aplicação.
+- Não executar downgrade nem remover o schema de colaboração enquanto houver linhas novas nas tabelas colaborativas.
+- Restaurar o dump somente para um rollback em nível de banco, dentro de janela de manutenção, aceitando explicitamente a perda de dados posteriores ao dump.

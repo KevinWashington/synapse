@@ -26,7 +26,9 @@ powershell -File scripts\verify-backup.ps1 `
   -TemporaryDatabase synapse_restore_check_20261005
 ```
 
-A verificação confere o checksum, restaura o dump, contabiliza usuários/projetos/artigos e rejeita referências órfãs. O banco restaurado é mantido para inspeção. Para removê-lo apenas após revisar o relatório, repita com um nome temporário novo e `-Cleanup`, ou remova explicitamente o banco já inspecionado.
+A verificação confere o checksum, restaura o dump e contabiliza usuários, projetos, artigos e todas as tabelas de colaboração: membros, convites, atribuições, decisões, conflitos, notificações e auditoria. Também rejeita qualquer referência órfã dessas tabelas para projeto, artigo, usuário, atribuição ou decisão, inclusive IDs inexistentes ou incompatíveis no campo `review_conflicts.decisionIds`.
+
+O relatório JSON registra `rowCounts`, `orphanCounts` e `integrityPassed`. Ele é escrito mesmo quando uma contagem órfã é diferente de zero; nesse caso o comando termina com erro, mas o diagnóstico continua disponível em formato legível por máquina. O banco restaurado é mantido para inspeção. Para removê-lo apenas após revisar o relatório, repita com um nome temporário novo e `-Cleanup`, ou remova explicitamente o banco já inspecionado.
 
 Nunca use `synapse` como destino de restauração. O script recusa o nome de produção e também recusa sobrescrever um banco temporário existente.
 
@@ -38,5 +40,18 @@ Uma migração pode começar somente depois de:
 
 1. o dump possuir tamanho maior que zero e checksum válido;
 2. a restauração terminar sem erro;
-3. todas as contagens esperadas serem registradas;
-4. as três verificações de referências órfãs retornarem zero.
+3. todas as contagens esperadas, inclusive as sete tabelas colaborativas, serem registradas;
+4. `integrityPassed` ser `true` e todas as contagens de referências órfãs serem zero.
+
+## Uso no rollout colaborativo
+
+O dump deve ser criado **antes** da migração de colaboração. A ordem operacional é:
+
+1. criar o dump pré-migração e guardar seu manifesto;
+2. verificar o dump por restauração isolada em um novo `synapse_restore_check_*`;
+3. revisar o relatório JSON e confirmar `integrityPassed=true`;
+4. somente então implantar schema e código com `ASSIGNED_REVIEW_FLOW_ENABLED=false`.
+
+Nunca execute a verificação contra o banco de produção, nunca reutilize um banco temporário existente e nunca use um arquivo que não seja um caminho absoluto terminado em `.dump`. O script mantém essas proteções obrigatórias.
+
+Em rollback, preservar o dump e o relatório. A restauração do dump é uma medida de rollback em nível de banco e deve ocorrer somente em janela de manutenção, após retirada do tráfego e decisão explícita de descartar os dados posteriores ao backup. Não faça downgrade nem remova as tabelas colaborativas enquanto existirem linhas novas nelas.

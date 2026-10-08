@@ -5,6 +5,48 @@ import pytest
 from app.config import Settings
 
 
+def test_assigned_review_flow_defaults_to_disabled():
+    settings = Settings(_env_file=None)
+
+    assert settings.ASSIGNED_REVIEW_FLOW_ENABLED is False
+
+
+@pytest.mark.parametrize(
+    ("configured_value", "expected"),
+    [
+        ("true", True),
+        ("false", False),
+        ("1", True),
+        ("0", False),
+    ],
+)
+def test_assigned_review_flow_parses_boolean_environment_values(configured_value, expected):
+    settings = Settings(
+        _env_file=None,
+        ASSIGNED_REVIEW_FLOW_ENABLED=configured_value,
+    )
+
+    assert settings.ASSIGNED_REVIEW_FLOW_ENABLED is expected
+
+
+def test_production_can_start_with_assigned_review_flow_disabled():
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        PUBLIC_APP_URL="https://synapse.labit.dev.br",
+        GOOGLE_CLIENT_ID="client.apps.googleusercontent.com",
+        SESSION_SECRET="a-production-session-secret-longer-than-32-characters",
+        CREDENTIAL_ENCRYPTION_KEY="aFd1aGY8pniwHZQ1R8iY6bXdQSV7LP33aOs-zl45j2M=",
+        SESSION_COOKIE_SECURE=True,
+        ALLOWED_ORIGINS="https://synapse.labit.dev.br",
+        ASSIGNED_REVIEW_FLOW_ENABLED="false",
+    )
+
+    settings.validate_runtime()
+
+    assert settings.ASSIGNED_REVIEW_FLOW_ENABLED is False
+
+
 def test_deepseek_key_is_not_required_at_startup():
     settings = Settings(_env_file=None, APP_ENV="development")
 

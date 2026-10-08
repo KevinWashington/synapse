@@ -58,4 +58,65 @@ $productionRestore = Invoke-ScriptProcess -Arguments @(
 )
 Assert-Rejected -Result $productionRestore -MessagePattern "production database"
 
+$verifySource = Get-Content -Raw -LiteralPath $verifyScript
+
+if ($verifySource -notmatch 'CREATE OR REPLACE FUNCTION pg_temp\.safe_count') {
+    throw "Pre-migration restore verification must tolerate collaboration tables that do not exist yet."
+}
+if ($verifySource -notmatch "to_regclass\('public\.' \|\| table_name\)") {
+    throw "Optional collaboration table checks must resolve tables without referencing missing relations."
+}
+
+$collaborationTables = @(
+    "project_members",
+    "project_invitations",
+    "review_assignments",
+    "review_decisions",
+    "review_conflicts",
+    "project_notifications",
+    "project_audit_events"
+)
+foreach ($table in $collaborationTables) {
+    if ($verifySource -notmatch "'$table'.+SELECT count\(\*\) FROM $table") {
+        throw "Restore report must include a row count for $table."
+    }
+}
+
+$collaborationOrphanChecks = @(
+    "projectMembersWithoutProject",
+    "projectMembersWithoutUser",
+    "projectMembersWithoutInviter",
+    "projectInvitationsWithoutProject",
+    "projectInvitationsWithoutInviter",
+    "reviewAssignmentsWithoutProject",
+    "reviewAssignmentsWithoutArticle",
+    "reviewAssignmentsWithoutReviewer",
+    "reviewAssignmentsWithoutAssigner",
+    "reviewAssignmentsWithoutInheritedAssignment",
+    "reviewDecisionsWithoutAssignment",
+    "reviewDecisionsWithoutProject",
+    "reviewDecisionsWithoutArticle",
+    "reviewDecisionsWithoutReviewer",
+    "reviewConflictsWithoutProject",
+    "reviewConflictsWithoutArticle",
+    "reviewConflictsWithoutResolver",
+    "reviewConflictsWithInvalidDecisionIds",
+    "projectNotificationsWithoutProject",
+    "projectNotificationsWithoutRecipient",
+    "projectAuditEventsWithoutProject",
+    "projectAuditEventsWithoutActor"
+)
+foreach ($check in $collaborationOrphanChecks) {
+    if ($verifySource -notmatch "'$check'") {
+        throw "Restore verification must include orphan check $check."
+    }
+}
+
+if ($verifySource -notmatch 'orphanCounts = \$orphans') {
+    throw "Restore report must keep orphan counts machine-readable."
+}
+if ($verifySource -notmatch '\$nonZeroOrphans') {
+    throw "Restore verification must fail generically for every non-zero orphan count."
+}
+
 Write-Host "Backup safety tests passed."
