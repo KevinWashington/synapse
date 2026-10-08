@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import HTTPException, status
@@ -15,6 +16,11 @@ from app.services.project_access_service import CAP_MANAGE_DISTRIBUTION, Project
 
 
 ReviewPhase = Literal["screening", "eligibility"]
+
+_DISTRIBUTION_LOCK_KEYS: dict[ReviewPhase, int] = {
+    "screening": -1_001,
+    "eligibility": -1_002,
+}
 
 
 @dataclass(frozen=True)
@@ -123,6 +129,16 @@ async def distribute_reviews(
     phase: ReviewPhase,
     assigned_by_user_id: int,
 ) -> DistributionPreview:
+    require_capability(access, CAP_MANAGE_DISTRIBUTION)
+    _ensure_enabled()
+    await db.execute(
+        select(
+            func.pg_advisory_xact_lock(
+                access.project.id,
+                _DISTRIBUTION_LOCK_KEYS[phase],
+            )
+        )
+    )
     preview = await preview_distribution(db, access=access, phase=phase)
     counts = Counter()
     for item in preview.assignments:
@@ -196,6 +212,7 @@ async def reassign_review(
     if duplicate_result.scalar_one_or_none() is not None:
         raise HTTPException(status_code=409, detail={"code": "REVIEWER_ALREADY_ASSIGNED", "message": "Revisor já atribuído."})
     previous.status = "cancelled"
+    previous.cancelledAt = datetime.now(timezone.utc)
     replacement = ReviewAssignment(
         projectId=previous.projectId,
         articleId=previous.articleId,

@@ -68,6 +68,7 @@ async def test_reassignment_notifies_reviewer_and_records_audit(monkeypatch):
         reviewerUserId=22,
         slot=2,
         status="needs_reassignment",
+        cancelledAt=None,
         inheritedFromAssignmentId=None,
     )
     member = SimpleNamespace(userId=44, role="reviewer", participatesInReview=True)
@@ -105,6 +106,8 @@ async def test_reassignment_notifies_reviewer_and_records_audit(monkeypatch):
     )
 
     assert previous.status == "cancelled"
+    assert previous.cancelledAt is not None
+    assert previous.cancelledAt.tzinfo is not None
     assert replacement.reviewerUserId == 44
     notification.assert_called_once_with(
         db,
