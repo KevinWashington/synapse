@@ -176,7 +176,9 @@ describe("ArticleDetails extraction workspace", () => {
 
     expect(screen.getByRole("navigation", { name: "Navegação estrutural" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Abrir menu da conta" })).toBeInTheDocument();
-    expect(screen.getByText("PRISMA").closest("div.grid")).toHaveClass(
+    expect(screen.getByRole("link", { name: "Synapse" })).toHaveAttribute("href", "/");
+    expect(screen.queryByText("PRISMA")).not.toBeInTheDocument();
+    expect(screen.getByText("Synapse").closest("div.grid")).toHaveClass(
       "xl:grid-cols-[240px_minmax(0,1fr)]"
     );
   });

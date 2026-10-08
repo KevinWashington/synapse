@@ -18,7 +18,7 @@ from app.models.article import Article
 from app.models.collaboration import ProjectMember, ReviewAssignment, ReviewConflict, ReviewDecision
 from app.models.project import Project
 from app.models.user import User
-from app.routers import articles
+from app.routers import articles, projects
 from app.schemas.article import (
     ArticleCreate, ArticleEvidenceUpdate, ArticleNotesUpdate, ArticleUpdate, BatchEvaluateRequest,
     DedupApplyRequest, ImportBibTeXRequest, PromoteToScreeningRequest,
@@ -111,6 +111,20 @@ async def assign(scene, user, *, article=None, phase="screening", slot=1, status
                                    checklistAnswers={"private": True}, answeringRQs=[1]))
         await scene.db.flush()
     return assignment
+
+
+@pytest.mark.asyncio
+async def test_project_listing_supports_json_fields_after_collaboration_join(scene):
+    scene.project.picoc = {"population": "Adults"}
+    await scene.db.flush()
+
+    response = await projects.get_all_projects(
+        current_user=scene.owner,
+        db=scene.db,
+    )
+
+    assert response.total == 1
+    assert [project.id for project in response.projects] == [scene.project.id]
 
 
 @pytest.mark.asyncio

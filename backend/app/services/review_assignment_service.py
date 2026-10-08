@@ -208,6 +208,31 @@ async def reassign_review(
     )
     db.add(replacement)
     await db.flush()
+    create_notification(
+        db,
+        project_id=previous.projectId,
+        recipient_user_id=reviewer_user_id,
+        type="review_reassigned",
+        title="Revisão reatribuída",
+        body=f"Um artigo foi reatribuído a você na etapa de {previous.phase}.",
+        entity_type="article",
+        entity_id=previous.articleId,
+        payload={"phase": previous.phase, "assignmentId": replacement.id},
+    )
+    create_audit_event(
+        db,
+        project_id=previous.projectId,
+        actor_user_id=assigned_by_user_id,
+        action="review_reassigned",
+        entity_type="assignment",
+        entity_id=replacement.id,
+        payload={
+            "articleId": previous.articleId,
+            "phase": previous.phase,
+            "previousReviewerUserId": previous.reviewerUserId,
+            "reviewerUserId": reviewer_user_id,
+        },
+    )
     return replacement
 
 

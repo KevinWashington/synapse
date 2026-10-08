@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   AlertTriangleIcon,
   ArrowLeftIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
   FileIcon,
-  FileTextIcon,
   LoaderIcon,
   SaveIcon,
   SearchIcon,
@@ -143,12 +143,12 @@ function PrismaExtractionWorkspace({
   return (
     <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="hidden min-h-0 flex-col border-r border-[#edf0f7] bg-[#fbfcff] px-5 pb-4 xl:flex">
-        <div className="flex h-[72px] shrink-0 items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.2)]">
-            <FileTextIcon className="h-5 w-5" />
-          </span>
-          <span className="text-xl font-semibold tracking-normal text-[#111936]">PRISMA</span>
-        </div>
+        <Link
+          to="/"
+          className="flex h-[72px] shrink-0 items-center text-xl font-semibold tracking-normal text-[#111936]"
+        >
+          Synapse
+        </Link>
 
         <Button
           variant="ghost"
@@ -487,12 +487,12 @@ function PrismaArticleReviewWorkspace({
   return (
     <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="hidden min-h-0 flex-col border-r border-[#edf0f7] bg-[#fbfcff] px-5 pb-4 xl:flex">
-        <div className="flex h-[72px] shrink-0 items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6259ff] text-white shadow-[0_10px_24px_rgba(98,89,255,0.2)]">
-            <FileTextIcon className="h-5 w-5" />
-          </span>
-          <span className="text-xl font-semibold tracking-normal text-[#111936]">PRISMA</span>
-        </div>
+        <Link
+          to="/"
+          className="flex h-[72px] shrink-0 items-center text-xl font-semibold tracking-normal text-[#111936]"
+        >
+          Synapse
+        </Link>
 
         <Button
           variant="ghost"

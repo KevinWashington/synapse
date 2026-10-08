@@ -94,6 +94,13 @@ class DeepSeekKeyRequiredError(HTTPException):
         )
 
 
+def get_optional_credential_vault() -> CredentialVault | None:
+    try:
+        return get_credential_vault()
+    except CredentialVaultError:
+        return None
+
+
 async def get_user_ai_service(
     current_user: User = Depends(get_current_user),
     vault: CredentialVault = Depends(get_credential_vault),
@@ -113,8 +120,10 @@ async def get_user_ai_service(
 
 async def get_optional_user_ai_service(
     current_user: User = Depends(get_current_user),
-    vault: CredentialVault = Depends(get_credential_vault),
+    vault: CredentialVault | None = Depends(get_optional_credential_vault),
 ) -> AIService | None:
+    if vault is None:
+        return None
     try:
         return await get_user_ai_service(current_user, vault)
     except DeepSeekKeyRequiredError:

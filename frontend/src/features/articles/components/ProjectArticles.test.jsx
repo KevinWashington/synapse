@@ -143,6 +143,18 @@ describe("ProjectArticles work queue", () => {
     expect(footer).toHaveClass("mt-auto");
   });
 
+  it("keeps article metadata readable by moving status controls below the row on narrow screens", () => {
+    renderList({ activeStage: "screening" });
+
+    const row = screen.getByTestId("stage-article-row");
+    const articleButton = row.querySelector("button");
+    const statusControls = screen.getByText("Pendente").parentElement;
+
+    expect(row).toHaveClass("flex-wrap", "sm:flex-nowrap");
+    expect(articleButton).toHaveClass("min-w-[min(100%,16rem)]");
+    expect(statusControls).toHaveClass("w-full", "sm:w-auto");
+  });
+
   it("labels the screening abstract as Resumo only once", () => {
     render(
       <ArticleDetailPanel

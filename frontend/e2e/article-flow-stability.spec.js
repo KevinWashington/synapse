@@ -83,6 +83,9 @@ test.describe("stable article workflow", () => {
         eligibilityChecklist: ["O texto completo responde a pergunta da revisao?"],
         dataExtractionSchema: [{ key: "resultado", label: "Resultado principal", type: "text", options: [] }],
       });
+      const soloAssignments = await page.request.get(`${apiBaseUrl}/api/projetos/${project.id}/assignments`);
+      expect(soloAssignments.ok(), await soloAssignments.text()).toBeTruthy();
+      expect(await soloAssignments.json()).toEqual([]);
 
       const uniqueEntries = Array.from({ length: 23 }, (_, index) => ({
         title: index === 0 ? primaryTitle : index === 1 ? secondaryTitle : `Fluxo estavel ${String(index + 1).padStart(2, "0")}`,

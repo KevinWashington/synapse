@@ -50,3 +50,19 @@ def test_request_routes_do_not_use_global_ai_factory():
     for relative in ("app/routers/ai.py", "app/routers/articles.py"):
         source = (backend / relative).read_text(encoding="utf-8")
         assert "get_ai_service(" not in source
+
+
+def test_optional_vault_tolerates_missing_development_master_key(monkeypatch):
+    from app.config import settings
+    from app.core.dependencies import get_optional_credential_vault
+
+    monkeypatch.setattr(settings, "CREDENTIAL_ENCRYPTION_KEY", "")
+
+    assert get_optional_credential_vault() is None
+
+
+@pytest.mark.asyncio
+async def test_optional_ai_service_stays_disabled_when_vault_is_unavailable():
+    from app.core.dependencies import get_optional_user_ai_service
+
+    assert await get_optional_user_ai_service(user(1), None) is None

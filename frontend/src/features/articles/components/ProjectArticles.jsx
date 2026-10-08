@@ -513,7 +513,7 @@ export function StageListPanel({
                 data-testid="stage-article-row"
                 data-article-title={article.title}
                 className={cn(
-                  "flex w-full items-start gap-4 border-b border-[#edf0f7] px-5 py-4 text-left last:border-b-0 hover:bg-[#fbfcff]",
+                  "flex w-full flex-wrap items-start gap-3 border-b border-[#edf0f7] px-5 py-4 text-left last:border-b-0 hover:bg-[#fbfcff] sm:flex-nowrap sm:gap-4",
                   selected && "bg-[#fbfaff] ring-1 ring-inset ring-[#c9c3ff]"
                 )}
               >
@@ -530,7 +530,7 @@ export function StageListPanel({
                   type="button"
                   aria-current={selected ? "true" : undefined}
                   onClick={() => onArticleSelect(article)}
-                  className="flex min-w-0 flex-1 items-start gap-4 text-left"
+                  className="flex min-w-[min(100%,16rem)] flex-1 items-start gap-3 text-left sm:gap-4"
                 >
                   <span className={cn("mt-3 h-2 w-2 shrink-0 rounded-full", badge.dot)} />
                   <SourceBadge article={article} />
@@ -542,7 +542,7 @@ export function StageListPanel({
                     </span>
                   </span>
                 </button>
-                <div className="flex shrink-0 flex-col items-end gap-2">
+                <div className="ml-auto flex w-full shrink-0 items-center justify-end gap-2 sm:ml-0 sm:w-auto sm:flex-col sm:items-end">
                   <span title={badge.tooltip || badge.label} className={cn("max-w-44 rounded-full px-3 py-1 text-right text-xs font-semibold", badge.className)}>{badge.label}</span>
                   <span className="text-xs text-[#56627f]">{formatDate(article.updatedAt || article.createdAt)}</span>
                   <DropdownMenu>

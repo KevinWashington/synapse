@@ -1,10 +1,15 @@
 from collections import Counter
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from app.services.review_assignment_service import build_balanced_plan, mark_reviewer_unavailable
+from app.services.project_access_service import CAP_MANAGE_DISTRIBUTION, ProjectAccess
+from app.services.review_assignment_service import (
+    build_balanced_plan,
+    mark_reviewer_unavailable,
+    reassign_review,
+)
 
 
 def test_distribution_requires_at_least_one_eligible_reviewer():
@@ -51,3 +56,73 @@ async def test_removed_reviewer_assignments_are_marked_for_reassignment():
     assert changed == 1
     assert assignments[0].status == "needs_reassignment"
     assert assignments[1].status == "submitted"
+
+
+@pytest.mark.asyncio
+async def test_reassignment_notifies_reviewer_and_records_audit(monkeypatch):
+    previous = SimpleNamespace(
+        id=31,
+        projectId=7,
+        articleId=12,
+        phase="screening",
+        reviewerUserId=22,
+        slot=2,
+        status="needs_reassignment",
+        inheritedFromAssignmentId=None,
+    )
+    member = SimpleNamespace(userId=44, role="reviewer", participatesInReview=True)
+    previous_result = SimpleNamespace(scalar_one_or_none=lambda: previous)
+    members_result = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: [member]))
+    duplicate_result = SimpleNamespace(scalar_one_or_none=lambda: None)
+    added = []
+
+    async def assign_generated_id():
+        added[0].id = 32
+
+    db = SimpleNamespace(
+        execute=AsyncMock(side_effect=[previous_result, members_result, duplicate_result]),
+        add=Mock(side_effect=added.append),
+        flush=AsyncMock(side_effect=assign_generated_id),
+    )
+    access = ProjectAccess(
+        project=SimpleNamespace(id=7, ownerId=1),
+        role="owner",
+        capabilities=frozenset({CAP_MANAGE_DISTRIBUTION}),
+        participates_in_review=True,
+    )
+    notification = Mock()
+    audit = Mock()
+    monkeypatch.setattr("app.services.review_assignment_service.settings.ASSIGNED_REVIEW_FLOW_ENABLED", True)
+    monkeypatch.setattr("app.services.review_assignment_service.create_notification", notification)
+    monkeypatch.setattr("app.services.review_assignment_service.create_audit_event", audit)
+
+    replacement = await reassign_review(
+        db,
+        access=access,
+        assignment_id=31,
+        reviewer_user_id=44,
+        assigned_by_user_id=1,
+    )
+
+    assert previous.status == "cancelled"
+    assert replacement.reviewerUserId == 44
+    notification.assert_called_once_with(
+        db,
+        project_id=7,
+        recipient_user_id=44,
+        type="review_reassigned",
+        title="Revisão reatribuída",
+        body="Um artigo foi reatribuído a você na etapa de screening.",
+        entity_type="article",
+        entity_id=12,
+        payload={"phase": "screening", "assignmentId": 32},
+    )
+    audit.assert_called_once_with(
+        db,
+        project_id=7,
+        actor_user_id=1,
+        action="review_reassigned",
+        entity_type="assignment",
+        entity_id=32,
+        payload={"articleId": 12, "phase": "screening", "previousReviewerUserId": 22, "reviewerUserId": 44},
+    )

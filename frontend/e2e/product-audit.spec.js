@@ -114,11 +114,15 @@ test.describe("authenticated product flow", () => {
     await auditProject.click();
     await settle(page);
     await expect(page.getByRole("button", { name: "Planejamento", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Equipe", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Notificações do projeto,/ })).toBeVisible();
     await expect(page.getByRole("button", { name: "Abrir menu da conta" })).toBeVisible();
     await expect(page.getByText(/Progresso da revis/)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Identificação", { exact: true })).toBeVisible();
     await expect(page.getByText("Ações rápidas", { exact: true })).toBeVisible();
     await page.screenshot({ path: path.join(evidenceDir, `${testInfo.project.name}-04-project-overview.png`), fullPage: true });
+    await page.getByRole("button", { name: "Equipe", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Equipe do projeto" })).toBeVisible();
     await page.getByRole("button", { name: "Artigos", exact: true }).click();
     await expect(page.getByRole("button", { name: "Exportar dados" })).toBeVisible();
     await expect(page.getByText("Carregando artigos...")).not.toBeVisible({ timeout: 20_000 });

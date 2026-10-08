@@ -48,7 +48,7 @@ function ArticleLibraryDetailPanel({
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-[var(--syn-text-secondary)]">Journal</dt>
+                  <dt className="text-[var(--syn-text-secondary)]">Periódico</dt>
                   <dd className="font-medium text-[var(--syn-text-primary)]">
                     {article.journal}
                   </dd>
@@ -68,7 +68,7 @@ function ArticleLibraryDetailPanel({
           {article.abstract && (
             <div className="space-y-2">
               <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--syn-text-secondary)]">
-                Abstract
+                Resumo
               </h3>
               <p className="text-sm leading-relaxed text-[var(--syn-text-primary)]">
                 {article.abstract}

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 
 from app.database import get_db
 from app.models.user import User
@@ -26,6 +26,7 @@ from app.services.project_access_service import (
     CAP_DELETE_PROJECT,
     CAP_EDIT_PROJECT,
     ProjectAccess,
+    accessible_project_ids_query,
     capabilities_for_role,
     require_capability,
     resolve_project_access,
@@ -301,16 +302,8 @@ async def get_all_projects(
     db: AsyncSession = Depends(get_db)
 ):
     """Listar projetos do usuário logado com busca, filtro e paginação."""
-    query = (
-        select(Project)
-        .outerjoin(
-            ProjectMember,
-            (ProjectMember.projectId == Project.id)
-            & (ProjectMember.userId == current_user.id)
-            & (ProjectMember.status == "active"),
-        )
-        .where(or_(Project.ownerId == current_user.id, ProjectMember.id.is_not(None)))
-        .distinct()
+    query = select(Project).where(
+        Project.id.in_(accessible_project_ids_query(current_user.id))
     )
 
     if search:

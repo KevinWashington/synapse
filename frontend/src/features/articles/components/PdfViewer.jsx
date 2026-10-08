@@ -45,7 +45,7 @@ function PdfViewer({ projectId, articleId, article, pdfData }) {
             <div className="flex items-center gap-2">
               <FileTextIcon className="h-4 w-4 text-[var(--syn-text-secondary)]" />
               <span className="text-sm font-semibold text-[var(--syn-text-primary)]">
-                {hasAbstract ? "Abstract / Resumo" : "Conteudo do Artigo"}
+                {hasAbstract ? "Resumo" : "Conteúdo do artigo"}
               </span>
             </div>
           </div>
@@ -57,9 +57,9 @@ function PdfViewer({ projectId, articleId, article, pdfData }) {
             ) : (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <FileIcon className="mb-4 h-16 w-16 text-[var(--syn-text-secondary)]" />
-                <h3 className="mb-2 text-lg font-medium text-[var(--syn-text-primary)]">Nenhum conteudo disponivel</h3>
+                <h3 className="mb-2 text-lg font-medium text-[var(--syn-text-primary)]">Nenhum conteúdo disponível</h3>
                 <p className="max-w-md text-sm text-[var(--syn-text-secondary)]">
-                  Este artigo nao possui PDF nem abstract cadastrado.
+                  Este artigo não possui PDF nem resumo cadastrado.
                 </p>
               </div>
             )}
@@ -67,7 +67,7 @@ function PdfViewer({ projectId, articleId, article, pdfData }) {
           {hasAbstract ? (
             <div className="border-t border-[var(--syn-border)] px-4 py-2">
               <p className="text-[10px] text-[var(--syn-text-secondary)]">
-                PDF nao disponivel para este artigo. Exibindo o abstract/resumo.
+                PDF não disponível para este artigo. Exibindo o resumo.
               </p>
             </div>
           ) : null}
@@ -88,22 +88,22 @@ function PdfViewer({ projectId, articleId, article, pdfData }) {
           <div className="flex h-full flex-col items-center justify-center p-6 text-center">
             <FileIcon className="mb-4 h-16 w-16 text-[var(--syn-text-secondary)]" />
             <h3 className="mb-2 text-lg font-medium text-[var(--syn-text-primary)]">
-              Nao foi possivel carregar o visualizador de PDF
+              Não foi possível carregar o visualizador de PDF
             </h3>
             <p className="mb-4 text-sm text-[var(--syn-text-secondary)]">
-              O PDF esta disponivel para download ou visualizacao em nova aba.
+              O PDF está disponível para baixar ou visualizar em uma nova aba.
             </p>
             <div className="mt-2 flex gap-3">
               <Button onClick={handleOpenPdf} className="gap-2">
                 <FileIcon className="h-4 w-4" />
-                Abrir PDF em Nova Aba
+                Abrir PDF em nova aba
               </Button>
               <Button variant="outline" onClick={handleDownloadPdf} className="gap-2">
                 <DownloadIcon className="h-4 w-4" />
-                Download PDF
+                Baixar PDF
               </Button>
               <Button variant="outline" onClick={() => setPdfError(false)}>
-                Tentar Novamente
+                Tentar novamente
               </Button>
             </div>
           </div>
@@ -117,15 +117,15 @@ function PdfViewer({ projectId, articleId, article, pdfData }) {
           >
             <div className="flex h-full flex-col items-center justify-center p-6 text-center">
               <FileIcon className="mb-4 h-16 w-16 text-[var(--syn-text-secondary)]" />
-              <p className="mb-2 text-sm text-[var(--syn-text-primary)]">Nao foi possivel exibir o PDF no navegador.</p>
+              <p className="mb-2 text-sm text-[var(--syn-text-primary)]">Não foi possível exibir o PDF no navegador.</p>
               <div className="mt-2 flex gap-3">
                 <Button variant="outline" onClick={handleOpenPdf} className="gap-2">
                   <FileIcon className="h-4 w-4" />
-                  Abrir PDF em Nova Aba
+                  Abrir PDF em nova aba
                 </Button>
                 <Button variant="outline" onClick={handleDownloadPdf} className="gap-2">
                   <DownloadIcon className="h-4 w-4" />
-                  Download PDF
+                  Baixar PDF
                 </Button>
               </div>
             </div>
