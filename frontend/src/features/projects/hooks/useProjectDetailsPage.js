@@ -8,8 +8,21 @@ const INITIAL_EDIT_DATA = {
   objetivo: "",
   status: "",
 };
-const PROJECT_DETAIL_TABS = new Set(["overview", "planejamento", "artigos", "fluxo", "grafo", "sintese"]);
-const ARTICLE_FLOWS = new Set(["identification", "screening", "eligibility", "included"]);
+const PROJECT_DETAIL_TABS = new Set([
+  "overview",
+  "planejamento",
+  "artigos",
+  "fluxo",
+  "grafo",
+  "sintese",
+  "equipe",
+]);
+const ARTICLE_FLOWS = new Set([
+  "identification",
+  "screening",
+  "eligibility",
+  "included",
+]);
 
 function useProjectDetailsPage() {
   const { id } = useParams();
@@ -19,7 +32,9 @@ function useProjectDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const requestedTab = searchParams.get("tab");
-  const activeTab = PROJECT_DETAIL_TABS.has(requestedTab) ? requestedTab : "overview";
+  const activeTab = PROJECT_DETAIL_TABS.has(requestedTab)
+    ? requestedTab
+    : "overview";
   const [editOpen, setEditOpen] = useState(false);
   const [editData, setEditData] = useState(INITIAL_EDIT_DATA);
   const [editLoading, setEditLoading] = useState(false);
@@ -44,9 +59,12 @@ function useProjectDetailsPage() {
 
   const setActiveTab = useCallback(
     (nextTab) => {
-      const resolvedTab = PROJECT_DETAIL_TABS.has(nextTab) ? nextTab : "overview";
+      const resolvedTab = PROJECT_DETAIL_TABS.has(nextTab)
+        ? nextTab
+        : "overview";
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
+        if (resolvedTab !== "equipe") next.delete("conflict");
 
         if (resolvedTab === "overview") {
           next.delete("tab");
@@ -67,7 +85,7 @@ function useProjectDetailsPage() {
         return next;
       });
     },
-    [setSearchParams]
+    [setSearchParams],
   );
 
   const handleEditProject = useCallback(() => {

@@ -20,6 +20,7 @@ class CollaborationService {
       ? apiService.get(`${base(id)}/assignments/me`, { phase })
       : apiService.get(`${base(id)}/assignments/me`);
   }
+  getAssignments(id) { return apiService.get(`${base(id)}/assignments`); }
   reassignAssignment(id, assignmentId, data) { return apiService.patch(`${base(id)}/assignments/${assignmentId}`, data); }
   getConflicts(id) { return apiService.get(`${base(id)}/conflicts`); }
   resolveConflict(id, conflictId, data) { return apiService.post(`${base(id)}/conflicts/${conflictId}/resolve`, data); }

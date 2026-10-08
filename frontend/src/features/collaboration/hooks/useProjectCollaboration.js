@@ -39,14 +39,16 @@ export function useProjectCollaboration(project) {
   const loadCollection = useCallback(async (session, collection) => {
     if (!session?.active) return;
     if (collection === "conflicts" && !session.capabilities.includes("resolve_conflicts")) return;
-    if (collection === "assignments" && !session.capabilities.includes("review_assigned")) return;
+    if (collection === "assignments" && !session.capabilities.some((capability) => ["review_assigned", "manage_distribution"].includes(capability))) return;
     // Only the most recently started request may update a collection or its error.
     const generation = (session.generations[collection] ?? 0) + 1;
     session.generations[collection] = generation;
     const isCurrent = () => session.active && session.generations[collection] === generation;
     const loaders = {
       team: () => collaborationService.getTeam(session.id),
-      assignments: () => collaborationService.getMyAssignments(session.id),
+      assignments: () => session.capabilities.includes("manage_distribution")
+        ? collaborationService.getAssignments(session.id)
+        : collaborationService.getMyAssignments(session.id),
       conflicts: () => collaborationService.getConflicts(session.id),
       notifications: () => collaborationService.getNotifications(session.id),
       access: () => projectService.getProjectAccess(session.id),
@@ -60,7 +62,7 @@ export function useProjectCollaboration(project) {
         if (collection === "access") return {
           ...current,
           capabilities: response.capabilities,
-          assignments: response.capabilities.includes("review_assigned") ? current.assignments : [],
+          assignments: response.capabilities.some((capability) => ["review_assigned", "manage_distribution"].includes(capability)) ? current.assignments : [],
           conflicts: response.capabilities.includes("resolve_conflicts") ? current.conflicts : [],
         };
         return { ...current, [collection]: response ?? [] };

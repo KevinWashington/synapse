@@ -19,10 +19,20 @@ function ConfirmationDialog({
   isPending = false,
   onConfirm,
   onOpenChange,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
 }) {
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !isPending && onOpenChange(nextOpen)}>
-      <DialogContent showCloseButton={false} className="sm:max-w-md">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => !isPending && onOpenChange(nextOpen)}
+    >
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-md"
+        onOpenAutoFocus={onOpenAutoFocus}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

@@ -1,6 +1,18 @@
-import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { projectService } from "@features/projects/services/projectService";
-import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import useProjectDetailsPage from "./useProjectDetailsPage";
 
@@ -15,16 +27,29 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 it("exposes server role and capabilities through project details", async () => {
-  vi.mocked(projectService.getProjectById).mockResolvedValueOnce({ id: 7, role: "reviewer", capabilities: ["read_project", "review_assigned"] });
-  const { result } = renderHook(() => useProjectDetailsPage(), { wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter> });
+  vi.mocked(projectService.getProjectById).mockResolvedValueOnce({
+    id: 7,
+    role: "reviewer",
+    capabilities: ["read_project", "review_assigned"],
+  });
+  const { result } = renderHook(() => useProjectDetailsPage(), {
+    wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter>,
+  });
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.role).toBe("reviewer");
-  expect(result.current.capabilities).toEqual(["read_project", "review_assigned"]);
+  expect(result.current.capabilities).toEqual([
+    "read_project",
+    "review_assigned",
+  ]);
 });
 
 it("keeps project 404 as the existing page error", async () => {
-  vi.mocked(projectService.getProjectById).mockRejectedValueOnce(Object.assign(new Error("Projeto não encontrado."), { status: 404 }));
-  const { result } = renderHook(() => useProjectDetailsPage(), { wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter> });
+  vi.mocked(projectService.getProjectById).mockRejectedValueOnce(
+    Object.assign(new Error("Projeto não encontrado."), { status: 404 }),
+  );
+  const { result } = renderHook(() => useProjectDetailsPage(), {
+    wrapper: ({ children }) => <MemoryRouter>{children}</MemoryRouter>,
+  });
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.error).toBe("Projeto não encontrado.");
   expect(result.current.project).toBeNull();
@@ -40,12 +65,24 @@ function Harness() {
     <div>
       <output aria-label="aba ativa">{activeTab}</output>
       <output aria-label="consulta atual">{location.search}</output>
-      <button type="button" onClick={() => setActiveTab("overview")}>Visão Geral</button>
-      <button type="button" onClick={() => setActiveTab("planejamento")}>Planejamento</button>
-      <button type="button" onClick={() => setActiveTab("artigos")}>Artigos</button>
-      <button type="button" onClick={() => setActiveTab("fluxo")}>Fluxo</button>
-      <button type="button" onClick={() => navigate(-1)}>Voltar</button>
-      <button type="button" onClick={() => navigate(1)}>Avançar</button>
+      <button type="button" onClick={() => setActiveTab("overview")}>
+        Visão Geral
+      </button>
+      <button type="button" onClick={() => setActiveTab("planejamento")}>
+        Planejamento
+      </button>
+      <button type="button" onClick={() => setActiveTab("artigos")}>
+        Artigos
+      </button>
+      <button type="button" onClick={() => setActiveTab("fluxo")}>
+        Fluxo
+      </button>
+      <button type="button" onClick={() => navigate(-1)}>
+        Voltar
+      </button>
+      <button type="button" onClick={() => navigate(1)}>
+        Avançar
+      </button>
     </div>
   );
 }
@@ -56,11 +93,15 @@ function renderAt(entry) {
       <Routes>
         <Route path="/projetos/:id" element={<Harness />} />
       </Routes>
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
 describe("useProjectDetailsPage navigation", () => {
+  it("accepts a direct team tab URL", () => {
+    renderAt("/projetos/7?tab=equipe&conflict=8");
+    expect(screen.getByLabelText("aba ativa")).toHaveTextContent("equipe");
+  });
   beforeEach(() => vi.clearAllMocks());
 
   it("opens planejamento from overview with one final URL", async () => {
@@ -69,8 +110,12 @@ describe("useProjectDetailsPage navigation", () => {
     screen.getByRole("button", { name: "Planejamento" }).click();
 
     await waitFor(() => {
-      expect(screen.getByLabelText("aba ativa")).toHaveTextContent("planejamento");
-      expect(screen.getByLabelText("consulta atual")).toHaveTextContent("?tab=planejamento");
+      expect(screen.getByLabelText("aba ativa")).toHaveTextContent(
+        "planejamento",
+      );
+      expect(screen.getByLabelText("consulta atual")).toHaveTextContent(
+        "?tab=planejamento",
+      );
     });
   });
 
@@ -82,7 +127,7 @@ describe("useProjectDetailsPage navigation", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("aba ativa")).toHaveTextContent("artigos");
       expect(screen.getByLabelText("consulta atual")).toHaveTextContent(
-        "?tab=artigos&flow=identification"
+        "?tab=artigos&flow=identification",
       );
     });
   });
@@ -94,7 +139,9 @@ describe("useProjectDetailsPage navigation", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("aba ativa")).toHaveTextContent("fluxo");
-      expect(screen.getByLabelText("consulta atual")).toHaveTextContent("?tab=fluxo");
+      expect(screen.getByLabelText("consulta atual")).toHaveTextContent(
+        "?tab=fluxo",
+      );
     });
   });
 
@@ -103,11 +150,17 @@ describe("useProjectDetailsPage navigation", () => {
     screen.getByRole("button", { name: "Planejamento" }).click();
     screen.getByRole("button", { name: "Artigos" }).click();
 
-    await act(async () => screen.getByRole("button", { name: "Voltar" }).click());
+    await act(async () =>
+      screen.getByRole("button", { name: "Voltar" }).click(),
+    );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("aba ativa")).toHaveTextContent("planejamento");
-      expect(screen.getByLabelText("consulta atual")).toHaveTextContent("?tab=planejamento");
+      expect(screen.getByLabelText("aba ativa")).toHaveTextContent(
+        "planejamento",
+      );
+      expect(screen.getByLabelText("consulta atual")).toHaveTextContent(
+        "?tab=planejamento",
+      );
     });
   });
 

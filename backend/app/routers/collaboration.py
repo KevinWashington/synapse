@@ -33,6 +33,7 @@ from app.services.notification_service import (
 )
 from app.services.project_access_service import (
     CAP_MANAGE_MEMBERS,
+    CAP_MANAGE_DISTRIBUTION,
     CAP_TRANSFER_OWNERSHIP,
     require_capability,
     resolve_project_access,
@@ -280,6 +281,19 @@ async def distribute_assignments(projectId: int, data: DistributionRequest, curr
     result = await distribute_reviews(db, access=access, phase=data.phase, assigned_by_user_id=current_user.id)
     await db.commit()
     return _preview_response(result)
+
+
+@router.get("/{projectId}/assignments", response_model=list[AssignmentResponse])
+async def project_assignments(projectId: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_MANAGE_DISTRIBUTION)
+    result = await db.execute(
+        select(ReviewAssignment).where(
+            ReviewAssignment.projectId == projectId,
+            ReviewAssignment.status != "cancelled",
+        ).order_by(ReviewAssignment.assignedAt.desc(), ReviewAssignment.id.desc())
+    )
+    return result.scalars().all()
 
 
 @router.get("/{projectId}/assignments/me", response_model=list[AssignmentResponse])

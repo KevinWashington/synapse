@@ -18,6 +18,7 @@ describe("collaboration endpoint contracts", () => {
     ["previewAssignments", [{ phase: "screening" }], "post", "/assignments/preview"],
     ["distributeAssignments", [{ phase: "eligibility" }], "post", "/assignments/distribute"],
     ["getMyAssignments", [], "get", "/assignments/me"],
+    ["getAssignments", [], "get", "/assignments"],
     ["reassignAssignment", [6, { reviewerUserId: 9 }], "patch", "/assignments/6"],
     ["getConflicts", [], "get", "/conflicts"],
     ["resolveConflict", [7, { decision: "included", reason: "Evidence" }], "post", "/conflicts/7/resolve"],

@@ -11,6 +11,7 @@ def test_collaboration_routes_are_registered():
         ("/api/projetos/{projectId}/assignments/preview", "POST"),
         ("/api/projetos/{projectId}/assignments/distribute", "POST"),
         ("/api/projetos/{projectId}/assignments/me", "GET"),
+        ("/api/projetos/{projectId}/assignments", "GET"),
         ("/api/projetos/{projectId}/conflicts", "GET"),
         ("/api/projetos/{projectId}/conflicts/{conflictId}/resolve", "POST"),
         ("/api/projetos/{projectId}/artigos/{articleId}/reopen-review", "POST"),
@@ -40,3 +41,49 @@ def test_team_member_response_represents_implicit_owner_with_identity():
     assert response.role == "owner"
     assert response.name == "Owner"
     assert response.email == "owner@example.com"
+
+
+async def _assignment_list(role, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from app.routers import collaboration
+    from app.services.project_access_service import capabilities_for_role
+
+    access = SimpleNamespace(capabilities=capabilities_for_role(role, participates_in_review=False))
+    monkeypatch.setattr(collaboration, "resolve_project_access", AsyncMock(return_value=access))
+    rows = [SimpleNamespace(id=9, projectId=7, articleId=12, reviewerUserId=99, status="needs_reassignment")]
+    result = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: rows))
+    db = SimpleNamespace(execute=AsyncMock(return_value=result))
+    return collaboration, db, rows
+
+
+def test_admin_assignment_list_is_scoped_and_includes_unavailable_reviewers(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from sqlalchemy.dialects import postgresql
+
+    async def check():
+        collaboration, db, rows = await _assignment_list("coordinator", monkeypatch)
+        result = await collaboration.project_assignments(7, current_user=SimpleNamespace(id=2), db=db)
+        assert result == rows
+        query = str(db.execute.call_args.args[0].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+        where = query.split("WHERE", 1)[1]
+        assert '"projectId" = 7' in where
+        assert "'cancelled'" in where
+        assert '"reviewerUserId" =' not in where
+    asyncio.run(check())
+
+
+def test_reviewer_cannot_list_administrative_assignments(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    import pytest
+    from fastapi import HTTPException
+
+    async def check():
+        collaboration, db, _ = await _assignment_list("reviewer", monkeypatch)
+        with pytest.raises(HTTPException) as denied:
+            await collaboration.project_assignments(7, current_user=SimpleNamespace(id=2), db=db)
+        assert denied.value.status_code == 403
+        db.execute.assert_not_called()
+    asyncio.run(check())

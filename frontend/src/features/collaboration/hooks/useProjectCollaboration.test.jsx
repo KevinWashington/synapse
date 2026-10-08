@@ -12,6 +12,7 @@ beforeEach(() => {
     if (url.endsWith("/members")) return { members: [{ userId: 1 }], invitations: [{ id: 3 }] };
     if (url.endsWith("/notifications")) return [{ id: 5, readAt: null }, { id: 6, readAt: "2026-10-07" }];
     if (url.endsWith("/assignments/me")) return [{ id: 7 }];
+    if (url.endsWith("/assignments")) return [{ id: 10, status: "needs_reassignment" }];
     if (url.endsWith("/conflicts")) return [{ id: 8 }];
     return { id: 2, role: "coordinator", capabilities: ["resolve_conflicts"] };
   });
@@ -24,6 +25,12 @@ async function mount(value = project) {
   return hook;
 }
 describe("project collaboration state", () => {
+  it("loads administrative slots even when the coordinator does not review", async () => {
+    const { result } = await mount({ id: 2, capabilities: ["manage_distribution"] });
+    expect(result.current.assignments).toEqual([{ id: 10, status: "needs_reassignment" }]);
+    expect(requests).toContain("/api/projetos/2/assignments");
+    expect(requests).not.toContain("/api/projetos/2/assignments/me");
+  });
   it("loads collections and derives unread count and access", async () => {
     const { result } = await mount();
     expect(result.current).toMatchObject({ members: [{ userId: 1 }], invitations: [{ id: 3 }], assignments: [{ id: 7 }], conflicts: [{ id: 8 }], unreadCount: 1, capabilities: project.capabilities, error: null });

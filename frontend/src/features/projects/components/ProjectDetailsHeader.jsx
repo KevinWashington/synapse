@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   BarChart3Icon,
   BookOpenIcon,
@@ -8,6 +9,7 @@ import {
   MoreVerticalIcon,
   PencilIcon,
   TrashIcon,
+  UsersIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -25,6 +27,7 @@ const TABS = [
   { key: "fluxo", label: "Fluxo" },
   { key: "sintese", label: "Síntese" },
   { key: "grafo", label: "Gráficos" },
+  { key: "equipe", label: "Equipe" },
 ];
 
 function ProjectDetailsHeader({
@@ -32,13 +35,24 @@ function ProjectDetailsHeader({
   onEditProject,
   onTabChange,
   project,
+  capabilities = [],
+  notifications,
 }) {
+  const activeTabRef = useRef(null);
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [activeTab]);
   return (
     <header className="mb-5 border-b border-[#edf0f7]">
       <div className="mb-5 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-semibold tracking-normal text-[#0f1734]">{project?.title}</h1>
+            <h1 className="text-3xl font-semibold tracking-normal text-[#0f1734]">
+              {project?.title}
+            </h1>
           </div>
           <p
             data-testid="project-objective"
@@ -48,15 +62,20 @@ function ProjectDetailsHeader({
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onEditProject}
-          className="h-10 gap-2 rounded-lg border-[#dfe4ef] bg-white text-[#182344] shadow-none"
-        >
-          <PencilIcon className="h-4 w-4" />
-          Editar projeto
-        </Button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {notifications}
+          {capabilities.includes("edit_project") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEditProject}
+              className="h-10 gap-2 rounded-lg border-[#dfe4ef] bg-white text-[#182344] shadow-none"
+            >
+              <PencilIcon className="h-4 w-4" />
+              Editar projeto
+            </Button>
+          )}
+        </div>
       </div>
 
       <nav className="flex gap-6 overflow-x-auto">
@@ -66,18 +85,28 @@ function ProjectDetailsHeader({
           return (
             <button
               key={tab.key}
+              ref={isActive ? activeTabRef : undefined}
               aria-current={isActive ? "page" : undefined}
               onClick={() => onTabChange(tab.key)}
               className={cn(
                 "relative flex cursor-pointer items-center gap-2 whitespace-nowrap px-1 pb-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
-                isActive ? "text-[#6259ff]" : "text-[#56627f] hover:text-[#182344]"
+                isActive
+                  ? "text-[#6259ff]"
+                  : "text-[#56627f] hover:text-[#182344]",
               )}
             >
-              {tab.key === "planejamento" && <ClipboardListIcon className="h-3.5 w-3.5" />}
-              {tab.key === "artigos" && <BookOpenIcon className="h-3.5 w-3.5" />}
+              {tab.key === "planejamento" && (
+                <ClipboardListIcon className="h-3.5 w-3.5" />
+              )}
+              {tab.key === "artigos" && (
+                <BookOpenIcon className="h-3.5 w-3.5" />
+              )}
               {tab.key === "fluxo" && <GitBranchIcon className="h-3.5 w-3.5" />}
-              {tab.key === "sintese" && <ClipboardCheckIcon className="h-3.5 w-3.5" />}
+              {tab.key === "sintese" && (
+                <ClipboardCheckIcon className="h-3.5 w-3.5" />
+              )}
               {tab.key === "grafo" && <BarChart3Icon className="h-3.5 w-3.5" />}
+              {tab.key === "equipe" && <UsersIcon className="h-3.5 w-3.5" />}
               {tab.label}
               {isActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t bg-[#6259ff]" />
