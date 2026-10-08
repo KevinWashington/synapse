@@ -23,6 +23,11 @@ class InvitationCreate(BaseModel):
 class InvitationUpdate(BaseModel):
     role: MemberRole | None = None
     participatesInReview: bool | None = None
+    reason: str | None = Field(default=None, min_length=1, max_length=2000)
+
+
+class InvitationSubmissionResponse(BaseModel):
+    message: str = "Solicitação de convite registrada."
 
 
 class InvitationResponse(BaseModel):

@@ -43,6 +43,112 @@ def test_team_member_response_represents_implicit_owner_with_identity():
     assert response.email == "owner@example.com"
 
 
+def test_invitation_submission_response_does_not_reveal_account_existence(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, Mock
+
+    from app.models.collaboration import ProjectInvitation, ProjectMember
+    from app.routers import collaboration
+
+    async def submit(service_result):
+        monkeypatch.setattr(
+            collaboration,
+            "resolve_project_access",
+            AsyncMock(return_value=SimpleNamespace(project=SimpleNamespace(id=7))),
+        )
+        monkeypatch.setattr(
+            collaboration,
+            "invite_project_member",
+            AsyncMock(return_value=service_result),
+        )
+        db = SimpleNamespace(commit=AsyncMock())
+        result = await collaboration.create_invitation(
+            7,
+            collaboration.InvitationCreate(email="person@example.com"),
+            current_user=SimpleNamespace(id=1),
+            db=db,
+        )
+        return result.model_dump()
+
+    existing_account = asyncio.run(submit(ProjectMember()))
+    unknown_account = asyncio.run(submit(ProjectInvitation()))
+
+    assert existing_account == unknown_account == {
+        "message": "Solicitação de convite registrada.",
+    }
+
+
+def test_invitation_update_and_cancel_are_audited_with_optional_reason(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, Mock
+
+    from app.models.collaboration import ProjectAuditEvent, ProjectInvitation
+    from app.routers import collaboration
+
+    invitation = ProjectInvitation(
+        projectId=7,
+        emailNormalized="person@example.com",
+        role="reviewer",
+        participatesInReview=True,
+        status="pending",
+    )
+    invitation.id = 3
+    access = SimpleNamespace(capabilities=frozenset({"manage_members"}))
+    monkeypatch.setattr(
+        collaboration,
+        "resolve_project_access",
+        AsyncMock(return_value=access),
+    )
+
+    async def check():
+        update_db = SimpleNamespace(
+            execute=AsyncMock(
+                return_value=SimpleNamespace(scalar_one_or_none=lambda: invitation)
+            ),
+            add=Mock(),
+            commit=AsyncMock(),
+            refresh=AsyncMock(),
+        )
+        await collaboration.update_invitation(
+            7,
+            3,
+            collaboration.InvitationUpdate(
+                role="coordinator",
+                participatesInReview=False,
+                reason="Ajuste solicitado pela coordenação",
+            ),
+            current_user=SimpleNamespace(id=1),
+            db=update_db,
+        )
+        updated_event = update_db.add.call_args.args[0]
+        assert isinstance(updated_event, ProjectAuditEvent)
+        assert updated_event.action == "invitation_updated"
+        assert updated_event.reason == "Ajuste solicitado pela coordenação"
+
+        cancel_db = SimpleNamespace(
+            execute=AsyncMock(
+                return_value=SimpleNamespace(scalar_one_or_none=lambda: invitation)
+            ),
+            add=Mock(),
+            commit=AsyncMock(),
+        )
+        await collaboration.cancel_invitation(
+            7,
+            3,
+            reason="E-mail informado incorretamente",
+            current_user=SimpleNamespace(id=1),
+            db=cancel_db,
+        )
+        cancelled_event = cancel_db.add.call_args.args[0]
+        assert isinstance(cancelled_event, ProjectAuditEvent)
+        assert cancelled_event.action == "invitation_cancelled"
+        assert cancelled_event.reason == "E-mail informado incorretamente"
+
+    asyncio.run(check())
+
+
 async def _assignment_list(role, monkeypatch):
     from types import SimpleNamespace
     from unittest.mock import AsyncMock

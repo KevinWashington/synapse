@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.collaboration import (
     InvitationCreate,
     InvitationResponse,
+    InvitationSubmissionResponse,
     InvitationUpdate,
     MemberResponse,
     MemberUpdate,
@@ -137,10 +138,10 @@ async def get_team(projectId: int, current_user: User = Depends(get_current_user
     return TeamResponse(members=members, invitations=invitations_result.scalars().all())
 
 
-@router.post("/{projectId}/invitations", response_model=MemberResponse | InvitationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{projectId}/invitations", response_model=InvitationSubmissionResponse, status_code=status.HTTP_201_CREATED)
 async def create_invitation(projectId: int, data: InvitationCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
-    result = await invite_project_member(
+    await invite_project_member(
         db,
         access=access,
         invited_by_user_id=current_user.id,
@@ -149,8 +150,7 @@ async def create_invitation(projectId: int, data: InvitationCreate, current_user
         participates_in_review=data.participatesInReview,
     )
     await db.commit()
-    await db.refresh(result)
-    return result
+    return InvitationSubmissionResponse()
 
 
 @router.patch("/{projectId}/invitations/{invitationId}", response_model=InvitationResponse)
@@ -162,17 +162,31 @@ async def update_invitation(projectId: int, invitationId: int, data: InvitationU
     if invitation is None:
         raise _not_found("invitation")
     values = data.model_dump(exclude_unset=True)
+    reason = values.pop("reason", None)
     for key, value in values.items():
         setattr(invitation, key, value)
     if invitation.role == "reviewer":
         invitation.participatesInReview = True
+    create_audit_event(
+        db,
+        project_id=projectId,
+        actor_user_id=current_user.id,
+        action="invitation_updated",
+        entity_type="invitation",
+        entity_id=invitation.id,
+        reason=reason,
+        payload={
+            "role": invitation.role,
+            "participatesInReview": invitation.participatesInReview,
+        },
+    )
     await db.commit()
     await db.refresh(invitation)
     return invitation
 
 
 @router.delete("/{projectId}/invitations/{invitationId}", status_code=status.HTTP_204_NO_CONTENT)
-async def cancel_invitation(projectId: int, invitationId: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def cancel_invitation(projectId: int, invitationId: int, reason: str | None = None, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     require_capability(access, CAP_MANAGE_MEMBERS)
     result = await db.execute(select(ProjectInvitation).where(ProjectInvitation.id == invitationId, ProjectInvitation.projectId == projectId))
@@ -180,6 +194,16 @@ async def cancel_invitation(projectId: int, invitationId: int, current_user: Use
     if invitation is None:
         raise _not_found("invitation")
     invitation.status = "cancelled"
+    create_audit_event(
+        db,
+        project_id=projectId,
+        actor_user_id=current_user.id,
+        action="invitation_cancelled",
+        entity_type="invitation",
+        entity_id=invitation.id,
+        reason=reason.strip() if reason and reason.strip() else None,
+        payload={"emailNormalized": invitation.emailNormalized},
+    )
     await db.commit()
 
 

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.collaboration import (
@@ -41,6 +42,68 @@ def create_audit_event(
     return event
 
 
+async def _activate_member(
+    db: AsyncSession,
+    *,
+    project_id: int,
+    user_id: int,
+    role: str,
+    participates_in_review: bool,
+    invited_by_user_id: int | None,
+    joined_at: datetime,
+) -> tuple[ProjectMember, bool, bool]:
+    member_result = await db.execute(
+        select(ProjectMember).where(
+            ProjectMember.projectId == project_id,
+            ProjectMember.userId == user_id,
+        )
+    )
+    member = member_result.scalar_one_or_none()
+    created = member is None
+    changed = created
+    if member is None:
+        savepoint = await db.begin_nested()
+        member = ProjectMember(
+            projectId=project_id,
+            userId=user_id,
+            role=role,
+            status="active",
+            participatesInReview=True if role == "reviewer" else participates_in_review,
+            invitedByUserId=invited_by_user_id,
+            joinedAt=joined_at,
+        )
+        db.add(member)
+        try:
+            await db.flush()
+            await savepoint.commit()
+        except IntegrityError:
+            await savepoint.rollback()
+            concurrent_result = await db.execute(
+                select(ProjectMember).where(
+                    ProjectMember.projectId == project_id,
+                    ProjectMember.userId == user_id,
+                )
+            )
+            member = concurrent_result.scalar_one()
+            created = False
+
+    changed = changed or any(
+        (
+            member.role != role,
+            member.status != "active",
+            member.participatesInReview
+            != (True if role == "reviewer" else participates_in_review),
+            member.deactivatedAt is not None,
+        )
+    )
+
+    member.role = role
+    member.status = "active"
+    member.participatesInReview = True if role == "reviewer" else participates_in_review
+    member.deactivatedAt = None
+    return member, created, changed
+
+
 async def invite_project_member(
     db: AsyncSession,
     *,
@@ -59,48 +122,43 @@ async def invite_project_member(
     now = datetime.now(timezone.utc)
 
     if user is not None:
-        member_result = await db.execute(
-            select(ProjectMember).where(
-                ProjectMember.projectId == access.project.id,
-                ProjectMember.userId == user.id,
-            )
-        )
-        member = member_result.scalar_one_or_none()
-        if member is None:
-            member = ProjectMember(
-                projectId=access.project.id,
-                userId=user.id,
-                role=role,
-                status="active",
-                participatesInReview=True if role == "reviewer" else participates_in_review,
-                invitedByUserId=invited_by_user_id,
-                joinedAt=now,
-            )
-            db.add(member)
-        else:
-            member.role = role
-            member.status = "active"
-            member.participatesInReview = True if role == "reviewer" else participates_in_review
-            member.deactivatedAt = None
-        create_notification(
+        member, created, changed = await _activate_member(
             db,
             project_id=access.project.id,
-            recipient_user_id=user.id,
-            type="project_joined",
-            title="Você entrou em um projeto",
-            body=f'Você agora participa de "{access.project.title if hasattr(access.project, "title") else "Projeto"}".',
-            entity_type="project",
-            entity_id=access.project.id,
+            user_id=user.id,
+            role=role,
+            participates_in_review=participates_in_review,
+            invited_by_user_id=invited_by_user_id,
+            joined_at=now,
         )
-        create_audit_event(
-            db,
-            project_id=access.project.id,
-            actor_user_id=invited_by_user_id,
-            action="member_added",
-            entity_type="member",
-            entity_id=user.id,
-            payload={"role": role},
-        )
+        if changed:
+            create_notification(
+                db,
+                project_id=access.project.id,
+                recipient_user_id=user.id,
+                type="project_joined" if created else "member_updated",
+                title=(
+                    "Você entrou em um projeto"
+                    if created
+                    else "Sua participação foi atualizada"
+                ),
+                body=(
+                    f'Você agora participa de "{access.project.title if hasattr(access.project, "title") else "Projeto"}".'
+                    if created
+                    else "Seu papel ou sua participação na revisão foi atualizado."
+                ),
+                entity_type="project",
+                entity_id=access.project.id,
+            )
+            create_audit_event(
+                db,
+                project_id=access.project.id,
+                actor_user_id=invited_by_user_id,
+                action="member_added" if created else "member_updated",
+                entity_type="member",
+                entity_id=user.id,
+                payload={"role": role},
+            )
         await db.flush()
         return member
 
@@ -112,7 +170,9 @@ async def invite_project_member(
         )
     )
     invitation = pending_result.scalar_one_or_none()
+    created = invitation is None
     if invitation is None:
+        savepoint = await db.begin_nested()
         invitation = ProjectInvitation(
             projectId=access.project.id,
             emailNormalized=normalized,
@@ -123,11 +183,40 @@ async def invite_project_member(
             expiresAt=now + timedelta(days=7),
         )
         db.add(invitation)
+        try:
+            await db.flush()
+            await savepoint.commit()
+        except IntegrityError:
+            await savepoint.rollback()
+            concurrent_result = await db.execute(
+                select(ProjectInvitation).where(
+                    ProjectInvitation.projectId == access.project.id,
+                    ProjectInvitation.emailNormalized == normalized,
+                    ProjectInvitation.status == "pending",
+                )
+            )
+            invitation = concurrent_result.scalar_one()
+            created = False
+            invitation.role = role
+            invitation.participatesInReview = True if role == "reviewer" else participates_in_review
+            invitation.expiresAt = now + timedelta(days=7)
     else:
         invitation.role = role
         invitation.participatesInReview = True if role == "reviewer" else participates_in_review
         invitation.expiresAt = now + timedelta(days=7)
     await db.flush()
+    create_audit_event(
+        db,
+        project_id=access.project.id,
+        actor_user_id=invited_by_user_id,
+        action="invitation_created" if created else "invitation_updated",
+        entity_type="invitation",
+        entity_id=invitation.id,
+        payload={
+            "role": role,
+            "participatesInReview": invitation.participatesInReview,
+        },
+    )
     return invitation
 
 
@@ -154,33 +243,19 @@ async def claim_pending_invitations(
             ProjectInvitation.emailNormalized == email,
             ProjectInvitation.status == "pending",
             ProjectInvitation.expiresAt > current,
-        )
+        ).with_for_update()
     )
     memberships = []
     for invitation in pending_result.scalars().all():
-        member_result = await db.execute(
-            select(ProjectMember).where(
-                ProjectMember.projectId == invitation.projectId,
-                ProjectMember.userId == user.id,
-            )
+        member, _, _ = await _activate_member(
+            db,
+            project_id=invitation.projectId,
+            user_id=user.id,
+            role=invitation.role,
+            participates_in_review=invitation.participatesInReview,
+            invited_by_user_id=invitation.invitedByUserId,
+            joined_at=current,
         )
-        member = member_result.scalar_one_or_none()
-        if member is None:
-            member = ProjectMember(
-                projectId=invitation.projectId,
-                userId=user.id,
-                role=invitation.role,
-                status="active",
-                participatesInReview=True if invitation.role == "reviewer" else invitation.participatesInReview,
-                invitedByUserId=invitation.invitedByUserId,
-                joinedAt=current,
-            )
-            db.add(member)
-        else:
-            member.role = invitation.role
-            member.status = "active"
-            member.participatesInReview = True if invitation.role == "reviewer" else invitation.participatesInReview
-            member.deactivatedAt = None
         invitation.status = "accepted"
         invitation.acceptedAt = current
         memberships.append(member)
@@ -205,5 +280,14 @@ async def claim_pending_invitations(
                 entity_type="member",
                 entity_id=user.id,
             )
+        create_audit_event(
+            db,
+            project_id=invitation.projectId,
+            actor_user_id=user.id,
+            action="invitation_accepted",
+            entity_type="invitation",
+            entity_id=invitation.id,
+            payload={"memberUserId": user.id, "role": invitation.role},
+        )
     await db.flush()
     return memberships
