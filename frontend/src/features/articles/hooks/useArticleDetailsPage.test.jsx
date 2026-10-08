@@ -6,6 +6,7 @@ import useArticleDetailsPage from "./useArticleDetailsPage";
 const mocks = vi.hoisted(() => ({
   getArticleById: vi.fn(),
   getArticlesByProject: vi.fn(),
+  getSelectionSummary: vi.fn(),
   getProjectById: vi.fn(),
   submitScreeningDecision: vi.fn(),
   getMyAssignments: vi.fn(),
@@ -15,6 +16,7 @@ vi.mock("@features/articles/services/articleService", () => ({
   articleService: {
     getArticleById: mocks.getArticleById,
     getArticlesByProject: mocks.getArticlesByProject,
+    getSelectionSummary: mocks.getSelectionSummary,
     getPdfData: vi.fn(),
     submitScreeningDecision: mocks.submitScreeningDecision,
   },
@@ -49,6 +51,7 @@ describe("useArticleDetailsPage stage queue", () => {
     vi.clearAllMocks();
     mocks.getArticleById.mockResolvedValue({ id: 11, title: "Artigo", hasPdf: false });
     mocks.getArticlesByProject.mockResolvedValue({ articles: [], total: 0 });
+    mocks.getSelectionSummary.mockResolvedValue({ included: 0, pendingExtraction: 0 });
     mocks.getProjectById.mockResolvedValue({ id: 7, title: "Projeto" });
   });
 
@@ -86,5 +89,19 @@ describe("useArticleDetailsPage stage queue", () => {
     expect(result.current.myAssignments).toEqual([inherited.myReviewAssignment]);
     expect(mocks.getMyAssignments).toHaveBeenCalledWith("7");
     expect(mocks.getArticlesByProject.mock.calls.length).toBeGreaterThan(listCalls);
+  });
+
+  it("preserves the server stage total when the loaded detail list is capped", async () => {
+    mocks.getArticlesByProject.mockResolvedValue({
+      articles: [{ id: 11, title: "Artigo" }],
+      total: 1093,
+    });
+
+    const { result } = renderHook(() => useArticleDetailsPage(), {
+      wrapper: wrapperAt("/projetos/7/artigos/11?flow=screening"),
+    });
+
+    await waitFor(() => expect(result.current.articleList).toHaveLength(1));
+    expect(result.current.articleListTotal).toBe(1093);
   });
 });

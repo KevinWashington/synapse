@@ -42,6 +42,13 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   const [screeningArticle, setScreeningArticle] = useState(null);
   const [eligibilityArticle, setEligibilityArticle] = useState(null);
   const searchTerm = searchTermsByFlow[activeFlowTab] || "";
+  const articleContext = useRef(null);
+  articleContext.current = {
+    activeFlowTab,
+    articlePage,
+    assignedToMe,
+    searchTermsByFlow,
+  };
 
   useEffect(() => {
     const requestedFlow = searchParams.get("flow");
@@ -142,13 +149,15 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     }
   }, [project?.id]);
 
-  const loadArticles = useCallback(async (flowOverride = activeFlowTab, pageOverride = articlePage) => {
+  const loadArticles = useCallback(async (flowOverride, pageOverride) => {
     if (!project?.id) {
       return;
     }
-    const resolvedFlowTab = FLOW_TABS.has(flowOverride) ? flowOverride : activeFlowTab;
+    const context = articleContext.current;
+    const resolvedFlowTab = FLOW_TABS.has(flowOverride) ? flowOverride : context.activeFlowTab;
+    const resolvedPage = pageOverride ?? context.articlePage;
     const request = ++articleRequest.current;
-    const currentSearchTerm = searchTermsByFlow[resolvedFlowTab] || "";
+    const currentSearchTerm = context.searchTermsByFlow[resolvedFlowTab] || "";
 
     if (!PHASE_FILTERS[resolvedFlowTab]) {
       setArticles([]);
@@ -161,9 +170,9 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
       const response = await articleService.getArticlesByProject(project.id, {
         ...PHASE_FILTERS[resolvedFlowTab],
         search: currentSearchTerm || undefined,
-        page: pageOverride,
+        page: resolvedPage,
         limit: ARTICLE_PAGE_SIZE,
-        ...(assignedToMe && ["screening", "eligibility"].includes(resolvedFlowTab) ? { assignedToMe: true } : {}),
+        ...(context.assignedToMe && ["screening", "eligibility"].includes(resolvedFlowTab) ? { assignedToMe: true } : {}),
       });
       if (request !== articleRequest.current) return;
       const nextArticles = response.articles || [];
@@ -171,7 +180,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
       const lastPage = Math.max(1, Math.ceil(nextTotal / ARTICLE_PAGE_SIZE));
 
       setArticleTotal(nextTotal);
-      if (nextTotal > 0 && nextArticles.length === 0 && pageOverride > lastPage) {
+      if (nextTotal > 0 && nextArticles.length === 0 && resolvedPage > lastPage) {
         setArticlePage(lastPage);
         return;
       }
@@ -188,7 +197,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     } finally {
       if (request === articleRequest.current) setIsLoadingArticles(false);
     }
-  }, [activeFlowTab, articlePage, assignedToMe, project?.id, searchTermsByFlow]);
+  }, [project?.id]);
 
   useEffect(() => {
     loadSummary();
@@ -197,13 +206,15 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   }, [loadDuplicateCandidates, loadReport, loadSummary]);
 
   useEffect(() => {
-    loadArticles(activeFlowTab);
+    loadArticles(activeFlowTab, articlePage);
     return () => { articleRequest.current += 1; };
-  }, [activeFlowTab, loadArticles]);
+  }, [activeFlowTab, articlePage, assignedToMe, loadArticles, searchTermsByFlow]);
 
   const refreshAll = useCallback(
     async ({ refreshSynthesisReport = false, targetFlowTab } = {}) => {
-      const flowToLoad = targetFlowTab || activeFlowTab;
+      const context = articleContext.current;
+      const flowToLoad = targetFlowTab || context.activeFlowTab;
+      const pageToLoad = targetFlowTab ? 1 : context.articlePage;
 
       if (targetFlowTab) {
         setActiveFlowTab(targetFlowTab);
@@ -213,7 +224,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
         loadSummary(),
         loadReport(),
         loadDuplicateCandidates(),
-        loadArticles(flowToLoad, targetFlowTab ? 1 : articlePage),
+        loadArticles(flowToLoad, pageToLoad),
       ]);
       if (refreshSynthesisReport && synthesisReportData) {
         const synthesis = await articleService.getProjectSynthesisReport(project.id);
@@ -221,8 +232,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
       }
     },
     [
-      activeFlowTab,
-      articlePage,
       loadArticles,
       loadDuplicateCandidates,
       loadReport,

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getSelectionSummary: vi.fn(),
   promoteAllUniqueToScreening: vi.fn(),
   submitScreeningDecision: vi.fn(),
+  batchEvaluateScreening: vi.fn(),
   toastError: vi.fn(),
 }));
 
@@ -21,6 +22,7 @@ vi.mock("@features/articles/services/articleService", () => ({
     getSelectionSummary: mocks.getSelectionSummary,
     promoteAllUniqueToScreening: mocks.promoteAllUniqueToScreening,
     submitScreeningDecision: mocks.submitScreeningDecision,
+    batchEvaluateScreening: mocks.batchEvaluateScreening,
   },
 }));
 
@@ -140,6 +142,40 @@ describe("useProjectArticles work queues", () => {
     await act(async () => resolveUnfiltered({ articles: [{ id: 99, currentPhase: "screening" }], total: 120 }));
     expect(result.current.articleTotal).toBe(41);
     expect(result.current.articles.map((item) => item.id)).toEqual([11]);
+  });
+
+  it.each([
+    ["batch", "phase"], ["batch", "assigned"], ["decision", "phase"], ["decision", "assigned"],
+  ])("refreshes the current context when a deferred %s completes after a %s change", async (mutation, change) => {
+    let complete;
+    const pending = new Promise((resolve) => { complete = resolve; });
+    mocks.batchEvaluateScreening.mockReturnValue(pending);
+    mocks.submitScreeningDecision.mockReturnValue(pending);
+    mocks.getArticlesByProject.mockImplementation((_id, filters) => Promise.resolve({
+      articles: [{ id: filters.assignedToMe ? 22 : 11, currentPhase: filters.phase }], total: 100,
+    }));
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }), {
+      wrapper: wrapperAt("/projetos/7?tab=artigos&flow=screening"),
+    });
+    await waitFor(() => expect(result.current.articles).toHaveLength(1));
+    act(() => result.current.setScreeningArticle({ id: 11 }));
+    let finishing;
+    act(() => { finishing = mutation === "batch" ? result.current.runBatchEvaluate()
+      : result.current.submitScreeningDecision({ decision: "included" }); });
+    act(() => {
+      if (change === "phase") result.current.setActiveFlowTab("eligibility");
+      else result.current.setAssignedToMe(true);
+    });
+    act(() => result.current.setSearchTerm("current search"));
+    act(() => result.current.changeArticlePage(3));
+    await waitFor(() => expect(result.current.articlePage).toBe(3));
+    await act(async () => { complete({ summary: {} }); await finishing; });
+    expect(mocks.getArticlesByProject).toHaveBeenLastCalledWith(7, {
+      phase: change === "phase" ? "eligibility" : "screening", outcome: "active", search: "current search",
+      page: 3, limit: 20, ...(change === "assigned" ? { assignedToMe: true } : {}),
+    });
+    expect(result.current.articles[0]).toEqual({ id: change === "assigned" ? 22 : 11,
+      currentPhase: change === "phase" ? "eligibility" : "screening" });
   });
 
   it("clears the assigned filter when browser navigation changes the review phase", async () => {

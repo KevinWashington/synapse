@@ -20,13 +20,34 @@ from app.models.project import Project
 from app.models.user import User
 from app.routers import articles
 from app.schemas.article import (
-    ArticleEvidenceUpdate, ArticleNotesUpdate, ArticleUpdate, BatchEvaluateRequest,
+    ArticleCreate, ArticleEvidenceUpdate, ArticleNotesUpdate, ArticleUpdate, BatchEvaluateRequest,
+    DedupApplyRequest, ImportBibTeXRequest, PromoteToScreeningRequest,
     EligibilityDecisionRequest, FullTextStatusUpdate, LegacyArticleDecisionUpdate,
     LegacyArticleStatusUpdate, RelationshipCreate, ScreeningDecisionRequest,
 )
 
 DATABASE = "synapse_article_collaboration_test"
 URL = f"postgresql+asyncpg://synapse:synapse@localhost:5432/{DATABASE}"
+
+
+def test_selection_summary_counts_pending_extraction_across_the_full_corpus():
+    def item(article_id, *, outcome="included", completed=None):
+        return SimpleNamespace(
+            id=article_id,
+            currentPhase="included",
+            reviewOutcome=outcome,
+            extractionCompletedAt=completed,
+            sourceCategory="database",
+            sourceName="Scopus",
+        )
+
+    summary = articles._selection_summary_from_articles(
+        7,
+        [item(1), item(2, completed="done"), item(3, outcome="excluded_eligibility")],
+    )
+
+    assert summary.included == 2
+    assert summary.pendingExtraction == 1
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -298,7 +319,7 @@ async def test_submission_returns_caller_assignment_and_rejects_resubmission(sce
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("role", ["reviewer", "owner", "coordinator"])
-async def test_pdf_and_full_text_mutations_retain_caller_permissions(scene, role):
+async def test_pdf_mutations_retain_caller_permissions(scene, role):
     scene.article.currentPhase = "eligibility"
     await assign(scene, scene.reviewer, phase="eligibility")
     user = getattr(scene, role)
@@ -306,10 +327,67 @@ async def test_pdf_and_full_text_mutations_retain_caller_permissions(scene, role
     result = await articles.upload_pdf(scene.project.id, scene.article.id, pdf, user, scene.db)
     assert result.hasActiveReviewAssignments is True
     assert result.canWriteReview is True
-    result = await articles.update_full_text_status(scene.project.id, scene.article.id,
-        FullTextStatusUpdate(fullTextStatus="uploaded"), user, scene.db)
-    assert result.hasActiveReviewAssignments is True
-    assert result.canWriteReview is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("assigned", [False, True])
+@pytest.mark.parametrize("operation", ["create", "import", "analyze", "apply", "promote", "promote_unique"])
+async def test_reviewers_cannot_mutate_the_corpus_even_when_assigned(scene, assigned, operation):
+    scene.article.currentPhase = "identification"
+    if assigned:
+        await assign(scene, scene.reviewer)
+    kwargs = {"current_user": scene.reviewer, "db": scene.db}
+    operations = {
+        "create": lambda: articles.create_article(scene.project.id, ArticleCreate(title="Forbidden", authors="A", year=2025,
+            journal="J", sourceCategory="database", sourceName="Test"), ai_service=None, **kwargs),
+        "import": lambda: articles.import_bibtex_entries(scene.project.id, ImportBibTeXRequest(sourceCategory="database", sourceName="Test"), ai_service=None, **kwargs),
+        "analyze": lambda: articles.analyze_duplicates(scene.project.id, **kwargs),
+        "apply": lambda: articles.apply_duplicate_decisions(scene.project.id, DedupApplyRequest(), **kwargs),
+        "promote": lambda: articles.promote_articles_to_screening(scene.project.id, PromoteToScreeningRequest(articleIds=[scene.article.id]), **kwargs),
+        "promote_unique": lambda: articles.promote_unique_articles_to_screening(scene.project.id, **kwargs),
+    }
+    with pytest.raises(HTTPException) as denied:
+        await operations[operation]()
+    assert denied.value.status_code == 403
+    assert scene.article.currentPhase == "identification"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["owner", "coordinator"])
+@pytest.mark.parametrize("bulk", [False, True])
+async def test_corpus_administrators_can_promote(scene, role, bulk):
+    scene.article.currentPhase = "identification"
+    if bulk:
+        result = await articles.promote_unique_articles_to_screening(scene.project.id, getattr(scene, role), scene.db)
+    else:
+        result = await articles.promote_articles_to_screening(scene.project.id,
+            PromoteToScreeningRequest(articleIds=[scene.article.id]), getattr(scene, role), scene.db)
+    assert result.movedCount == 1
+    assert scene.article.currentPhase == "screening"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", ["reviewer", "owner", "coordinator"])
+@pytest.mark.parametrize("state", ["pending", "submitted", "consolidated"])
+@pytest.mark.parametrize("requested", ["uploaded", "pending_upload", "unavailable"])
+async def test_managed_full_text_status_cannot_change_or_reset_canonical_decisions(scene, role, state, requested):
+    scene.article.currentPhase = "eligibility"
+    if state == "consolidated":
+        scene.article.reviewOutcome = "included"
+        scene.article.eligibilityDecision = "included"
+        scene.article.currentPhase = "included"
+    await assign(scene, scene.reviewer, phase="eligibility", status="pending" if state == "pending" else "submitted",
+                 value=None if state == "pending" else "included")
+    await assign(scene, scene.peer, phase="eligibility", slot=2, status="submitted" if state == "consolidated" else "pending",
+                 value="included" if state == "consolidated" else None)
+    before = (scene.article.fullTextStatus, scene.article.reviewOutcome, scene.article.eligibilityDecision, scene.article.currentPhase)
+    with pytest.raises(HTTPException) as denied:
+        await articles.update_full_text_status(scene.project.id, scene.article.id,
+            FullTextStatusUpdate(fullTextStatus=requested, reasonText="Unavailable"), getattr(scene, role), scene.db)
+    assert denied.value.status_code == 409
+    assert denied.value.detail["code"] == "MANAGED_REVIEW"
+    assert "eligibility-decision" in denied.value.detail["message"]
+    assert (scene.article.fullTextStatus, scene.article.reviewOutcome, scene.article.eligibilityDecision, scene.article.currentPhase) == before
 
 
 @pytest.mark.asyncio

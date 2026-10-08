@@ -14,6 +14,8 @@ function useArticleDetailsPage() {
   const [article, setArticle] = useState(null);
   const [project, setProject] = useState(null);
   const [articleList, setArticleList] = useState([]);
+  const [articleListTotal, setArticleListTotal] = useState(0);
+  const [selectionSummary, setSelectionSummary] = useState(null);
   const [myAssignments, setMyAssignments] = useState([]);
   const [articleListLoading, setArticleListLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,8 @@ function useArticleDetailsPage() {
   const fetchArticleList = useCallback(async () => {
     if (!projectId || !listFlow) {
       setArticleList([]);
+      setArticleListTotal(0);
+      setSelectionSummary(null);
       return;
     }
 
@@ -83,11 +87,18 @@ function useArticleDetailsPage() {
 
     try {
       setArticleListLoading(true);
-      const response = await articleService.getArticlesByProject(projectId, filters);
+      const [response, summary] = await Promise.all([
+        articleService.getArticlesByProject(projectId, filters),
+        articleService.getSelectionSummary(projectId),
+      ]);
       setArticleList(response.articles || []);
+      setArticleListTotal(response.total || 0);
+      setSelectionSummary(summary || null);
     } catch (currentError) {
       console.error("Erro ao carregar lista do workspace:", currentError);
       setArticleList([]);
+      setArticleListTotal(0);
+      setSelectionSummary(null);
     } finally {
       setArticleListLoading(false);
     }
@@ -263,6 +274,7 @@ function useArticleDetailsPage() {
   return {
     article,
     articleList,
+    articleListTotal,
     articleListLoading,
     articleId,
     backUrl,
@@ -282,6 +294,7 @@ function useArticleDetailsPage() {
     projectId,
     refreshArticle,
     rightTab,
+    selectionSummary,
     setRightTab,
   };
 }

@@ -96,6 +96,7 @@ function PrismaExtractionWorkspace({
   article,
   articleId,
   articleList,
+  articleListTotal,
   articleListLoading,
   backUrl,
   isSavingEvidence,
@@ -105,6 +106,7 @@ function PrismaExtractionWorkspace({
   pdfData,
   project,
   projectId,
+  selectionSummary,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [leftTab, setLeftTab] = useState("pdf");
@@ -119,11 +121,10 @@ function PrismaExtractionWorkspace({
       return `${item.title} ${item.authors} ${item.journal}`.toLowerCase().includes(normalizedSearch);
     });
   }, [articleList, searchTerm]);
-  const completedCount = useMemo(
-    () => (articleList || []).filter((item) => item.extractionCompletedAt).length,
-    [articleList]
-  );
-  const totalCount = articleList?.length || 0;
+  const totalCount = articleListTotal ?? articleList?.length ?? 0;
+  const completedCount = selectionSummary
+    ? Math.max((selectionSummary.included || 0) - (selectionSummary.pendingExtraction || 0), 0)
+    : (articleList || []).filter((item) => item.extractionCompletedAt).length;
   const progress = formatPercent(completedCount, totalCount);
   const currentIndex = Math.max(
     0,
@@ -428,6 +429,7 @@ function PrismaArticleReviewWorkspace({
   article,
   articleId,
   articleList,
+  articleListTotal,
   articleListLoading,
   backUrl,
   onRequestDelete,
@@ -460,7 +462,7 @@ function PrismaArticleReviewWorkspace({
       return `${item.title} ${item.authors} ${item.journal}`.toLowerCase().includes(normalizedSearch);
     });
   }, [listSource, searchTerm]);
-  const totalCount = listSource.length;
+  const totalCount = articleListTotal ?? listSource.length;
   const currentIndex = Math.max(
     0,
     listSource.findIndex((item) => String(item.id) === String(articleId))
@@ -705,6 +707,7 @@ function ArticleDetails() {
   const {
     article,
     articleList,
+    articleListTotal,
     articleListLoading,
     articleId,
     backUrl,
@@ -723,6 +726,7 @@ function ArticleDetails() {
     projectId,
     refreshArticle,
     rightTab,
+    selectionSummary,
     setRightTab,
   } = useArticleDetailsPage();
   const [screeningDialogOpen, setScreeningDialogOpen] = useState(false);
@@ -833,6 +837,7 @@ function ArticleDetails() {
       article={article}
       articleId={articleId}
       articleList={articleList}
+      articleListTotal={articleListTotal}
       articleListLoading={articleListLoading}
       backUrl={backUrl}
       isSavingEvidence={isSavingEvidence}
@@ -842,6 +847,7 @@ function ArticleDetails() {
       pdfData={pdfData}
       project={project}
       projectId={projectId}
+      selectionSummary={selectionSummary}
     />
   ) : (
     <PrismaArticleReviewWorkspace
@@ -849,6 +855,7 @@ function ArticleDetails() {
       article={article}
       articleId={articleId}
       articleList={articleList}
+      articleListTotal={articleListTotal}
       articleListLoading={articleListLoading}
       backUrl={backUrl}
       onRequestDelete={() => setDeleteConfirmOpen(true)}

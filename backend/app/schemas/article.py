@@ -117,6 +117,7 @@ class SelectionSummaryResponse(BaseModel):
     screening: SelectionSummaryPhaseItem
     eligibility: SelectionSummaryPhaseItem
     included: int
+    pendingExtraction: int = 0
     duplicatesRemoved: int
     greyLiterature: int
     fullTextUnavailable: int

@@ -49,6 +49,7 @@ vi.mock("@/features/articles", () => ({
   useArticleDetailsPage: () => ({
     article,
     articleList,
+    articleListTotal: 1093,
     articleListLoading: false,
     articleId: "2",
     backUrl: "/projetos/7?tab=artigos&flow=included",
@@ -137,6 +138,13 @@ describe("ArticleDetails extraction workspace", () => {
     expect(navigate).toHaveBeenCalledWith(
       "/projetos/7/artigos/3?flow=included&workspace=extracao"
     );
+  });
+
+  it("shows the server total instead of treating the loaded detail list as the whole stage", async () => {
+    renderPage();
+    await screen.findByPlaceholderText("Digite resultado...");
+
+    expect(screen.getAllByText(/de 1\.093 estudos/).length).toBeGreaterThan(0);
   });
 
   it("keeps an unassigned extraction workspace readable with all write controls disabled", async () => {

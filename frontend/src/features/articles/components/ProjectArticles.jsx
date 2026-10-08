@@ -375,6 +375,7 @@ export function StageListPanel({
   articlePageSize = 20,
   articleTotal,
   articles,
+  canManageArticles = true,
   duplicateIds,
   filterOptions,
   isLoading,
@@ -416,7 +417,7 @@ export function StageListPanel({
             </div>
             <p className="mt-2 text-sm leading-6 text-[#56627f]">{stage.description}</p>
           </div>
-          {activeStage === "identification" ? (
+          {activeStage === "identification" && canManageArticles ? (
             <Button
               size="sm"
               className="h-9 gap-2 rounded-lg bg-[#6259ff] text-xs text-white hover:bg-[#5148ee]"
@@ -464,7 +465,7 @@ export function StageListPanel({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[#56627f]">
-          {activeStage === "identification" ? (
+          {activeStage === "identification" && canManageArticles ? (
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -479,7 +480,7 @@ export function StageListPanel({
           ) : (
             <span>{selectedArticle ? "Artigo aberto no painel" : "Selecione um artigo para avaliar"}</span>
           )}
-          {activeStage === "identification" ? (
+          {activeStage === "identification" && canManageArticles ? (
             <Button
               size="sm"
               variant="outline"
@@ -516,7 +517,7 @@ export function StageListPanel({
                   selected && "bg-[#fbfaff] ring-1 ring-inset ring-[#c9c3ff]"
                 )}
               >
-                {activeStage === "identification" ? (
+                {activeStage === "identification" && canManageArticles ? (
                   <input
                     type="checkbox"
                     aria-label={`Selecionar ${article.title}`}
@@ -862,6 +863,7 @@ export function StageSidebar({
   activeStage,
   articleTotal,
   articles,
+  canManageArticles = true,
   duplicateCandidates,
   onBatchEvaluate,
   onExportStage,
@@ -876,7 +878,7 @@ export function StageSidebar({
   const count = activeStage === "identification"
     ? identificationCount
     : getStageCount(summary, activeStage);
-  const extractionPending = articles.filter((article) => !Object.keys(article.extractionData || {}).length).length;
+  const extractionPending = summary?.pendingExtraction ?? 0;
 
   const rows = {
     identification: [
@@ -932,10 +934,10 @@ export function StageSidebar({
         <div className="mt-4 space-y-2">
           {activeStage === "identification" ? (
             <>
-              <Button variant="outline" className="h-10 w-full justify-between rounded-lg border-[#dfe4ef] bg-white" onClick={onRunDedup}>
+              {canManageArticles ? <Button variant="outline" className="h-10 w-full justify-between rounded-lg border-[#dfe4ef] bg-white" onClick={onRunDedup}>
                 Detectar duplicatas
                 <span className="rounded-full bg-[#6259ff] px-2 py-0.5 text-xs text-white">{duplicateCandidates.length}</span>
-              </Button>
+              </Button> : null}
               <Button variant="outline" className="h-10 w-full justify-start rounded-lg border-[#dfe4ef] bg-white" onClick={onExportStage}>
                 Exportar etapa
               </Button>
@@ -943,10 +945,10 @@ export function StageSidebar({
           ) : null}
           {activeStage === "screening" ? (
             <>
-              <Button variant="outline" className="h-10 w-full justify-start gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onBatchEvaluate}>
+              {canManageArticles ? <Button variant="outline" className="h-10 w-full justify-start gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onBatchEvaluate}>
                 <SparklesIcon className="h-4 w-4" />
                 Triagem IA
-              </Button>
+              </Button> : null}
               <Button variant="outline" className="h-10 w-full justify-start rounded-lg border-[#dfe4ef] bg-white" onClick={onExportStage}>
                 Exportar etapa
               </Button>
@@ -990,6 +992,7 @@ export function StageSidebar({
 }
 
 function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow, collaboration }) {
+  const canManageArticles = (collaboration?.capabilities ?? project?.capabilities ?? []).includes("edit_project");
   const [searchParams, setSearchParams] = useSearchParams();
   const [showNewArticleModal, setShowNewArticleModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -1049,13 +1052,13 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
       return;
     }
 
-    setShowImportModal(true);
+    setShowImportModal(canManageArticles);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.delete("action");
       return next;
     });
-  }, [searchParams, setSearchParams]);
+  }, [canManageArticles, searchParams, setSearchParams]);
 
   useEffect(() => {
     setActiveFilter("all");
@@ -1156,14 +1159,14 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           <DownloadIcon className="h-4 w-4" />
           Exportar dados
         </Button>
-        <Button className="h-10 gap-2 rounded-lg bg-[#6259ff] px-4 text-white hover:bg-[#5148ee]" onClick={() => setShowImportModal(true)}>
+        {canManageArticles ? <><Button className="h-10 gap-2 rounded-lg bg-[#6259ff] px-4 text-white hover:bg-[#5148ee]" onClick={() => setShowImportModal(true)}>
           <PlusIcon className="h-4 w-4" />
           Importar artigos
         </Button>
         <Button className="h-10 gap-2 rounded-lg bg-[#6259ff] px-4 text-white hover:bg-[#5148ee]" onClick={() => setShowNewArticleModal(true)}>
           <PlusIcon className="h-4 w-4" />
           Adicionar artigo  
-        </Button>
+        </Button></> : null}
       </div>
 
       <StageStepper
@@ -1172,7 +1175,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         summary={summary}
       />
 
-      {activeStage === "identification" ? (
+      {activeStage === "identification" && canManageArticles ? (
         <DuplicateReviewPanel
           candidates={duplicateCandidates}
           isApplying={isLoadingDuplicates}
@@ -1192,6 +1195,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           articlePageSize={articlePageSize}
           articleTotal={articleTotal}
           articles={filteredArticles}
+          canManageArticles={canManageArticles}
           duplicateIds={duplicateIds}
           filterOptions={filterOptions}
           isLoading={isLoadingArticles}
@@ -1255,6 +1259,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           activeStage={activeStage}
           articleTotal={articleTotal}
           articles={stageArticles}
+          canManageArticles={canManageArticles}
           duplicateCandidates={duplicateCandidates}
           onBatchEvaluate={runBatchEvaluate}
           onExportStage={handleExportStage}
@@ -1272,14 +1277,14 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
       ) : null}
 
       <NewArticleModal
-        isOpen={showNewArticleModal}
+        isOpen={canManageArticles && showNewArticleModal}
         onClose={() => setShowNewArticleModal(false)}
         onSuccess={() => refreshAll()}
         projectId={project.id}
       />
 
       <ImportBibTeXModal
-        isOpen={showImportModal}
+        isOpen={canManageArticles && showImportModal}
         onClose={() => setShowImportModal(false)}
         onSuccess={() => refreshAll()}
         projectId={project.id}

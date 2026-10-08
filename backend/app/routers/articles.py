@@ -961,6 +961,12 @@ def _selection_summary_from_articles(project_id: int, articles: list[Article]) -
             excluded=eligibility_excluded,
         ),
         included=sum(1 for article in articles if article.reviewOutcome == "included"),
+        pendingExtraction=sum(
+            1
+            for article in articles
+            if article.reviewOutcome == "included"
+            and getattr(article, "extractionCompletedAt", None) is None
+        ),
         duplicatesRemoved=duplicates_removed,
         greyLiterature=sum(1 for article in articles if article.sourceCategory == "grey_literature"),
         fullTextUnavailable=sum(1 for article in articles if article.reviewOutcome == "full_text_unavailable"),
@@ -1454,7 +1460,9 @@ async def create_article(
     db: AsyncSession = Depends(get_db),
     ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
-    project = await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
+    project = access.project
     article = _create_article_entity(
         payload=data,
         project_id=projectId,
@@ -1483,7 +1491,9 @@ async def import_bibtex_entries(
     db: AsyncSession = Depends(get_db),
     ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
-    project = await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
+    project = access.project
     batch_label = data.importBatchLabel or f"bibtex-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
     article_ids: list[int] = []
 
@@ -1519,7 +1529,8 @@ async def analyze_duplicates(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
     result = await db.execute(
         select(Article).where(Article.projectId == projectId)
     )
@@ -1590,7 +1601,8 @@ async def apply_duplicate_decisions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
     applied_groups = 0
     removed_duplicates = 0
 
@@ -1638,7 +1650,8 @@ async def promote_articles_to_screening(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
     moved_count = 0
     for article_id in data.articleIds:
         article = await get_article_or_404(article_id, projectId, current_user.id, db)
@@ -1662,7 +1675,8 @@ async def promote_unique_articles_to_screening(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await get_project_or_404(projectId, current_user.id, db)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
     result = await db.execute(
         select(Article).where(
             Article.projectId == projectId,
@@ -1843,6 +1857,17 @@ async def update_full_text_status(
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
+    # Protect managed outcomes even after consolidation, and even with rollout disabled.
+    managed = await db.scalar(select(ReviewAssignment.id).where(
+        ReviewAssignment.articleId == articleId,
+        ReviewAssignment.phase == "eligibility",
+        ReviewAssignment.status != "cancelled",
+    ).limit(1))
+    if managed is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
+            "code": "MANAGED_REVIEW",
+            "message": "Revisão gerenciada: use eligibility-decision para texto completo indisponível ou o endpoint PDF para enviar o arquivo.",
+        })
     if article.currentPhase != "eligibility":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

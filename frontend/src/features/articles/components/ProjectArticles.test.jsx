@@ -1,9 +1,13 @@
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { articleService } from "@features/articles/services/articleService";
+import ProjectArticles from "./ProjectArticles";
 import { describe, expect, it, vi } from "vitest";
 import {
   ArticleDetailPanel,
   getFilterOptions,
   StageListPanel,
+  StageSidebar,
 } from "./ProjectArticles";
 import * as ProjectArticlesComponents from "./ProjectArticles";
 
@@ -53,6 +57,22 @@ function renderList(overrides = {}) {
 }
 
 describe("ProjectArticles work queue", () => {
+  it.each(["identification", "screening"])("hides corpus administration from assigned reviewers in %s", async (flow) => {
+    vi.spyOn(articleService, "getArticlesByProject").mockResolvedValue({ articles: [{ ...article, currentPhase: flow,
+      hasActiveReviewAssignments: true, myReviewAssignment: { reviewerUserId: 1, status: "pending" } }], total: 1 });
+    vi.spyOn(articleService, "getSelectionSummary").mockResolvedValue({});
+    vi.spyOn(articleService, "getSelectionReport").mockResolvedValue({});
+    vi.spyOn(articleService, "getDuplicateCandidates").mockResolvedValue([{ groupKey: "test", candidateIds: [1], articles: [article] }]);
+    render(<MemoryRouter initialEntries={[`/projetos/7?flow=${flow}&action=import`]}>
+      <ProjectArticles project={{ id: 7 }} collaboration={{ capabilities: ["read_project", "review_assigned"] }} />
+    </MemoryRouter>);
+    await screen.findAllByText(article.title);
+    expect(screen.queryByRole("button", { name: /Importar artigos|Adicionar artigo|Detectar duplicatas|Enviar.*triagem|Triagem IA|Confirmar revis/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exportar dados" })).toBeEnabled();
+  });
+
   it("shows the server total separately from the loaded page", () => {
     renderList();
 
@@ -187,6 +207,24 @@ describe("collaborative article review", () => {
     expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     if (canDecide) expect(screen.getByRole("button", { name: "Incluir" })).toBeEnabled();
     else expect(screen.getByRole("button", { name: "Incluir" })).toBeDisabled();
+  });
+
+  it("uses the corpus aggregate for pending extraction instead of the visible page", () => {
+    render(
+      <StageSidebar
+        activeStage="included"
+        articleTotal={124}
+        articles={[{ ...article, extractionCompletedAt: new Date().toISOString() }]}
+        duplicateCandidates={[]}
+        onBatchEvaluate={vi.fn()}
+        onExportStage={vi.fn()}
+        onRunDedup={vi.fn()}
+        onViewFlow={vi.fn()}
+        summary={{ included: 124, pendingExtraction: 103 }}
+      />
+    );
+
+    expect(screen.getByText("Aguarda extração").parentElement).toHaveTextContent("103");
   });
 
   it("does not invent included or extraction filter totals from a single page", () => {
