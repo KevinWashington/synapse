@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import DistributionPanel from "./DistributionPanel";
 import { collaboration } from "./testFixtures";
@@ -97,6 +97,79 @@ describe("controlled distribution", () => {
     expect(
       await screen.findByRole("button", { name: "Confirmar distribuição" }),
     ).toBeInTheDocument();
+  });
+  it("blocks distribution immediately while a reassignment is pending", async () => {
+    let finishReassignment;
+    const state = collaboration({
+      assignments: [
+        {
+          id: 9,
+          articleId: 7,
+          phase: "screening",
+          slot: 1,
+          reviewerUserId: 99,
+          status: "needs_reassignment",
+        },
+      ],
+    });
+    state.reassignAssignment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishReassignment = resolve;
+        }),
+    );
+    state.previewAssignments.mockResolvedValue({
+      phase: "screening",
+      articleCount: 1,
+      reviewerCount: 2,
+      loads: { 1: 1, 2: 1 },
+      assignments: [{ articleId: 7 }],
+    });
+    render(<DistributionPanel collaboration={state} />);
+    const previewButton = screen.getByRole("button", {
+      name: "Pré-visualizar distribuição",
+    });
+    fireEvent.click(previewButton);
+    const oldConfirm = await screen.findByRole("button", {
+      name: "Confirmar distribuição",
+    });
+    fireEvent.keyDown(
+      screen.getByRole("combobox", {
+        name: "Novo revisor do artigo 7, vaga 1",
+      }),
+      { key: "ArrowDown" },
+    );
+    fireEvent.click(await screen.findByRole("option", { name: "Bruno" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reatribuir artigo 7, vaga 1" }),
+    );
+
+    try {
+      expect(
+        screen.queryByRole("button", { name: "Confirmar distribuição" }),
+      ).not.toBeInTheDocument();
+      expect(previewButton).toBeDisabled();
+      fireEvent.click(oldConfirm);
+      fireEvent.click(previewButton);
+      expect(state.distributeAssignments).not.toHaveBeenCalled();
+      expect(state.previewAssignments).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => {
+        finishReassignment({});
+      });
+    }
+
+    expect(previewButton).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Confirmar distribuição" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(previewButton);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Confirmar distribuição" }),
+    );
+    await waitFor(() =>
+      expect(state.distributeAssignments).toHaveBeenCalledOnce(),
+    );
   });
   it("invalidates preview when reviewers change", async () => {
     const state = collaboration();

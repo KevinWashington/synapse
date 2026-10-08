@@ -3,7 +3,13 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import TeamSelect from "./TeamSelect";
 
-function ReassignmentRow({ assignment, reviewers, assignments, onReassign }) {
+function ReassignmentRow({
+  assignment,
+  reviewers,
+  assignments,
+  onReassign,
+  disabled,
+}) {
   const [reviewer, setReviewer] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(null);
@@ -20,7 +26,7 @@ function ReassignmentRow({ assignment, reviewers, assignments, onReassign }) {
       ),
   );
   async function reassign() {
-    if (!reviewer || pending) return;
+    if (!reviewer || pending || disabled) return;
     setPending(true);
     setError(null);
     try {
@@ -42,7 +48,7 @@ function ReassignmentRow({ assignment, reviewers, assignments, onReassign }) {
       <TeamSelect
         label={`Novo revisor do ${label}`}
         value={reviewer}
-        disabled={pending}
+        disabled={pending || disabled}
         onValueChange={setReviewer}
         options={available.map((member) => ({
           value: String(member.userId),
@@ -52,7 +58,7 @@ function ReassignmentRow({ assignment, reviewers, assignments, onReassign }) {
       <Button
         variant="outline"
         aria-label={`Reatribuir ${label}`}
-        disabled={!reviewer || pending}
+        disabled={!reviewer || pending || disabled}
         onClick={reassign}
       >
         Reatribuir
@@ -86,6 +92,7 @@ export default function DistributionPanel({ collaboration }) {
   const [previewTeam, setPreviewTeam] = useState(null);
   const [previewAssignmentSet, setPreviewAssignmentSet] = useState(null);
   const [pending, setPending] = useState(false);
+  const [reassignmentPending, setReassignmentPending] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const reviewers = members.filter(
@@ -95,12 +102,13 @@ export default function DistributionPanel({ collaboration }) {
     reviewers.map((member) => [member.userId, member.role]),
   );
   const validPreview =
+    !reassignmentPending &&
     preview?.phase === phase &&
     previewTeam === teamKey &&
     previewAssignmentSet === assignments;
   if (!capabilities.includes("manage_distribution")) return null;
   async function run(confirm) {
-    if (pending) return;
+    if (pending || reassignmentPending || (confirm && !validPreview)) return;
     setPending(true);
     setError(null);
     setSuccess(false);
@@ -123,9 +131,15 @@ export default function DistributionPanel({ collaboration }) {
     }
   }
   async function reassign(...args) {
-    const response = await reassignAssignment(...args);
+    if (pending || reassignmentPending) return;
     setPreview(null);
-    return response;
+    setSuccess(false);
+    setReassignmentPending(true);
+    try {
+      return await reassignAssignment(...args);
+    } finally {
+      setReassignmentPending(false);
+    }
   }
   const unavailable = assignments.filter(
     (assignment) => assignment.status === "needs_reassignment",
@@ -145,7 +159,7 @@ export default function DistributionPanel({ collaboration }) {
             <TeamSelect
               label="Etapa da distribuição"
               value={phase}
-              disabled={pending}
+              disabled={pending || reassignmentPending}
               onValueChange={(value) => {
                 setPhase(value);
                 setPreview(null);
@@ -159,7 +173,7 @@ export default function DistributionPanel({ collaboration }) {
           </div>
           <Button
             variant="outline"
-            disabled={pending || !reviewers.length}
+            disabled={pending || reassignmentPending || !reviewers.length}
             onClick={() => run(false)}
           >
             Pré-visualizar distribuição
@@ -193,6 +207,7 @@ export default function DistributionPanel({ collaboration }) {
             <Button
               disabled={
                 pending ||
+                reassignmentPending ||
                 !preview.reviewerCount ||
                 !preview.articleCount ||
                 !preview.assignments?.length
@@ -230,6 +245,7 @@ export default function DistributionPanel({ collaboration }) {
                   reviewers={reviewers}
                   assignments={assignments}
                   onReassign={reassign}
+                  disabled={pending || reassignmentPending}
                 />
               ))}
             </ul>
