@@ -391,6 +391,24 @@ async def test_managed_full_text_status_cannot_change_or_reset_canonical_decisio
 
 
 @pytest.mark.asyncio
+async def test_disabled_rollout_preserves_solo_full_text_status_with_existing_assignments(scene, monkeypatch):
+    scene.article.currentPhase = "eligibility"
+    await assign(scene, scene.peer, phase="eligibility")
+    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", False)
+
+    result = await articles.update_full_text_status(
+        scene.project.id,
+        scene.article.id,
+        FullTextStatusUpdate(fullTextStatus="pending_upload"),
+        scene.owner,
+        scene.db,
+    )
+
+    assert result.fullTextStatus == "pending_upload"
+    assert result.currentPhase == "eligibility"
+
+
+@pytest.mark.asyncio
 async def test_previous_phase_assignment_does_not_grant_eligibility_writes_or_queue_membership(scene):
     scene.article.currentPhase = "eligibility"
     await assign(scene, scene.reviewer, phase="screening", status="submitted", value="included")

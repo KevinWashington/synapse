@@ -1857,12 +1857,14 @@ async def update_full_text_status(
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
-    # Protect managed outcomes even after consolidation, and even with rollout disabled.
-    managed = await db.scalar(select(ReviewAssignment.id).where(
-        ReviewAssignment.articleId == articleId,
-        ReviewAssignment.phase == "eligibility",
-        ReviewAssignment.status != "cancelled",
-    ).limit(1))
+    # Protect managed outcomes after consolidation while the collaborative rollout is active.
+    managed = None
+    if get_settings().ASSIGNED_REVIEW_FLOW_ENABLED:
+        managed = await db.scalar(select(ReviewAssignment.id).where(
+            ReviewAssignment.articleId == articleId,
+            ReviewAssignment.phase == "eligibility",
+            ReviewAssignment.status != "cancelled",
+        ).limit(1))
     if managed is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
             "code": "MANAGED_REVIEW",

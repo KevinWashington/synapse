@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getSelectionSummary: vi.fn(),
   getProjectById: vi.fn(),
   submitScreeningDecision: vi.fn(),
+  updateArticleEvidence: vi.fn(),
   getMyAssignments: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock("@features/articles/services/articleService", () => ({
     getSelectionSummary: mocks.getSelectionSummary,
     getPdfData: vi.fn(),
     submitScreeningDecision: mocks.submitScreeningDecision,
+    updateArticleEvidence: mocks.updateArticleEvidence,
   },
 }));
 
@@ -103,5 +105,26 @@ describe("useArticleDetailsPage stage queue", () => {
 
     await waitFor(() => expect(result.current.articleList).toHaveLength(1));
     expect(result.current.articleListTotal).toBe(1093);
+  });
+
+  it("refreshes the corpus extraction progress after completing evidence", async () => {
+    const incomplete = { id: 11, title: "Artigo", hasPdf: false, extractionCompletedAt: null };
+    const completed = { ...incomplete, extractionCompletedAt: "2026-10-08T12:00:00Z" };
+    mocks.getArticleById.mockResolvedValue(incomplete);
+    mocks.getArticlesByProject.mockResolvedValue({ articles: [incomplete], total: 10 });
+    mocks.getSelectionSummary
+      .mockResolvedValueOnce({ included: 10, pendingExtraction: 5 })
+      .mockResolvedValueOnce({ included: 10, pendingExtraction: 4 });
+    mocks.updateArticleEvidence.mockResolvedValue(completed);
+
+    const { result } = renderHook(() => useArticleDetailsPage(), {
+      wrapper: wrapperAt("/projetos/7/artigos/11?flow=included&workspace=extracao"),
+    });
+    await waitFor(() => expect(result.current.selectionSummary?.pendingExtraction).toBe(5));
+
+    await act(async () => result.current.handleSaveEvidence({ markCompleted: true }));
+
+    await waitFor(() => expect(result.current.selectionSummary?.pendingExtraction).toBe(4));
+    expect(mocks.getSelectionSummary).toHaveBeenCalledTimes(2);
   });
 });

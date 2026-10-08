@@ -239,6 +239,12 @@ function useArticleDetailsPage() {
         setArticleList((current) =>
           current.map((item) => (String(item.id) === String(articleId) ? updated : item))
         );
+        try {
+          const summary = await articleService.getSelectionSummary(projectId);
+          setSelectionSummary(summary || null);
+        } catch (summaryError) {
+          console.error("Erro ao atualizar progresso da extracao:", summaryError);
+        }
         toast.success("Extracao e qualidade salvas com sucesso!");
         return updated;
       } catch (currentError) {
