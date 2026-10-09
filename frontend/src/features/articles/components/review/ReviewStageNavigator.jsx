@@ -22,7 +22,7 @@ function ReviewStageNavigator({ activeStage, onStageChange, summary }) {
 
   return (
     <nav aria-label="Etapas da revisão" className="border-b border-[#edf0f7] bg-white px-3 py-3 sm:px-5">
-      <div className="flex gap-2 overflow-x-auto pb-1 xl:grid xl:grid-cols-4 xl:overflow-visible xl:pb-0">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {REVIEW_STAGES.map((stage, index) => {
           const isActive = stage.key === activeStage;
           const isDone = index < activeIndex;
@@ -34,7 +34,7 @@ function ReviewStageNavigator({ activeStage, onStageChange, summary }) {
               aria-current={isActive ? "step" : undefined}
               onClick={() => onStageChange(stage.key)}
               className={cn(
-                "relative flex min-w-44 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors xl:min-w-0",
+                "relative flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
                 isActive
                   ? "bg-[#f0edff] text-[#554bea]"
                   : "text-[#667391] hover:bg-[#f7f8fc] hover:text-[#111936]"

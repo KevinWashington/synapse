@@ -16,7 +16,7 @@ function AdaptiveReviewWorkspace({ queue, content, tool }) {
       <div
         role="tablist"
         aria-label="Áreas do workspace"
-        className="grid grid-cols-3 border-b border-[#edf0f7] bg-[#fbfcff] lg:hidden"
+        className="grid grid-cols-3 border-b border-[#edf0f7] bg-[#fbfcff] xl:hidden"
       >
         {REGIONS.map((region) => (
           <button
@@ -39,7 +39,7 @@ function AdaptiveReviewWorkspace({ queue, content, tool }) {
         ))}
       </div>
 
-      <div className="grid min-h-[620px] lg:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.45fr)_minmax(280px,0.83fr)]">
+      <div className="grid min-h-[620px] xl:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.45fr)_minmax(280px,0.83fr)]">
         {REGIONS.map((region) => {
           const isActive = activeRegion === region.key;
           return (
@@ -54,7 +54,7 @@ function AdaptiveReviewWorkspace({ queue, content, tool }) {
                 "min-h-0 min-w-0",
                 region.key !== "queue" && "border-l border-[#edf0f7]",
                 isActive ? "block" : "hidden",
-                "lg:block"
+                "xl:block"
               )}
             >
               {regions[region.key]}

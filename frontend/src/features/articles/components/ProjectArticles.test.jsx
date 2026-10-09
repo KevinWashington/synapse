@@ -163,7 +163,7 @@ describe("ProjectArticles work queue", () => {
     const panel = scrollRegion.closest("section");
 
     expect(scrollRegion.parentElement).toHaveClass("flex", "h-full", "flex-col");
-    expect(panel).toHaveClass("lg:h-[720px]");
+    expect(panel).toHaveClass("xl:h-[720px]");
     expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
     expect(footer).toHaveClass("mt-auto");
   });

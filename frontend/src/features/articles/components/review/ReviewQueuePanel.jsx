@@ -176,7 +176,7 @@ function ReviewQueuePanel({
 
   return (
     <>
-      <section className="flex h-full min-h-0 min-w-0 flex-col bg-white lg:h-[720px]">
+      <section className="flex h-full min-h-0 min-w-0 flex-col bg-white xl:h-[720px]">
         <div className="border-b border-[#edf0f7] p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
