@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
 import ProjectArticles from "./ProjectArticles";
@@ -58,6 +58,60 @@ function renderList(overrides = {}) {
 }
 
 describe("ProjectArticles work queue", () => {
+  it("saves included-study extraction inside the workspace and refreshes queue progress", async () => {
+    const onNavigate = vi.fn();
+    const included = {
+      ...article,
+      currentPhase: "included",
+      reviewOutcome: "included",
+      extractionData: { population: "Pessoas 60+" },
+      extractionCompletedAt: null,
+    };
+    const updated = {
+      ...included,
+      extractionData: { population: "Pessoas 60+", result: "Melhora significativa" },
+    };
+    let currentArticle = included;
+    vi.spyOn(articleService, "getArticlesByProject").mockImplementation(async () => ({ articles: [currentArticle], total: 1 }));
+    vi.spyOn(articleService, "getArticleById").mockImplementation(async () => currentArticle);
+    vi.spyOn(articleService, "getSelectionSummary").mockResolvedValue({ included: 1, pendingExtraction: 1 });
+    vi.spyOn(articleService, "getSelectionReport").mockResolvedValue({});
+    vi.spyOn(articleService, "getDuplicateCandidates").mockResolvedValue([]);
+    const updateEvidence = vi.spyOn(articleService, "updateArticleEvidence").mockImplementation(async () => {
+      currentArticle = updated;
+      return updated;
+    });
+
+    render(<MemoryRouter initialEntries={["/projetos/7?flow=included"]}>
+      <ProjectArticles
+        onNavigate={onNavigate}
+        project={{
+          id: 7,
+          capabilities: ["edit_project"],
+          dataExtractionSchema: [
+            { key: "population", label: "População", type: "text" },
+            { key: "result", label: "Resultado", type: "text" },
+          ],
+          qualityAssessmentSchema: [],
+        }}
+      />
+    </MemoryRouter>);
+
+    fireEvent.change(await screen.findByPlaceholderText("Digite resultado..."), {
+      target: { value: "Melhora significativa" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+
+    await waitFor(() => expect(updateEvidence).toHaveBeenCalledWith(7, included.id, {
+      extractionData: { population: "Pessoas 60+", result: "Melhora significativa" },
+      qualityAssessmentAnswers: {},
+      markExtractionComplete: false,
+    }));
+    expect(await screen.findByText("Em andamento 2/2")).toBeInTheDocument();
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(articleService.getSelectionSummary.mock.calls.length).toBeGreaterThan(1);
+  });
+
   it("keeps the current stage when a dirty decision navigation is cancelled", async () => {
     const screeningArticle = { ...article, currentPhase: "screening", hasPdf: true };
     vi.spyOn(articleService, "getArticlesByProject").mockResolvedValue({ articles: [screeningArticle], total: 1 });

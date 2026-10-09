@@ -6,7 +6,9 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import ArticleEvidenceEditor from "../ArticleEvidenceEditor";
 import PdfViewer from "../PdfViewer";
+import { collaborativeReview } from "../../utils/collaborativeReview";
 import DecisionHistory from "./DecisionHistory";
 
 function formatNumber(value) {
@@ -23,6 +25,10 @@ function ArticleReadingPane({
   onUploadPdf,
   onOpenArticle,
   pdfData,
+  extractionFormId,
+  isSavingEvidence,
+  onDirtyChange,
+  onSaveEvidence,
 }) {
   if (!article) {
     return (
@@ -39,8 +45,7 @@ function ArticleReadingPane({
   const isEligibility = activeStage === "eligibility";
   const isIncluded = activeStage === "included";
   const label = isIncluded ? "Dados do estudo" : isEligibility ? "Texto completo" : "Resumo";
-  const extractionSchema = project?.dataExtractionSchema || [];
-  const extractionData = article.extractionData || {};
+  const review = collaborativeReview(article);
 
   return (
     <article className="min-h-[620px] bg-white">
@@ -82,19 +87,18 @@ function ArticleReadingPane({
         </div>
 
         {isIncluded ? (
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {extractionSchema.length ? extractionSchema.slice(0, 8).map((field) => {
-              const value = extractionData[field.key];
-              const filled = value !== undefined && value !== null && value !== "";
-              return (
-                <div key={field.key} className="border-b border-[#edf0f7] py-3">
-                  <p className="text-xs font-semibold text-[#667391]">{field.label}</p>
-                  <p className={filled ? "mt-1 text-sm text-[#111936]" : "mt-1 text-sm text-[#a4adc2]"}>
-                    {filled ? String(Array.isArray(value) ? value.join(", ") : value) : "Não preenchido"}
-                  </p>
-                </div>
-              );
-            }) : <p className="text-sm text-[#667391]">Nenhum campo de extração configurado.</p>}
+          <div className="mt-5 h-[500px] min-h-0 overflow-hidden rounded-lg border border-[#e2e6ef] bg-white">
+            <ArticleEvidenceEditor
+              article={article}
+              formId={extractionFormId}
+              isSaving={isSavingEvidence}
+              onDirtyChange={onDirtyChange}
+              onSave={onSaveEvidence}
+              project={project}
+              readOnly={!review.canWrite}
+              showFooterActions={false}
+              variant="workspace"
+            />
           </div>
         ) : isEligibility && article.hasPdf ? (
           <div className="mt-5 h-[520px] min-h-0 w-full">

@@ -167,4 +167,80 @@ describe("IncludedExtractionTool", () => {
     expect(screen.getByText("103 pendentes de extração")).toBeInTheDocument();
     expect(screen.getByText("124 estudos incluídos")).toBeInTheDocument();
   });
+
+  it("edits and saves extraction without leaving the workspace", async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const extractionProject = {
+      dataExtractionSchema: [
+        { key: "population", label: "População", type: "text" },
+        { key: "result", label: "Resultado", type: "text" },
+      ],
+      qualityAssessmentSchema: [],
+    };
+    render(
+      <>
+        <ArticleReadingPane
+          activeStage="included"
+          article={{ ...article, reviewOutcome: "included" }}
+          extractionFormId="workspace-extraction-form"
+          onDirtyChange={vi.fn()}
+          onNext={vi.fn()}
+          onOpenArticle={vi.fn()}
+          onPrevious={vi.fn()}
+          onSaveEvidence={onSave}
+          onUploadPdf={vi.fn()}
+          position={{ current: 1, total: 1 }}
+          project={extractionProject}
+        />
+        <IncludedExtractionTool
+          article={{ ...article, reviewOutcome: "included" }}
+          extractionFormId="workspace-extraction-form"
+          onExport={vi.fn()}
+          onOpenExtraction={vi.fn()}
+          onViewFlow={vi.fn()}
+          project={extractionProject}
+          summary={{ included: 1, pendingExtraction: 1 }}
+        />
+      </>
+    );
+
+    expect(screen.getByText("1 de 2 campos preenchidos")).toBeInTheDocument();
+    expect(screen.getByText("Pendente: Resultado")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Digite resultado..."), {
+      target: { value: "Melhora significativa" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar rascunho" }));
+
+    expect(onSave).toHaveBeenCalledWith({
+      extractionData: { population: "Pessoas 60+", result: "Melhora significativa" },
+      qualityAssessmentAnswers: {},
+      markExtractionComplete: false,
+    });
+  });
+
+  it("keeps missing-schema guidance and read-only extraction usable", () => {
+    render(
+      <ArticleReadingPane
+        activeStage="included"
+        article={{
+          ...article,
+          reviewOutcome: "included",
+          hasActiveReviewAssignments: true,
+          myReviewAssignment: null,
+          canWriteReview: false,
+        }}
+        extractionFormId="read-only-extraction"
+        onDirtyChange={vi.fn()}
+        onNext={vi.fn()}
+        onOpenArticle={vi.fn()}
+        onPrevious={vi.fn()}
+        onSaveEvidence={vi.fn()}
+        onUploadPdf={vi.fn()}
+        position={{ current: 1, total: 1 }}
+        project={{ dataExtractionSchema: [], qualityAssessmentSchema: [] }}
+      />
+    );
+
+    expect(screen.getByText("Nenhum esquema de extração configurado")).toBeInTheDocument();
+  });
 });

@@ -615,6 +615,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [isDetailClosed, setIsDetailClosed] = useState(false);
   const [isReviewDraftDirty, setIsReviewDraftDirty] = useState(false);
+  const [isSavingEvidence, setIsSavingEvidence] = useState(false);
   const [reviewStatus, setReviewStatus] = useState("");
   const draftGuard = useReviewDraftGuard({
     isDirty: isReviewDraftDirty,
@@ -718,6 +719,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
   const {
     article: workspaceArticle,
     pdfData: workspacePdfData,
+    refreshArticle: refreshWorkspaceArticle,
   } = useWorkspaceArticle({
     activeStage,
     article: selectedArticle,
@@ -733,6 +735,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
   const selectedIndex = selectedArticle
     ? filteredArticles.findIndex((article) => article.id === selectedArticle.id)
     : -1;
+  const extractionFormId = `workspace-extraction-${workspaceArticle?.id || "none"}`;
 
   function openUploadPdf(article) {
     setPdfTarget(article);
@@ -791,6 +794,29 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     } catch (error) {
       setReviewStatus("Não foi possível salvar a decisão de elegibilidade.");
       throw error;
+    }
+  }
+
+  async function saveEvidence(payload) {
+    if (!workspaceArticle?.id) return false;
+    setIsSavingEvidence(true);
+    setReviewStatus("Salvando extração do estudo.");
+    try {
+      const updated = await articleService.updateArticleEvidence(project.id, workspaceArticle.id, payload);
+      setIsReviewDraftDirty(false);
+      await refreshAll();
+      await refreshWorkspaceArticle();
+      setReviewStatus(payload.markExtractionComplete
+        ? "Extração concluída."
+        : "Rascunho da extração salvo.");
+      toast.success(payload.markExtractionComplete ? "Extração concluída." : "Rascunho da extração salvo.");
+      return updated;
+    } catch (error) {
+      setReviewStatus("Não foi possível salvar a extração.");
+      toast.error("Erro ao salvar extração: " + error.message);
+      throw error;
+    } finally {
+      setIsSavingEvidence(false);
     }
   }
 
@@ -887,6 +913,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         content={<ArticleReadingPane
           activeStage={activeStage}
           article={workspaceArticle}
+          extractionFormId={extractionFormId}
+          isSavingEvidence={isSavingEvidence}
           onNext={() => {
             if (filteredArticles.length > 1) draftGuard.guard(() => selectAdjacent(1));
           }}
@@ -900,6 +928,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onPrevious={() => {
             if (filteredArticles.length > 1) draftGuard.guard(() => selectAdjacent(-1));
           }}
+          onDirtyChange={setIsReviewDraftDirty}
+          onSaveEvidence={saveEvidence}
           onUploadPdf={openUploadPdf}
           pdfData={workspacePdfData}
           position={{ current: selectedIndex >= 0 ? selectedIndex + 1 : 0, total: filteredArticles.length }}
@@ -930,6 +960,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           researchQuestions={project?.researchQuestions || []}
         /> : activeStage === "included" ? <IncludedExtractionTool
           article={workspaceArticle}
+          extractionFormId={extractionFormId}
+          isSaving={isSavingEvidence}
           onExport={handleExportStage}
           onOpenExtraction={(articleId) => {
             const params = new URLSearchParams({ flow: activeStage, workspace: "extracao" });

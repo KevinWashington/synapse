@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { articleService } from "@features/articles/services/articleService";
 
 const DETAIL_STAGES = new Set(["eligibility", "included"]);
@@ -65,10 +65,16 @@ export function useWorkspaceArticle({ projectId, article, activeStage }) {
     };
   }, [refreshArticle]);
 
+  const resolvedArticle = useMemo(
+    () =>
+      article && loadedDetail && String(loadedDetail.id) === String(article.id)
+        ? { ...article, ...loadedDetail }
+        : article || null,
+    [article, loadedDetail],
+  );
+
   return {
-    article: article && loadedDetail && String(loadedDetail.id) === String(article.id)
-      ? { ...article, ...loadedDetail }
-      : article || null,
+    article: resolvedArticle,
     pdfData,
     isLoadingArticle,
     isLoadingPdf,

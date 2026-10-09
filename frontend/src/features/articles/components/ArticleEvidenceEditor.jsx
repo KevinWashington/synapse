@@ -29,6 +29,7 @@ const FIELD_TYPE_LABELS = {
   multi_select: "Selecao multipla",
   boolean: "Booleano",
 };
+const EMPTY_SCHEMA = [];
 
 function buildExtractionPayload(schema, values) {
   return Object.fromEntries(
@@ -40,6 +41,13 @@ function buildQualityPayload(schema, values) {
   return Object.fromEntries(
     (schema || []).map((criterion) => [criterion.key, values[criterion.key] ?? null])
   );
+}
+
+function evidenceSignature(extractionSchema, extractionValues, qualitySchema, qualityValues) {
+  return JSON.stringify({
+    extractionData: buildExtractionPayload(extractionSchema, extractionValues),
+    qualityAssessmentAnswers: buildQualityPayload(qualitySchema, qualityValues),
+  });
 }
 
 function formatQualityRating(value) {
@@ -63,16 +71,24 @@ function ArticleEvidenceEditor({
   formId,
   project,
   isSaving,
+  onDirtyChange,
   onSave,
   showFooterActions = true,
   readOnly = false,
   variant = "default",
 }) {
-  const extractionSchema = project?.dataExtractionSchema || [];
-  const qualitySchema = project?.qualityAssessmentSchema || [];
+  const extractionSchema = project?.dataExtractionSchema || EMPTY_SCHEMA;
+  const qualitySchema = project?.qualityAssessmentSchema || EMPTY_SCHEMA;
   const [extractionValues, setExtractionValues] = useState({});
   const [qualityValues, setQualityValues] = useState({});
   const [pendingCompletion, setPendingCompletion] = useState(null);
+  const savedEvidenceSignature = evidenceSignature(
+    extractionSchema,
+    article?.extractionData || {},
+    qualitySchema,
+    article?.qualityAssessmentAnswers || {}
+  );
+  const [baselineSignature, setBaselineSignature] = useState(() => savedEvidenceSignature);
   const isWorkspaceVariant = variant === "workspace";
   const fieldControlClass =
     "min-h-9 rounded-md border-[#dfe4ef] bg-white text-xs text-[#33405f] shadow-none focus-visible:ring-[#6259ff]/20";
@@ -88,7 +104,15 @@ function ArticleEvidenceEditor({
     setExtractionValues(article?.extractionData || {});
     setQualityValues(article?.qualityAssessmentAnswers || {});
     setPendingCompletion(null);
-  }, [article]);
+    setBaselineSignature(savedEvidenceSignature);
+  }, [article?.id, savedEvidenceSignature]);
+
+  useEffect(() => {
+    onDirtyChange?.(
+      evidenceSignature(extractionSchema, extractionValues, qualitySchema, qualityValues)
+        !== baselineSignature
+    );
+  }, [baselineSignature, extractionSchema, extractionValues, onDirtyChange, qualitySchema, qualityValues]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -106,11 +130,23 @@ function ArticleEvidenceEditor({
     }
 
     await onSave(payload);
+    setBaselineSignature(evidenceSignature(
+      extractionSchema,
+      payload.extractionData,
+      qualitySchema,
+      payload.qualityAssessmentAnswers
+    ));
   }
 
   async function confirmCompletion() {
     if (readOnly || !pendingCompletion) return;
     await onSave(pendingCompletion);
+    setBaselineSignature(evidenceSignature(
+      extractionSchema,
+      pendingCompletion.extractionData,
+      qualitySchema,
+      pendingCompletion.qualityAssessmentAnswers
+    ));
     setPendingCompletion(null);
   }
 

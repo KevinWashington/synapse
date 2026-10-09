@@ -42,6 +42,38 @@ function requestCompletion() {
 }
 
 describe("ArticleEvidenceEditor completion", () => {
+  it("reports dirty state and clears it only after a successful draft save", async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const onDirtyChange = vi.fn();
+    render(
+      <ArticleEvidenceEditor
+        article={article}
+        formId="dirty-extraction-form"
+        project={project}
+        onDirtyChange={onDirtyChange}
+        onSave={onSave}
+        showFooterActions={false}
+      />
+    );
+
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+    fireEvent.change(screen.getByPlaceholderText("Digite amostra..."), {
+      target: { value: "120 participantes" },
+    });
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+
+    const submit = document.createElement("button");
+    submit.type = "submit";
+    submit.value = "draft";
+    submit.setAttribute("form", "dirty-extraction-form");
+    document.body.appendChild(submit);
+    submit.click();
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+    submit.remove();
+  });
+
   it("saves a draft immediately without confirmation", async () => {
     const onSave = renderEditor();
 
