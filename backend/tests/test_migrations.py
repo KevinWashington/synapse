@@ -291,7 +291,7 @@ def test_migration_runner_stamps_compatible_legacy_schema():
         finally:
             await engine.dispose()
 
-    assert asyncio.run(preserved_state()) == ("0003_project_collaboration", 1)
+    assert asyncio.run(preserved_state()) == ("0004_inbox_invite_consent", 1)
 
 
 def test_migration_runner_rejects_partial_legacy_schema():
