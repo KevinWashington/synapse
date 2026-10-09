@@ -802,7 +802,9 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
 
       <ReviewStageNavigator
         activeStage={activeStage}
-        onStageChange={(stage) => draftGuard.guard(() => setActiveFlowTab(stage))}
+        onStageChange={(stage) => {
+          if (stage !== activeStage) draftGuard.guard(() => setActiveFlowTab(stage));
+        }}
         summary={summary}
       />
 
@@ -832,12 +834,14 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           isLoading={isLoadingArticles}
           isPromotingUnique={isPromotingUnique}
           onArticleSelect={(article) => {
+            if (article.id === selectedArticle?.id) return;
             draftGuard.guard(() => {
               setIsDetailClosed(false);
               setSelectedArticleId(article.id);
             });
           }}
           onFilterChange={(filter) => {
+            if (filter === activeFilter) return;
             draftGuard.guard(() => {
               setActiveFilter(filter);
               setAssignedToMe(filter === "assigned");
@@ -852,7 +856,9 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
               onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
             });
           }}
-          onPageChange={(page) => draftGuard.guard(() => changeArticlePage(page))}
+          onPageChange={(page) => {
+            if (page !== articlePage) draftGuard.guard(() => changeArticlePage(page));
+          }}
           onPromoteAllUnique={promoteAllUniqueToScreening}
           onPromoteSelected={promoteSelectedToScreening}
           onToggleAllIdentification={toggleAllIdentificationSelection}
@@ -866,7 +872,9 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         content={<ArticleReadingPane
           activeStage={activeStage}
           article={selectedArticle}
-          onNext={() => draftGuard.guard(() => selectAdjacent(1))}
+          onNext={() => {
+            if (filteredArticles.length > 1) draftGuard.guard(() => selectAdjacent(1));
+          }}
           onOpenArticle={(articleId) => {
             draftGuard.guard(() => {
               const params = new URLSearchParams({ flow: activeStage });
@@ -874,7 +882,9 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
               onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
             });
           }}
-          onPrevious={() => draftGuard.guard(() => selectAdjacent(-1))}
+          onPrevious={() => {
+            if (filteredArticles.length > 1) draftGuard.guard(() => selectAdjacent(-1));
+          }}
           onUploadPdf={openUploadPdf}
           position={{ current: selectedIndex >= 0 ? selectedIndex + 1 : 0, total: filteredArticles.length }}
           project={project}

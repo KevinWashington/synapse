@@ -74,6 +74,8 @@ describe("ProjectArticles work queue", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Justificativa" }), {
       target: { value: "Rascunho ainda não salvo" },
     });
+    fireEvent.click(screen.getByRole("button", { name: /Triagem/ }));
+    expect(screen.queryByRole("dialog", { name: /Descartar alterações/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Elegibilidade/ }));
 
     expect(await screen.findByRole("dialog", { name: /Descartar alterações/ })).toBeInTheDocument();
