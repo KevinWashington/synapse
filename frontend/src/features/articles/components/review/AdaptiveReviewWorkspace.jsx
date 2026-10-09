@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const REGIONS = [
-  { key: "queue", label: "Fila" },
-  { key: "content", label: "Artigo" },
-  { key: "tool", label: "Decisão" },
-];
-
-function AdaptiveReviewWorkspace({ queue, content, tool }) {
+function AdaptiveReviewWorkspace({ activeStage, queue, content, tool }) {
   const [activeRegion, setActiveRegion] = useState("content");
   const regions = { queue, content, tool };
+  const regionDefinitions = [
+    { key: "queue", label: "Fila" },
+    { key: "content", label: activeStage === "included" ? "Extração" : "Artigo" },
+    { key: "tool", label: "Decisão" },
+  ];
 
   return (
     <section className="overflow-hidden rounded-xl border border-[#edf0f7] bg-white">
@@ -18,7 +17,7 @@ function AdaptiveReviewWorkspace({ queue, content, tool }) {
         aria-label="Áreas do workspace"
         className="grid grid-cols-3 border-b border-[#edf0f7] bg-[#fbfcff] xl:hidden"
       >
-        {REGIONS.map((region) => (
+        {regionDefinitions.map((region) => (
           <button
             key={region.key}
             id={`review-region-tab-${region.key}`}
@@ -40,7 +39,7 @@ function AdaptiveReviewWorkspace({ queue, content, tool }) {
       </div>
 
       <div className="grid min-h-[620px] xl:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.45fr)_minmax(280px,0.83fr)]">
-        {REGIONS.map((region) => {
+        {regionDefinitions.map((region) => {
           const isActive = activeRegion === region.key;
           return (
             <section
@@ -51,7 +50,7 @@ function AdaptiveReviewWorkspace({ queue, content, tool }) {
               aria-labelledby={`review-region-tab-${region.key}`}
               data-active-region={String(isActive)}
               className={cn(
-                "min-h-0 min-w-0",
+                "min-h-0 min-w-0 overflow-hidden",
                 region.key !== "queue" && "border-l border-[#edf0f7]",
                 isActive ? "block" : "hidden",
                 "xl:block"

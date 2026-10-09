@@ -41,6 +41,32 @@ describe("ReviewStageNavigator", () => {
 });
 
 describe("AdaptiveReviewWorkspace", () => {
+  it("names the center region Extração during inclusion and Artigo in earlier stages", () => {
+    const { rerender } = render(
+      <AdaptiveReviewWorkspace
+        activeStage="included"
+        queue={<p>Queue content</p>}
+        content={<p>Extraction content</p>}
+        tool={<p>Actions content</p>}
+      />
+    );
+
+    expect(screen.getByRole("tab", { name: "Extração" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Extração" })).toHaveTextContent("Extraction content");
+
+    rerender(
+      <AdaptiveReviewWorkspace
+        activeStage="eligibility"
+        queue={<p>Queue content</p>}
+        content={<p>Article content</p>}
+        tool={<p>Decision content</p>}
+      />
+    );
+
+    expect(screen.getByRole("tab", { name: "Artigo" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Artigo" })).toHaveTextContent("Article content");
+  });
+
   it("exposes queue, article, and decision as named regions", () => {
     render(
       <AdaptiveReviewWorkspace
@@ -71,5 +97,19 @@ describe("AdaptiveReviewWorkspace", () => {
     expect(screen.getByRole("textbox", { name: "Busca da fila" })).toHaveValue("idosos");
     expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveValue("rascunho");
     expect(screen.getByRole("tab", { name: /Decis/ })).toHaveClass("focus-visible:ring-2");
+  });
+
+  it("contains overflow independently in every desktop region", () => {
+    render(
+      <AdaptiveReviewWorkspace
+        queue={<p>Queue content</p>}
+        content={<p>Article content</p>}
+        tool={<p>Decision content</p>}
+      />
+    );
+
+    ["Fila", "Artigo", "Decisão"].forEach((name) => {
+      expect(screen.getByRole("region", { name })).toHaveClass("min-w-0", "overflow-hidden");
+    });
   });
 });

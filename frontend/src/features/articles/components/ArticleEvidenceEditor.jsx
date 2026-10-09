@@ -88,6 +88,10 @@ function ArticleEvidenceEditor({
     qualitySchema,
     article?.qualityAssessmentAnswers || {}
   );
+  const savedEvidence = useMemo(
+    () => JSON.parse(savedEvidenceSignature),
+    [savedEvidenceSignature],
+  );
   const [baselineSignature, setBaselineSignature] = useState(() => savedEvidenceSignature);
   const isWorkspaceVariant = variant === "workspace";
   const fieldControlClass =
@@ -101,11 +105,11 @@ function ArticleEvidenceEditor({
   }, [article]);
 
   useEffect(() => {
-    setExtractionValues(article?.extractionData || {});
-    setQualityValues(article?.qualityAssessmentAnswers || {});
+    setExtractionValues(savedEvidence.extractionData);
+    setQualityValues(savedEvidence.qualityAssessmentAnswers);
     setPendingCompletion(null);
     setBaselineSignature(savedEvidenceSignature);
-  }, [article?.id, savedEvidenceSignature]);
+  }, [article?.id, savedEvidence, savedEvidenceSignature]);
 
   useEffect(() => {
     onDirtyChange?.(

@@ -236,6 +236,7 @@ function ReviewQueuePanel({
               const badge = getArticleBadge(article, activeStage, duplicateIds, extractionSchema);
               const selected = selectedArticle?.id === article.id;
               const checked = selectedIdentificationIds.includes(article.id);
+              const articleDate = formatDate(article.updatedAt || article.createdAt);
               return (
                 <div
                   key={article.id}
@@ -268,14 +269,16 @@ function ReviewQueuePanel({
                       <span className="line-clamp-2 text-sm font-semibold leading-5 text-[#111936]">{article.title}</span>
                       <span className="mt-1 block line-clamp-1 text-xs text-[#56627f]">{article.authors}</span>
                       <span className="mt-1 block line-clamp-1 text-xs text-[#56627f]">{article.year} · {article.journal}</span>
-                      <span className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                      <span className="mt-2 flex min-w-0 flex-col items-start gap-1">
                         <span
                           title={badge.tooltip || badge.label}
-                          className={cn("min-w-0 truncate rounded-full px-2 py-0.5 text-[11px] font-semibold", badge.className)}
+                          className={cn("max-w-full rounded-full px-2 py-0.5 text-[11px] font-semibold", badge.className)}
                         >
                           {badge.label}
                         </span>
-                        <span className="shrink-0 text-[11px] text-[#7a849d]">{formatDate(article.updatedAt || article.createdAt)}</span>
+                        {articleDate !== "-" ? (
+                          <span className="text-[11px] text-[#7a849d]">{articleDate}</span>
+                        ) : null}
                       </span>
                     </span>
                   </button>

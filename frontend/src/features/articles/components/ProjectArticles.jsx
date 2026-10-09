@@ -859,6 +859,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
       ) : null}
 
       <AdaptiveReviewWorkspace
+        activeStage={activeStage}
         queue={<ReviewQueuePanel
           activeFilter={activeFilter}
           activeStage={activeStage}

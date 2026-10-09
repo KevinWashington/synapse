@@ -239,6 +239,8 @@ describe("ProjectArticles work queue", () => {
     expect(row).toHaveClass("min-w-0");
     expect(articleButton).toHaveClass("min-w-0", "flex-1");
     expect(articleButton).toContainElement(status);
+    expect(status).not.toHaveClass("truncate");
+    expect(status.parentElement).toHaveClass("flex-col", "items-start");
     expect(row.querySelector(".max-w-44")).not.toBeInTheDocument();
   });
 

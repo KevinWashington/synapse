@@ -10,6 +10,7 @@ export function useWorkspaceArticle({ projectId, article, activeStage }) {
   const [isLoadingPdf, setIsLoadingPdf] = useState(false);
   const requestSequence = useRef(0);
   const articleRef = useRef(article);
+  const selectedArticleId = article?.id;
   articleRef.current = article;
 
   const refreshArticle = useCallback(async () => {
@@ -19,14 +20,14 @@ export function useWorkspaceArticle({ projectId, article, activeStage }) {
     setPdfData(null);
     setIsLoadingPdf(false);
 
-    if (!sourceArticle?.id || !projectId || !DETAIL_STAGES.has(activeStage)) {
+    if (!selectedArticleId || !projectId || !DETAIL_STAGES.has(activeStage)) {
       setIsLoadingArticle(false);
       return sourceArticle || null;
     }
 
     setIsLoadingArticle(true);
     try {
-      const detail = await articleService.getArticleById(projectId, sourceArticle.id);
+      const detail = await articleService.getArticleById(projectId, selectedArticleId);
       if (requestSequence.current !== requestId) return null;
 
       const mergedArticle = { ...sourceArticle, ...detail };
@@ -39,7 +40,7 @@ export function useWorkspaceArticle({ projectId, article, activeStage }) {
 
       setIsLoadingPdf(true);
       try {
-        const buffer = await articleService.getPdfData(projectId, sourceArticle.id);
+        const buffer = await articleService.getPdfData(projectId, selectedArticleId);
         if (requestSequence.current === requestId) setPdfData(buffer || null);
       } catch (error) {
         if (requestSequence.current === requestId) {
@@ -56,7 +57,7 @@ export function useWorkspaceArticle({ projectId, article, activeStage }) {
       }
       return null;
     }
-  }, [activeStage, article?.id, projectId]);
+  }, [activeStage, projectId, selectedArticleId]);
 
   useEffect(() => {
     refreshArticle();
