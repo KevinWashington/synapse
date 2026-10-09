@@ -26,13 +26,13 @@ import { useProjectArticles } from "@features/articles/hooks/useProjectArticles"
 import { resolveSelectedArticle } from "@features/articles/utils/reviewFlow";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import EligibilityDecisionDialog from "./EligibilityDecisionDialog";
 import ImportBibTeXModal from "./ImportBibTeXModal";
 import NewArticleModal from "./NewArticleModal";
 import UploadPDFModal from "./UploadPDFModal";
 import ReviewAssignmentStatus from "./ReviewAssignmentStatus";
 import AdaptiveReviewWorkspace from "./review/AdaptiveReviewWorkspace";
 import ArticleReadingPane from "./review/ArticleReadingPane";
+import EligibilityDecisionTool from "./review/EligibilityDecisionTool";
 import IdentificationTool from "./review/IdentificationTool";
 import IncludedExtractionTool from "./review/IncludedExtractionTool";
 import ReviewQueuePanel, { getArticleBadge, getFilterOptions } from "./review/ReviewQueuePanel";
@@ -608,7 +608,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
   const [showImportModal, setShowImportModal] = useState(false);
   const [showUploadPdfModal, setShowUploadPdfModal] = useState(false);
   const [pdfTarget, setPdfTarget] = useState(null);
-  const [eligibilityInitialDecision, setEligibilityInitialDecision] = useState("included");
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [isDetailClosed, setIsDetailClosed] = useState(false);
@@ -623,7 +622,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     articles,
     changeArticlePage,
     duplicateCandidates,
-    eligibilityArticle,
     identificationArticles,
     isBatchEvaluating,
     isLoadingArticles,
@@ -640,7 +638,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     selectedDuplicateMap,
     setActiveFlowTab,
     setAssignedToMe,
-    setEligibilityArticle,
     setSearchTerm,
     setSelectedDuplicateMap,
     submitEligibilityDecision,
@@ -717,11 +714,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
   const selectedIndex = selectedArticle
     ? filteredArticles.findIndex((article) => article.id === selectedArticle.id)
     : -1;
-
-  function openEligibilityDecision(article, initialDecision = "included") {
-    setEligibilityInitialDecision(initialDecision);
-    setEligibilityArticle(article);
-  }
 
   function openUploadPdf(article) {
     setPdfTarget(article);
@@ -833,7 +825,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           setSearchTerm={setSearchTerm}
           summary={summary}
         />}
-        content={activeStage === "identification" || activeStage === "screening" || activeStage === "included" ? <ArticleReadingPane
+        content={<ArticleReadingPane
           activeStage={activeStage}
           article={selectedArticle}
           onNext={() => selectAdjacent(1)}
@@ -846,25 +838,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onUploadPdf={openUploadPdf}
           position={{ current: selectedIndex >= 0 ? selectedIndex + 1 : 0, total: filteredArticles.length }}
           project={project}
-        /> : <ArticleDetailPanel
-          activeStage={activeStage}
-          article={selectedArticle}
-          currentIndex={selectedIndex >= 0 ? selectedIndex : 0}
-          onClose={() => setIsDetailClosed(true)}
-          onSkip={handleSkip}
-          onNext={() => selectAdjacent(1)}
-          onOpenArticle={(articleId, workspace) => {
-            const params = new URLSearchParams({ flow: activeStage });
-            if (workspace || activeStage === "included") {
-              params.set("workspace", workspace || "extracao");
-            }
-            onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
-          }}
-          onOpenEligibility={openEligibilityDecision}
-          onOpenUploadPdf={openUploadPdf}
-          onPrevious={() => selectAdjacent(-1)}
-          project={project}
-          total={filteredArticles.length}
         />}
         tool={activeStage === "identification" ? <IdentificationTool
           articleTotal={articleTotal}
@@ -880,6 +853,13 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onAdvance={() => selectAdjacent(1)}
           onSkip={handleSkip}
           onSubmit={submitScreeningDecision}
+        /> : activeStage === "eligibility" ? <EligibilityDecisionTool
+          article={selectedArticle}
+          checklist={project?.eligibilityChecklist || []}
+          isSaving={isSavingDecision}
+          onAdvance={() => selectAdjacent(1)}
+          onSubmit={submitEligibilityDecision}
+          researchQuestions={project?.researchQuestions || []}
         /> : activeStage === "included" ? <IncludedExtractionTool
           article={selectedArticle}
           onExport={handleExportStage}
@@ -940,17 +920,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         article={pdfTarget}
       />
 
-      <EligibilityDecisionDialog
-        article={eligibilityArticle}
-        checklist={project?.eligibilityChecklist || []}
-        initialDecision={eligibilityInitialDecision}
-        projectId={project?.id}
-        researchQuestions={project?.researchQuestions || []}
-        isOpen={Boolean(eligibilityArticle)}
-        isSaving={isSavingDecision}
-        onClose={() => setEligibilityArticle(null)}
-        onSubmit={submitEligibilityDecision}
-      />
     </div>
   );
 }

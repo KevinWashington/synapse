@@ -39,7 +39,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   const [synthesisReportData, setSynthesisReportData] = useState(null);
   const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
   const [selectedDuplicateMap, setSelectedDuplicateMap] = useState({});
-  const [eligibilityArticle, setEligibilityArticle] = useState(null);
   const searchTerm = searchTermsByFlow[activeFlowTab] || "";
   const articleContext = useRef(null);
   articleContext.current = {
@@ -390,18 +389,18 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   );
 
   const submitEligibilityDecision = useCallback(
-    async (payload) => {
-      if (!project?.id || !eligibilityArticle?.id) {
-        return;
+    async (articleId, payload) => {
+      if (!project?.id || !articleId) {
+        return false;
       }
       try {
         setIsSavingDecision(true);
-        await articleService.submitEligibilityDecision(project.id, eligibilityArticle.id, payload);
+        await articleService.submitEligibilityDecision(project.id, articleId, payload);
         toast.success("Decisão de elegibilidade registrada.");
         onGraphNeedsRefresh?.();
-        setEligibilityArticle(null);
         await refreshAll({ refreshSynthesisReport: true });
         await collaboration?.refreshAssignments?.();
+        return true;
       } catch (error) {
         toast.error("Erro ao salvar elegibilidade: " + error.message);
         throw error;
@@ -409,7 +408,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
         setIsSavingDecision(false);
       }
     },
-    [collaboration, eligibilityArticle, onGraphNeedsRefresh, project?.id, refreshAll]
+    [collaboration, onGraphNeedsRefresh, project?.id, refreshAll]
   );
 
   const updateFullTextStatus = useCallback(
@@ -477,7 +476,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     articles,
     changeArticlePage,
     duplicateCandidates,
-    eligibilityArticle,
     identificationArticles,
     isBatchEvaluating,
     isLoadingArticles,
@@ -500,7 +498,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     selectedIdentificationIds,
     setActiveFlowTab,
     setAssignedToMe,
-    setEligibilityArticle,
     setSearchTerm,
     setSelectedDuplicateMap,
     submitEligibilityDecision,

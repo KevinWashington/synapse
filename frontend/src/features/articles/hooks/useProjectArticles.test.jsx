@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   getSelectionSummary: vi.fn(),
   promoteAllUniqueToScreening: vi.fn(),
   submitScreeningDecision: vi.fn(),
+  submitEligibilityDecision: vi.fn(),
   batchEvaluateScreening: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -22,6 +23,7 @@ vi.mock("@features/articles/services/articleService", () => ({
     getSelectionSummary: mocks.getSelectionSummary,
     promoteAllUniqueToScreening: mocks.promoteAllUniqueToScreening,
     submitScreeningDecision: mocks.submitScreeningDecision,
+    submitEligibilityDecision: mocks.submitEligibilityDecision,
     batchEvaluateScreening: mocks.batchEvaluateScreening,
   },
 }));
@@ -127,6 +129,24 @@ describe("useProjectArticles work queues", () => {
     await act(async () => { saved = await result.current.submitScreeningDecision(11, { decision: "included" }); });
     expect(saved).toBe(true);
     expect(mocks.submitScreeningDecision).toHaveBeenCalledWith(7, 11, { decision: "included" });
+    expect(refreshAssignments).toHaveBeenCalledOnce();
+  });
+
+  it("submits eligibility for the explicit article and reports success", async () => {
+    const refreshAssignments = vi.fn().mockResolvedValue(undefined);
+    mocks.submitEligibilityDecision.mockResolvedValue({ currentPhase: "included" });
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }, undefined, { refreshAssignments }), {
+      wrapper: wrapperAt("/projetos/7?tab=artigos&flow=eligibility"),
+    });
+    await waitFor(() => expect(result.current.isLoadingArticles).toBe(false));
+
+    let saved;
+    await act(async () => {
+      saved = await result.current.submitEligibilityDecision(23, { decision: "included" });
+    });
+
+    expect(saved).toBe(true);
+    expect(mocks.submitEligibilityDecision).toHaveBeenCalledWith(7, 23, { decision: "included" });
     expect(refreshAssignments).toHaveBeenCalledOnce();
   });
 
