@@ -59,8 +59,7 @@ def assignment_database():
 
 
 @pytest.mark.asyncio
-async def test_concurrent_distribution_is_serialized_and_idempotent(assignment_database, monkeypatch):
-    monkeypatch.setattr("app.services.review_assignment_service.settings.ASSIGNED_REVIEW_FLOW_ENABLED", True)
+async def test_concurrent_distribution_is_serialized_and_idempotent(assignment_database):
     engine = create_async_engine(URL)
     session_one = AsyncSession(engine, expire_on_commit=False)
     session_two = AsyncSession(engine, expire_on_commit=False)

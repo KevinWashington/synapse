@@ -113,6 +113,18 @@ class NotificationResponse(BaseModel):
         from_attributes = True
 
 
+class InboxNotificationResponse(NotificationResponse):
+    projectTitle: str
+
+
+class UserInboxResponse(BaseModel):
+    notifications: list[InboxNotificationResponse] = Field(default_factory=list)
+    invitations: list[UserInvitationResponse] = Field(default_factory=list)
+    unreadNotificationCount: int = 0
+    pendingInvitationCount: int = 0
+    nextNotificationCursor: int | None = None
+
+
 class DistributionRequest(BaseModel):
     phase: Literal["screening", "eligibility"]
 

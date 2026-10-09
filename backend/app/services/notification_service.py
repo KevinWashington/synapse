@@ -1,9 +1,10 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.collaboration import ProjectMember, ProjectNotification
+from app.models.project import Project
 
 
 def create_notification(
@@ -50,6 +51,35 @@ async def list_notifications(
         query.order_by(ProjectNotification.createdAt.desc(), ProjectNotification.id.desc()).limit(limit)
     )
     return result.scalars().all()
+
+
+async def list_user_notifications(
+    db: AsyncSession, *, user_id: int, limit: int = 50, before_id: int | None = None
+):
+    query = (
+        select(ProjectNotification, Project.title)
+        .join(Project, Project.id == ProjectNotification.projectId)
+        .where(ProjectNotification.recipientUserId == user_id)
+    )
+    if before_id is not None:
+        query = query.where(ProjectNotification.id < before_id)
+    result = await db.execute(
+        query.order_by(ProjectNotification.createdAt.desc(), ProjectNotification.id.desc()).limit(limit + 1)
+    )
+    rows = result.all()
+    # The cursor identifies the final item returned.  Using the first hidden
+    # item would skip it on the next request (`id < before_id`).
+    return rows[:limit], (rows[limit - 1][0].id if len(rows) > limit else None)
+
+
+async def unread_notification_count(db: AsyncSession, *, user_id: int) -> int:
+    result = await db.execute(
+        select(func.count(ProjectNotification.id)).where(
+            ProjectNotification.recipientUserId == user_id,
+            ProjectNotification.readAt.is_(None),
+        )
+    )
+    return int(result.scalar_one())
 
 
 async def notify_member_administration(
@@ -157,12 +187,39 @@ async def mark_notification_read(
     return notification
 
 
+async def mark_user_notification_read(
+    db: AsyncSession, *, user_id: int, notification_id: int
+) -> ProjectNotification | None:
+    result = await db.execute(
+        select(ProjectNotification).where(
+            ProjectNotification.id == notification_id,
+            ProjectNotification.recipientUserId == user_id,
+        )
+    )
+    notification = result.scalar_one_or_none()
+    if notification and notification.readAt is None:
+        notification.readAt = datetime.now(timezone.utc)
+    return notification
+
+
 async def mark_all_notifications_read(db: AsyncSession, *, project_id: int, user_id: int):
     result = await db.execute(
         select(ProjectNotification).where(
             ProjectNotification.projectId == project_id,
             ProjectNotification.recipientUserId == user_id,
         )
+    )
+    notifications = result.scalars().all()
+    now = datetime.now(timezone.utc)
+    for notification in notifications:
+        if notification.readAt is None:
+            notification.readAt = now
+    return notifications
+
+
+async def mark_all_user_notifications_read(db: AsyncSession, *, user_id: int):
+    result = await db.execute(
+        select(ProjectNotification).where(ProjectNotification.recipientUserId == user_id)
     )
     notifications = result.scalars().all()
     now = datetime.now(timezone.utc)

@@ -13,7 +13,6 @@ from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from starlette.datastructures import Headers
 
-from app.config import get_settings
 from app.database import Base
 from app.models.article import Article
 from app.models.collaboration import ProjectMember, ReviewAssignment, ReviewConflict, ReviewDecision
@@ -75,7 +74,6 @@ def database():
 
 @pytest_asyncio.fixture
 async def scene(monkeypatch):
-    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", True)
     monkeypatch.setattr(articles, "_sync_article_indexes", AsyncMock())
     engine = create_async_engine(URL)
     async with engine.connect() as connection:
@@ -207,9 +205,7 @@ async def test_metadata_queries_are_batched_for_a_page(scene):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("enabled", [True, False])
-async def test_no_assignment_and_disabled_rollout_preserve_solo_flow(scene, monkeypatch, enabled):
-    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", enabled)
+async def test_no_assignment_preserves_solo_flow(scene):
     response = await articles.get_article_by_id(scene.project.id, scene.article.id, scene.owner, scene.db)
     assert response.hasActiveReviewAssignments is False
     assert response.myReviewAssignment is None
@@ -220,12 +216,9 @@ async def test_no_assignment_and_disabled_rollout_preserve_solo_flow(scene, monk
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("enabled", [True, False])
-async def test_existing_assignments_remain_authoritative_when_rollout_is_disabled(scene, monkeypatch, enabled):
+async def test_existing_assignments_remain_authoritative(scene):
     await assign(scene, scene.reviewer)
     await assign(scene, scene.peer, slot=2)
-    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", enabled)
-
     response = await articles.get_article_by_id(scene.project.id, scene.article.id, scene.reviewer, scene.db)
     assert response.hasActiveReviewAssignments is True
     assert response.myReviewAssignment.reviewerUserId == scene.reviewer.id
@@ -242,9 +235,7 @@ async def test_existing_assignments_remain_authoritative_when_rollout_is_disable
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("enabled", [True, False])
-async def test_reviewer_without_assignment_cannot_use_legacy_write_path(scene, monkeypatch, enabled):
-    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", enabled)
+async def test_reviewer_without_assignment_cannot_use_legacy_write_path(scene):
 
     with pytest.raises(HTTPException) as denied_decision:
         await articles.screening_decision(
@@ -454,11 +445,9 @@ async def test_managed_full_text_status_cannot_change_or_reset_canonical_decisio
 
 
 @pytest.mark.asyncio
-async def test_disabled_rollout_preserves_solo_full_text_status_with_existing_assignments(scene, monkeypatch):
+async def test_solo_full_text_status_is_blocked_with_existing_assignments(scene):
     scene.article.currentPhase = "eligibility"
     await assign(scene, scene.peer, phase="eligibility")
-    monkeypatch.setattr(get_settings(), "ASSIGNED_REVIEW_FLOW_ENABLED", False)
-
     with pytest.raises(HTTPException) as denied:
         await articles.update_full_text_status(
             scene.project.id,

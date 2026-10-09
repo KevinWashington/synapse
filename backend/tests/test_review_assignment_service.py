@@ -93,7 +93,6 @@ async def test_reassignment_notifies_reviewer_and_records_audit(monkeypatch):
     )
     notification = Mock()
     audit = Mock()
-    monkeypatch.setattr("app.services.review_assignment_service.settings.ASSIGNED_REVIEW_FLOW_ENABLED", True)
     monkeypatch.setattr("app.services.review_assignment_service.create_notification", notification)
     monkeypatch.setattr("app.services.review_assignment_service.create_audit_event", audit)
 

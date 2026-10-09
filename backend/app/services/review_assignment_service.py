@@ -7,7 +7,6 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.article import Article
 from app.models.collaboration import ProjectMember, ReviewAssignment
 from app.services.invitation_service import create_audit_event
@@ -56,14 +55,6 @@ def build_balanced_plan(
     return plan
 
 
-def _ensure_enabled() -> None:
-    if not settings.ASSIGNED_REVIEW_FLOW_ENABLED:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": "ASSIGNED_REVIEW_DISABLED", "message": "A distribuição de revisões ainda não está habilitada."},
-        )
-
-
 async def _eligible_reviewer_ids(db: AsyncSession, access: ProjectAccess) -> list[int]:
     result = await db.execute(
         select(ProjectMember).where(
@@ -87,7 +78,6 @@ async def preview_distribution(
     phase: ReviewPhase,
 ) -> DistributionPreview:
     require_capability(access, CAP_MANAGE_DISTRIBUTION)
-    _ensure_enabled()
     reviewers = await _eligible_reviewer_ids(db, access)
     assigned_result = await db.execute(
         select(ReviewAssignment.articleId).where(
@@ -130,7 +120,6 @@ async def distribute_reviews(
     assigned_by_user_id: int,
 ) -> DistributionPreview:
     require_capability(access, CAP_MANAGE_DISTRIBUTION)
-    _ensure_enabled()
     await db.execute(
         select(
             func.pg_advisory_xact_lock(
@@ -187,7 +176,6 @@ async def reassign_review(
     assigned_by_user_id: int,
 ) -> ReviewAssignment:
     require_capability(access, CAP_MANAGE_DISTRIBUTION)
-    _ensure_enabled()
     result = await db.execute(
         select(ReviewAssignment).where(
             ReviewAssignment.id == assignment_id,

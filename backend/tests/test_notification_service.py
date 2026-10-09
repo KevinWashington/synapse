@@ -55,6 +55,20 @@ async def test_notification_listing_is_bounded_and_supports_cursor():
 
 
 @pytest.mark.asyncio
+async def test_user_notification_cursor_continues_after_the_last_returned_row():
+    rows = [(SimpleNamespace(id=value), "Project") for value in (9, 8, 7)]
+    result = SimpleNamespace(all=lambda: rows)
+    db = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+    page, cursor = await notification_service.list_user_notifications(
+        db, user_id=22, limit=2
+    )
+
+    assert [notification.id for notification, _ in page] == [9, 8]
+    assert cursor == 8
+
+
+@pytest.mark.asyncio
 async def test_mark_all_read_is_not_limited_by_notification_poll_page(monkeypatch):
     notifications = [SimpleNamespace(readAt=None), SimpleNamespace(readAt="already-read")]
     result = SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: notifications))

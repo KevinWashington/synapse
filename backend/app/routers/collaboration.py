@@ -15,7 +15,6 @@ from app.schemas.collaboration import (
     InvitationUpdate,
     MemberResponse,
     MemberUpdate,
-    NotificationResponse,
     OwnershipTransferRequest,
     TeamResponse,
     AssignmentResponse,
@@ -27,12 +26,7 @@ from app.schemas.collaboration import (
     ReopenReviewRequest,
 )
 from app.services.invitation_service import create_audit_event, invite_project_member
-from app.services.notification_service import (
-    list_notifications,
-    mark_all_notifications_read,
-    mark_notification_read,
-    notify_member_administration,
-)
+from app.services.notification_service import notify_member_administration
 from app.services.project_access_service import (
     CAP_MANAGE_MEMBERS,
     CAP_MANAGE_DISTRIBUTION,
@@ -364,43 +358,6 @@ async def transfer_ownership(projectId: int, data: OwnershipTransferRequest, cur
     create_audit_event(db, project_id=projectId, actor_user_id=current_user.id, action="ownership_transferred", entity_type="project", entity_id=projectId, payload={"newOwnerUserId": data.userId})
     await db.commit()
     return await get_team(projectId, current_user, db)
-
-
-@router.get("/{projectId}/notifications", response_model=list[NotificationResponse])
-async def get_notifications(
-    projectId: int,
-    limit: int = Query(50, ge=1, le=100),
-    beforeId: int | None = Query(None, ge=1),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
-    return await list_notifications(
-        db,
-        project_id=projectId,
-        user_id=current_user.id,
-        limit=limit,
-        before_id=beforeId,
-    )
-
-
-@router.patch("/{projectId}/notifications/{notificationId}/read", response_model=NotificationResponse)
-async def read_notification(projectId: int, notificationId: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
-    notification = await mark_notification_read(db, project_id=projectId, user_id=current_user.id, notification_id=notificationId)
-    if notification is None:
-        raise _not_found("notification")
-    await db.commit()
-    await db.refresh(notification)
-    return notification
-
-
-@router.post("/{projectId}/notifications/read-all", response_model=list[NotificationResponse])
-async def read_all_notifications(projectId: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
-    notifications = await mark_all_notifications_read(db, project_id=projectId, user_id=current_user.id)
-    await db.commit()
-    return notifications
 
 
 @router.post("/{projectId}/assignments/preview", response_model=DistributionPreviewResponse)

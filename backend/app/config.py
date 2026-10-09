@@ -64,9 +64,6 @@ class Settings(BaseSettings):
     SQL_MCP_MAX_ROWS: int = 200
     SQL_MCP_ALLOW_WRITE_TABLES: str = "articles,projects"
 
-    # Controlled rollout for independent assigned reviews
-    ASSIGNED_REVIEW_FLOW_ENABLED: bool = False
-
     @field_validator("DEBUG", mode="before")
     @classmethod
     def normalize_debug_flag(cls, value):
