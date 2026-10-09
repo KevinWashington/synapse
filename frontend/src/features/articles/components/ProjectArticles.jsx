@@ -33,6 +33,9 @@ import ScreeningDecisionDialog from "./ScreeningDecisionDialog";
 import UploadPDFModal from "./UploadPDFModal";
 import ReviewAssignmentStatus from "./ReviewAssignmentStatus";
 import AdaptiveReviewWorkspace from "./review/AdaptiveReviewWorkspace";
+import ArticleReadingPane from "./review/ArticleReadingPane";
+import IdentificationTool from "./review/IdentificationTool";
+import IncludedExtractionTool from "./review/IncludedExtractionTool";
 import ReviewQueuePanel, { getArticleBadge, getFilterOptions } from "./review/ReviewQueuePanel";
 import ReviewStageNavigator from "./review/ReviewStageNavigator";
 import { collaborativeReview } from "../utils/collaborativeReview";
@@ -833,7 +836,20 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           setSearchTerm={setSearchTerm}
           summary={summary}
         />}
-        content={<ArticleDetailPanel
+        content={activeStage === "identification" || activeStage === "included" ? <ArticleReadingPane
+          activeStage={activeStage}
+          article={selectedArticle}
+          onNext={() => selectAdjacent(1)}
+          onOpenArticle={(articleId) => {
+            const params = new URLSearchParams({ flow: activeStage });
+            if (activeStage === "included") params.set("workspace", "extracao");
+            onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
+          }}
+          onPrevious={() => selectAdjacent(-1)}
+          onUploadPdf={openUploadPdf}
+          position={{ current: selectedIndex >= 0 ? selectedIndex + 1 : 0, total: filteredArticles.length }}
+          project={project}
+        /> : <ArticleDetailPanel
           activeStage={activeStage}
           article={selectedArticle}
           currentIndex={selectedIndex >= 0 ? selectedIndex : 0}
@@ -860,7 +876,25 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           project={project}
           total={filteredArticles.length}
         />}
-        tool={<StageSidebar
+        tool={activeStage === "identification" ? <IdentificationTool
+          articleTotal={articleTotal}
+          canManageArticles={canManageArticles}
+          duplicateCandidates={duplicateCandidates}
+          onExport={handleExportStage}
+          onPromoteAllUnique={promoteAllUniqueToScreening}
+          onRunDedup={handleDedupAndRefresh}
+          summary={summary}
+        /> : activeStage === "included" ? <IncludedExtractionTool
+          article={selectedArticle}
+          onExport={handleExportStage}
+          onOpenExtraction={(articleId) => {
+            const params = new URLSearchParams({ flow: activeStage, workspace: "extracao" });
+            onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
+          }}
+          onViewFlow={onViewFlow}
+          project={project}
+          summary={summary}
+        /> : <StageSidebar
           activeStage={activeStage}
           articleTotal={articleTotal}
           articles={stageArticles}
