@@ -1,6 +1,6 @@
 """Require explicit invitation consent.
 
-Revision ID: 0004_user_inbox_invitation_consent
+Revision ID: 0004_inbox_invite_consent
 Revises: 0003_project_collaboration
 Create Date: 2026-10-09
 """
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = "0004_user_inbox_invitation_consent"
+revision: str = "0004_inbox_invite_consent"
 down_revision: Union[str, None] = "0003_project_collaboration"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
