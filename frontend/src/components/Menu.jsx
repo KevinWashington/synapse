@@ -71,8 +71,8 @@ function NavItem({ item, onItemClick }) {
       className={cn(
         "flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
         active
-          ? "bg-[#eeefff] text-[#0f1734]"
-          : "text-[#56627f] hover:bg-[#f5f7fc] hover:text-[#0f1734]"
+          ? "bg-[#eeefff] text-[#0f1734] dark:bg-[#312e68] dark:text-[#f4f3ff]"
+          : "text-[var(--syn-text-secondary)] hover:bg-[var(--syn-sidebar-hover)] hover:text-[var(--syn-text-primary)]"
       )}
     >
       <item.icon className="h-[18px] w-[18px]" />
@@ -92,17 +92,17 @@ function ProjectNavItem({ project, index, onItemClick }) {
       onClick={onItemClick}
       className={cn(
         "group flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40",
-        active ? "bg-[#f5f6ff]" : "hover:bg-[#f7f8fc]"
+        active ? "bg-[#f5f6ff] dark:bg-[#292744]" : "hover:bg-[var(--syn-sidebar-hover)]"
       )}
     >
       <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", iconClass)}>
         <FileText className="h-4 w-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-semibold leading-5 text-[#2c3658]">
+        <span className="block truncate text-xs font-semibold leading-5 text-[var(--syn-text-primary)]">
           {project.title}
         </span>
-        <span className="block truncate text-xs text-[#74809d]">
+        <span className="block truncate text-xs text-[var(--syn-text-secondary)]">
           {project.articleCount} artigos
         </span>
       </span>
@@ -139,12 +139,12 @@ function SidebarContent({ onItemClick }) {
   const visibleProjects = useMemo(() => projects.slice(0, 6), [projects]);
 
   return (
-    <div className="flex h-full flex-col bg-[#fbfcff]">
+    <div className="flex h-full flex-col bg-[var(--syn-sidebar-bg)]">
       <div className="px-6 pb-6 pt-5">
         <Link
           to="/"
           onClick={onItemClick}
-          className="inline-flex cursor-pointer rounded-md text-xl font-semibold tracking-tight text-[#111936] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
+          className="inline-flex cursor-pointer rounded-md text-xl font-semibold tracking-tight text-[var(--syn-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
         >
           Synapse
         </Link>
@@ -156,18 +156,18 @@ function SidebarContent({ onItemClick }) {
         ))}
       </nav>
 
-      <div className="mx-6 my-6 h-px bg-[#edf0f7]" />
+      <div className="mx-6 my-6 h-px bg-[var(--syn-border)]" />
 
       <section className="min-h-0 flex-1 px-4">
         <div className="mb-4 flex items-center justify-between px-1">
-          <p className="text-xs font-medium text-[#56627f]">Seus projetos</p>
+          <p className="text-xs font-medium text-[var(--syn-text-secondary)]">Seus projetos</p>
           <button
             type="button"
             onClick={() => {
               onItemClick?.();
               navigate("/projetos");
             }}
-            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[#edf0f7] bg-white text-[#253252] transition-colors hover:bg-[#f5f7fc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
+            className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] text-[var(--syn-text-primary)] transition-colors hover:bg-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
             aria-label="Novo projeto"
           >
             <Plus className="h-4 w-4" />
@@ -188,11 +188,11 @@ function SidebarContent({ onItemClick }) {
 
       <div className="space-y-4 px-5 pb-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-[#56627f]">
+          <div className="flex items-center gap-2 text-sm text-[var(--syn-text-secondary)]">
             <Sparkles className="h-4 w-4" />
             <span>Tema</span>
           </div>
-          <ThemeToggle className="h-8 w-10 rounded-full border-[#dfe4ef] bg-[#eef1f7] text-[#68748f] shadow-none hover:bg-[#e8ecf4]" />
+          <ThemeToggle className="h-8 w-10 rounded-full border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] text-[var(--syn-text-secondary)] shadow-none hover:bg-[var(--accent)]" />
         </div>
       </div>
     </div>
@@ -207,11 +207,11 @@ function Menu() {
       <div className="fixed left-4 top-4 z-50 md:hidden">
         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="rounded-full bg-white" aria-label="Abrir menu">
+            <Button variant="outline" size="icon" className="rounded-full bg-[var(--syn-bg-primary)]" aria-label="Abrir menu">
               <MenuIcon size={20} />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[240px] border-0 bg-[#fbfcff] p-0">
+          <SheetContent side="left" className="w-[240px] border-0 bg-[var(--syn-sidebar-bg)] p-0">
             <SheetHeader className="sr-only">
               <SheetTitle>Menu de navegação</SheetTitle>
             </SheetHeader>
@@ -220,7 +220,7 @@ function Menu() {
         </Sheet>
       </div>
 
-      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[240px] border-r border-[#edf0f7] bg-[#fbfcff] md:block">
+      <aside className="fixed left-0 top-0 z-40 hidden h-full w-[240px] border-r border-[var(--syn-border)] bg-[var(--syn-sidebar-bg)] md:block">
         <SidebarContent />
       </aside>
     </>

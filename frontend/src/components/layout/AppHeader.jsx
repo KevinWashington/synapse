@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, LogOutIcon } from "lucide-react";
-import ThemeToggle from "@components/ThemeToggle";
 import { Button } from "@/components/ui/Button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
 import {
@@ -39,7 +38,7 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
   return (
     <header
       data-density={compact ? "compact" : "regular"}
-      className="flex h-[72px] shrink-0 items-center justify-between gap-4 bg-[#fbfcff] pl-20 pr-5 md:px-10"
+      className="flex h-[72px] shrink-0 items-center justify-between gap-4 border-b border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] pl-20 pr-5 md:px-10"
     >
       <div className="flex min-w-0 items-center gap-3">
         {backUrl ? (
@@ -47,7 +46,7 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
             type="button"
             aria-label="Voltar"
             onClick={() => navigate(backUrl)}
-            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[#e8ebf4] bg-white text-[#56627f] transition-colors hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
+            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] text-[var(--syn-text-secondary)] transition-colors hover:bg-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
           >
             <ArrowLeftIcon className="h-4 w-4" />
           </button>
@@ -61,7 +60,7 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
                   <ChevronRightIcon
                     aria-hidden="true"
                     data-testid="breadcrumb-separator"
-                    className="h-3.5 w-3.5 shrink-0 text-[#9aa4b8]"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--syn-text-secondary)]"
                   />
                 ) : null}
                 {item.href ? (
@@ -69,7 +68,7 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
                     {item.label}
                   </Link>
                 ) : (
-                  <span className="truncate text-[#667391]" aria-current="page">
+                  <span className="truncate text-[var(--syn-text-secondary)]" aria-current="page">
                     {item.label}
                   </span>
                 )}
@@ -77,24 +76,23 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
             ))}
           </nav>
         ) : title ? (
-          <h1 className="truncate text-lg font-semibold text-[#101936]">{title}</h1>
+          <h1 className="truncate text-lg font-semibold text-[var(--syn-text-primary)]">{title}</h1>
         ) : null}
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
         {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         <UserInbox />
-        <ThemeToggle className="h-10 w-10 rounded-full border-[#edf0f7] bg-white text-[#182344] shadow-none hover:bg-[#f6f7fb]" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               aria-label="Abrir menu da conta"
-              className="flex h-10 items-center gap-2 rounded-full px-1.5 text-[#182344] hover:bg-[#f6f7fb]"
+              className="flex h-10 items-center gap-2 rounded-full px-1.5 text-[var(--syn-text-primary)] hover:bg-[var(--accent)]"
             >
               <Avatar className="h-9 w-9">
                 {user?.avatar ? <AvatarImage src={user.avatar} alt={user?.name || "Perfil"} /> : null}
-                <AvatarFallback className="bg-[#eef1ff] text-[11px] font-semibold text-[#6259ff]">
+                <AvatarFallback className="bg-[#eef1ff] text-[11px] font-semibold text-[#6259ff] dark:bg-[#312e68] dark:text-[#c7c4ff]">
                   {getInitials(user?.name, user?.email)}
                 </AvatarFallback>
               </Avatar>

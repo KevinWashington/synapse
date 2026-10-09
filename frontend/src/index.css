@@ -122,11 +122,11 @@
 /* ===== Synapse Design System Tokens ===== */
 :root {
   /* Sidebar */
-  --syn-sidebar-bg: #1a1d23;
-  --syn-sidebar-text: #8b92a5;
-  --syn-sidebar-active: #ffffff;
+  --syn-sidebar-bg: #fbfcff;
+  --syn-sidebar-text: #56627f;
+  --syn-sidebar-active: #0f1734;
   --syn-sidebar-accent: #3b82f6;
-  --syn-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --syn-sidebar-hover: #f5f7fc;
 
   /* Backgrounds */
   --syn-bg-primary: #ffffff;

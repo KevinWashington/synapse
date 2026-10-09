@@ -205,31 +205,12 @@ describe("ProjectDetails unsaved Planning navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
     expect(mocks.setActiveTab).toHaveBeenCalledWith("equipe");
   });
-  it("guards notification destinations while planning is dirty", async () => {
-    renderPage();
-    await makePlanningDirty();
-    fireEvent.click(
-      screen.getByRole("button", { name: /Notificações do projeto,/ }),
-    );
-    fireEvent.click(
-      await screen.findByRole("link", { name: "Artigo atribuído" }),
-    );
-    expect(mocks.navigate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Sair sem salvar" }));
-    expect(mocks.navigate).toHaveBeenCalledWith("/projetos/7/artigos/9");
-  });
-  it("shares a single collection load between the team and notification header", async () => {
+  it("loads the project team without the retired project notification feed", async () => {
     mocks.activeTab = "equipe";
     renderPage();
     expect(await screen.findByText("Ana")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
-        name: "Notificações do projeto, 1 não lidas",
-      }),
-    ).toBeInTheDocument();
     expect(vi.mocked(apiService.get).mock.calls.map(([url]) => url)).toEqual([
       "/api/projetos/7/members",
-      "/api/projetos/7/notifications",
     ]);
   });
   it("discards an open team editor when the project changes", async () => {

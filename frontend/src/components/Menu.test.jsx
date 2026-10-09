@@ -68,6 +68,16 @@ describe("Menu", () => {
     expect(screen.getByRole("link", { name: "Biblioteca" })).toHaveAttribute("href", "/artigos");
   });
 
+  it("keeps the theme control in the sidebar", () => {
+    render(
+      <MemoryRouter initialEntries={["/artigos"]}>
+        <Menu />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByTitle(/Alternar para tema/)).toBeInTheDocument();
+  });
+
   it("marks enabled navigation actions as interactive", () => {
     render(
       <MemoryRouter>

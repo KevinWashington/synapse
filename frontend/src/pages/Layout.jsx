@@ -9,7 +9,7 @@ const Layout = () => {
   const isArticleWorkspace = /^\/projetos\/[^/]+\/artigos\/[^/]+/.test(location.pathname);
 
   return (
-    <div className="flex min-h-screen bg-[#fbfcff] text-[#0f1734]">
+    <div className="flex min-h-screen bg-[var(--syn-bg-secondary)] text-[var(--syn-text-primary)]">
       {!isArticleWorkspace ? <Menu /> : null}
 
       <div className={`flex min-h-screen min-w-0 flex-1 flex-col ${isArticleWorkspace ? "" : "md:ml-[240px]"}`}>

@@ -44,12 +44,12 @@ describe("AppHeader", () => {
     expect(screen.getAllByTestId("breadcrumb-separator")).toHaveLength(2);
   });
 
-  it("shows the authenticated identity, theme control, and account actions", async () => {
+  it("shows the authenticated identity and account actions without a theme control", async () => {
     renderHeader();
 
     expect(screen.getByText("AR")).toBeInTheDocument();
     expect(screen.queryByText("JS")).not.toBeInTheDocument();
-    expect(screen.getByTitle(/Alternar para tema/)).toBeInTheDocument();
+    expect(screen.queryByTitle(/Alternar para tema/)).not.toBeInTheDocument();
 
     fireEvent.pointerDown(screen.getByRole("button", { name: "Abrir menu da conta" }), {
       button: 0,
