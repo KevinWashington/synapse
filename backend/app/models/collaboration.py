@@ -45,7 +45,7 @@ class ProjectInvitation(Base):
     __tablename__ = "project_invitations"
     __table_args__ = (
         CheckConstraint("role IN ('coordinator', 'reviewer')", name="ck_project_invitations_role"),
-        CheckConstraint("status IN ('pending', 'accepted', 'cancelled', 'expired')", name="ck_project_invitations_status"),
+        CheckConstraint("status IN ('pending', 'accepted', 'declined', 'cancelled', 'expired')", name="ck_project_invitations_status"),
         Index(
             "uq_project_invitations_pending",
             "projectId",
@@ -64,6 +64,7 @@ class ProjectInvitation(Base):
     invitedByUserId: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     expiresAt: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     acceptedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    declinedAt: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     createdAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
     updatedAt: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 

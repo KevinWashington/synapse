@@ -39,10 +39,30 @@ class InvitationResponse(BaseModel):
     status: str
     expiresAt: datetime
     acceptedAt: datetime | None = None
+    declinedAt: datetime | None = None
     createdAt: datetime
 
     class Config:
         from_attributes = True
+
+
+class UserInvitationResponse(BaseModel):
+    id: int
+    projectId: int
+    projectTitle: str
+    inviterName: str | None = None
+    role: MemberRole
+    participatesInReview: bool
+    expiresAt: datetime
+    createdAt: datetime
+
+
+class InvitationDecisionResponse(BaseModel):
+    id: int
+    projectId: int
+    status: str
+    acceptedAt: datetime | None = None
+    declinedAt: datetime | None = None
 
 
 class MemberUpdate(BaseModel):

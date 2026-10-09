@@ -10,6 +10,7 @@ from app.models.collaboration import (
     ProjectMember,
 )
 from app.models.user import User
+from app.models.project import Project
 from app.services.notification_service import create_notification
 from app.services.project_access_service import CAP_MANAGE_MEMBERS, ProjectAccess, require_capability
 
@@ -40,6 +41,14 @@ def create_audit_event(
     )
     db.add(event)
     return event
+
+
+class InvitationDecisionError(Exception):
+    def __init__(self, status_code: int, code: str, message: str):
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
 
 
 async def _activate_member(
@@ -121,8 +130,19 @@ async def invite_project_member(
     )
     user = user_result.scalar_one_or_none()
     now = datetime.now(timezone.utc)
+    active_member = None
 
     if user is not None:
+        member_result = await db.execute(
+            select(ProjectMember).where(
+                ProjectMember.projectId == access.project.id,
+                ProjectMember.userId == user.id,
+                ProjectMember.status == "active",
+            )
+        )
+        active_member = member_result.scalar_one_or_none()
+
+    if active_member is not None:
         member, created, changed = await _activate_member(
             db,
             project_id=access.project.id,
@@ -292,3 +312,106 @@ async def claim_pending_invitations(
         )
     await db.flush()
     return memberships
+
+
+async def list_pending_invitations(db: AsyncSession, *, user: User):
+    now = datetime.now(timezone.utc)
+    email = normalize_email(user.email)
+    expired = await db.execute(
+        select(ProjectInvitation).where(
+            ProjectInvitation.emailNormalized == email,
+            ProjectInvitation.status == "pending",
+            ProjectInvitation.expiresAt <= now,
+        )
+    )
+    for invitation in expired.scalars().all():
+        invitation.status = "expired"
+
+    result = await db.execute(
+        select(ProjectInvitation, Project.title, User.name)
+        .join(Project, Project.id == ProjectInvitation.projectId)
+        .outerjoin(User, User.id == ProjectInvitation.invitedByUserId)
+        .where(
+            ProjectInvitation.emailNormalized == email,
+            ProjectInvitation.status == "pending",
+            ProjectInvitation.expiresAt > now,
+        )
+        .order_by(ProjectInvitation.createdAt.desc(), ProjectInvitation.id.desc())
+    )
+    return result.all()
+
+
+async def decide_invitation(
+    db: AsyncSession,
+    *,
+    invitation_id: int,
+    user: User,
+    decision: str,
+) -> ProjectInvitation:
+    now = datetime.now(timezone.utc)
+    email = normalize_email(user.email)
+    result = await db.execute(
+        select(ProjectInvitation)
+        .where(
+            ProjectInvitation.id == invitation_id,
+            ProjectInvitation.emailNormalized == email,
+        )
+        .with_for_update()
+    )
+    invitation = result.scalar_one_or_none()
+    if invitation is None:
+        raise InvitationDecisionError(404, "INVITATION_NOT_FOUND", "Registro não encontrado.")
+    if invitation.status == "accepted" and decision == "accept":
+        return invitation
+    if invitation.status != "pending":
+        raise InvitationDecisionError(409, "INVITATION_UNAVAILABLE", "Este convite não está mais disponível.")
+    if invitation.expiresAt <= now:
+        invitation.status = "expired"
+        raise InvitationDecisionError(410, "INVITATION_EXPIRED", "Este convite expirou.")
+
+    if decision == "accept":
+        await _activate_member(
+            db,
+            project_id=invitation.projectId,
+            user_id=user.id,
+            role=invitation.role,
+            participates_in_review=invitation.participatesInReview,
+            invited_by_user_id=invitation.invitedByUserId,
+            joined_at=now,
+        )
+        invitation.status = "accepted"
+        invitation.acceptedAt = now
+        event_action = "invitation_accepted"
+        notification_type = "member_joined"
+        notification_title = "Convite aceito"
+        notification_body = f"{user.name} entrou no projeto."
+    else:
+        invitation.status = "declined"
+        invitation.declinedAt = now
+        event_action = "invitation_declined"
+        notification_type = "invitation_declined"
+        notification_title = "Convite recusado"
+        notification_body = f"{user.name} recusou o convite para o projeto."
+
+    create_audit_event(
+        db,
+        project_id=invitation.projectId,
+        actor_user_id=user.id,
+        action=event_action,
+        entity_type="invitation",
+        entity_id=invitation.id,
+        payload={"memberUserId": user.id, "role": invitation.role},
+    )
+    if invitation.invitedByUserId:
+        create_notification(
+            db,
+            project_id=invitation.projectId,
+            recipient_user_id=invitation.invitedByUserId,
+            type=notification_type,
+            title=notification_title,
+            body=notification_body,
+            entity_type="invitation",
+            entity_id=invitation.id,
+        )
+    await db.flush()
+    return invitation

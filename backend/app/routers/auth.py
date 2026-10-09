@@ -15,7 +15,6 @@ from app.services.google_identity_service import (
     GoogleIdentityService,
     get_google_identity_service,
 )
-from app.services.invitation_service import claim_pending_invitations
 
 
 router = APIRouter()
@@ -87,7 +86,6 @@ async def google_login(
     try:
         if getattr(user, "id", None) is None:
             await db.flush()
-        await claim_pending_invitations(db, user=user)
         await db.commit()
         await db.refresh(user)
     except IntegrityError as exc:
