@@ -91,6 +91,11 @@ class ApiService {
 
   async request(endpoint, options = {}) {
     const response = await this.requestRaw(endpoint, options);
+
+    if (response.status === 204) {
+      return null;
+    }
+
     const contentType = response.headers.get("content-type");
 
     if (
@@ -106,7 +111,8 @@ class ApiService {
       return null;
     }
 
-    return await response.json();
+    const body = await response.text();
+    return body ? JSON.parse(body) : null;
   }
 
   async get(endpoint, params = {}) {
