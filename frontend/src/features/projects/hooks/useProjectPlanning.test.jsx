@@ -95,4 +95,22 @@ describe("useProjectPlanning dirty state", () => {
     expect(result.current.data.objetivo).toBe("Objetivo inicial");
     expect(result.current.isDirty).toBe(false);
   });
+
+  it("keeps manual schema identifiers stable while their labels are edited", () => {
+    const { result } = renderHook(() => useProjectPlanning(project));
+
+    act(() => result.current.addExtractionField());
+    act(() => result.current.addQualityCriterion());
+    act(() => result.current.updateExtractionField(0, { label: "Desenho do estudo" }));
+    act(() => result.current.updateQualityCriterion(0, "Risco de viés"));
+
+    expect(result.current.data.dataExtractionSchema[0]).toMatchObject({
+      key: "field",
+      label: "Desenho do estudo",
+    });
+    expect(result.current.data.qualityAssessmentSchema[0]).toMatchObject({
+      key: "criterion",
+      label: "Risco de viés",
+    });
+  });
 });

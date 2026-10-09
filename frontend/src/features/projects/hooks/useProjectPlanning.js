@@ -9,9 +9,7 @@ import { projectService } from "@features/projects/services/projectService";
 import {
   createExtractionField,
   createQualityCriterion,
-  ensureUniqueSchemaKey,
   normalizeOptions,
-  slugifySchemaKey,
 } from "@features/projects/utils/evidenceSchema";
 
 const INITIAL_LOADING_MAP = {
@@ -205,18 +203,6 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
           ...field,
           ...patch,
         };
-        if (
-          patch.label !== undefined &&
-          /^field(?:_\d+)?$/.test(field.key || "")
-        ) {
-          const siblingItems = (current.dataExtractionSchema || []).filter(
-            (_, currentItemIndex) => currentItemIndex !== index
-          );
-          nextField.key = ensureUniqueSchemaKey(
-            slugifySchemaKey(patch.label, "field"),
-            siblingItems
-          );
-        }
         if (patch.options !== undefined) {
           nextField.options = normalizeOptions(patch.options);
         }
@@ -252,19 +238,7 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
       ...current,
       qualityAssessmentSchema: (current.qualityAssessmentSchema || []).map((criterion, currentIndex) =>
         currentIndex === index
-          ? {
-              ...criterion,
-              key:
-                /^criterion(?:_\d+)?$/.test(criterion.key || "")
-                  ? ensureUniqueSchemaKey(
-                      slugifySchemaKey(label, "criterion"),
-                      (current.qualityAssessmentSchema || []).filter(
-                        (_, currentItemIndex) => currentItemIndex !== index
-                      )
-                    )
-                  : criterion.key,
-              label,
-            }
+          ? { ...criterion, label }
           : criterion
       ),
     }));
