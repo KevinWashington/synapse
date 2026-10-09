@@ -42,6 +42,8 @@ import NewArticleModal from "./NewArticleModal";
 import ScreeningDecisionDialog from "./ScreeningDecisionDialog";
 import UploadPDFModal from "./UploadPDFModal";
 import ReviewAssignmentStatus from "./ReviewAssignmentStatus";
+import AdaptiveReviewWorkspace from "./review/AdaptiveReviewWorkspace";
+import ReviewStageNavigator from "./review/ReviewStageNavigator";
 import { collaborativeReview } from "../utils/collaborativeReview";
 
 const STAGES = [
@@ -298,61 +300,6 @@ function filterArticles({ articles, duplicateIds, filter, searchTerm, stageKey }
     if (filter === "pending_extraction") return !Object.keys(article.extractionData || {}).length;
     return true;
   });
-}
-
-function StageStepper({ activeStage, onStageChange, summary }) {
-  const activeIndex = STAGES.findIndex((stage) => stage.key === activeStage);
-
-  return (
-    <section className="rounded-lg border border-[#edf0f7] bg-white p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-[#111936]">Etapas da revisão</h2>
-          <p className="mt-1 text-sm text-[#667391]">Acompanhe e gerencie cada etapa do fluxo PRISMA.</p>
-        </div>
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-4">
-        {STAGES.map((stage, index) => {
-          const isActive = stage.key === activeStage;
-          const isDone = index < activeIndex;
-
-          return (
-            <button
-              key={stage.key}
-              type="button"
-              onClick={() => onStageChange(stage.key)}
-              className={cn(
-                "relative flex items-center gap-4 rounded-lg border bg-white p-4 text-left transition-colors",
-                isActive ? "border-[#6259ff] bg-[#fbfaff]" : "border-[#edf0f7] hover:border-[#cfd6e7]"
-              )}
-            >
-              <span className={cn(
-                "grid h-10 w-10 shrink-0 place-items-center rounded-full border text-base font-semibold",
-                isActive ? "border-[#6259ff] bg-[#6259ff] text-white" : "border-[#dfe4ef] text-[#111936]"
-              )}>
-                {stage.number}
-              </span>
-              <span className="min-w-0">
-                <span className={cn("block truncate text-sm font-semibold", isActive ? "text-[#6259ff]" : "text-[#111936]")}>
-                  {stage.label}
-                </span>
-                <span className="mt-1 block text-xs text-[#56627f]">{formatNumber(getStageCount(summary, stage.key))} artigos</span>
-              </span>
-              {isDone ? (
-                <span className="ml-auto grid h-8 w-8 place-items-center rounded-full bg-[#dff7ea] text-[#21945a]">
-                  <CheckIcon className="h-4 w-4" />
-                </span>
-              ) : null}
-              {index < STAGES.length - 1 ? (
-                <span className="absolute -right-3 top-1/2 hidden h-px w-3 bg-[#dfe4ef] xl:block" />
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
 }
 
 function SourceBadge({ article }) {
@@ -1169,7 +1116,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         </Button></> : null}
       </div>
 
-      <StageStepper
+      <ReviewStageNavigator
         activeStage={activeStage}
         onStageChange={setActiveFlowTab}
         summary={summary}
@@ -1187,8 +1134,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         />
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)] 2xl:grid-cols-[minmax(0,1.08fr)_minmax(430px,0.88fr)_300px]">
-        <StageListPanel
+      <AdaptiveReviewWorkspace
+        queue={<StageListPanel
           activeFilter={activeFilter}
           activeStage={activeStage}
           articlePage={articlePage}
@@ -1225,9 +1172,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           selectedIdentificationIds={selectedIdentificationIds}
           setSearchTerm={setSearchTerm}
           summary={summary}
-        />
-
-        <ArticleDetailPanel
+        />}
+        content={<ArticleDetailPanel
           activeStage={activeStage}
           article={selectedArticle}
           currentIndex={selectedIndex >= 0 ? selectedIndex : 0}
@@ -1253,9 +1199,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onPrevious={() => selectAdjacent(-1)}
           project={project}
           total={filteredArticles.length}
-        />
-
-        <StageSidebar
+        />}
+        tool={<StageSidebar
           activeStage={activeStage}
           articleTotal={articleTotal}
           articles={stageArticles}
@@ -1266,8 +1211,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onRunDedup={handleDedupAndRefresh}
           onViewFlow={onViewFlow}
           summary={summary}
-        />
-      </div>
+        />}
+      />
 
       {isBatchEvaluating || isLoadingDuplicates ? (
         <div className="fixed bottom-5 right-5 flex items-center gap-2 rounded-lg border border-[#edf0f7] bg-white px-4 py-3 text-sm text-[#667391] shadow-lg">
