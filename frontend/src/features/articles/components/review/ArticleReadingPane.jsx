@@ -6,6 +6,7 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import PdfViewer from "../PdfViewer";
 import DecisionHistory from "./DecisionHistory";
 
 function formatNumber(value) {
@@ -21,6 +22,7 @@ function ArticleReadingPane({
   onNext,
   onUploadPdf,
   onOpenArticle,
+  pdfData,
 }) {
   if (!article) {
     return (
@@ -74,7 +76,7 @@ function ArticleReadingPane({
               onClick={() => article.hasPdf ? onOpenArticle(article.id) : onUploadPdf(article)}
             >
               {article.hasPdf ? <ExternalLinkIcon className="h-3.5 w-3.5" /> : <UploadIcon className="h-3.5 w-3.5" />}
-              {article.hasPdf ? "Abrir artigo" : "Enviar PDF"}
+              {article.hasPdf ? "Abrir em modo de foco" : "Enviar PDF"}
             </Button>
           ) : null}
         </div>
@@ -93,6 +95,15 @@ function ArticleReadingPane({
                 </div>
               );
             }) : <p className="text-sm text-[#667391]">Nenhum campo de extração configurado.</p>}
+          </div>
+        ) : isEligibility && article.hasPdf ? (
+          <div className="mt-5 h-[520px] min-h-0 w-full">
+            <PdfViewer
+              article={article}
+              articleId={article.id}
+              pdfData={pdfData}
+              projectId={project?.id || article.projectId}
+            />
           </div>
         ) : isEligibility ? (
           <div className="mt-5 min-h-72 rounded-lg border border-[#e2e6ef] bg-[#fbfcff] p-5">

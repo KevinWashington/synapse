@@ -4,6 +4,12 @@ import ArticleReadingPane from "./ArticleReadingPane";
 import IdentificationTool from "./IdentificationTool";
 import IncludedExtractionTool from "./IncludedExtractionTool";
 
+vi.mock("../PdfViewer", () => ({
+  default: ({ article, pdfData }) => (
+    <div data-testid="embedded-pdf">{article.title} · {pdfData?.byteLength || 0} bytes</div>
+  ),
+}));
+
 const article = {
   id: 7,
   title: "Inclusão digital para pessoas idosas",
@@ -78,6 +84,44 @@ describe("ArticleReadingPane", () => {
     const content = screen.getByTestId("article-reading-content");
     expect(content).toHaveClass("w-full");
     expect(content).not.toHaveClass("max-w-[760px]");
+  });
+
+  it("embeds the PDF as the primary eligibility content", () => {
+    render(
+      <ArticleReadingPane
+        activeStage="eligibility"
+        article={article}
+        pdfData={new ArrayBuffer(16)}
+        project={{ id: 3 }}
+        position={{ current: 1, total: 1 }}
+        onNext={vi.fn()}
+        onOpenArticle={vi.fn()}
+        onPrevious={vi.fn()}
+        onUploadPdf={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId("embedded-pdf")).toHaveTextContent("16 bytes");
+    expect(screen.getByRole("button", { name: "Abrir em modo de foco" })).toBeInTheDocument();
+  });
+
+  it("uses summary and upload as the eligibility fallback when there is no PDF", () => {
+    render(
+      <ArticleReadingPane
+        activeStage="eligibility"
+        article={{ ...article, hasPdf: false }}
+        project={{ id: 3 }}
+        position={{ current: 1, total: 1 }}
+        onNext={vi.fn()}
+        onOpenArticle={vi.fn()}
+        onPrevious={vi.fn()}
+        onUploadPdf={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId("embedded-pdf")).not.toBeInTheDocument();
+    expect(screen.getByText("Resumo do estudo.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enviar PDF" })).toBeInTheDocument();
   });
 });
 

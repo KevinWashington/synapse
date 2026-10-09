@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/Button";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { articleService } from "@features/articles/services/articleService";
 import { useProjectArticles } from "@features/articles/hooks/useProjectArticles";
+import { useWorkspaceArticle } from "@features/articles/hooks/useWorkspaceArticle";
 import { resolveSelectedArticle } from "@features/articles/utils/reviewFlow";
 import { getExtractionProgress } from "@features/articles/utils/reviewWorkspace";
 import { toast } from "@/lib/toast";
@@ -714,6 +715,15 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     [filteredArticles, isDetailClosed, selectedArticleId]
   );
 
+  const {
+    article: workspaceArticle,
+    pdfData: workspacePdfData,
+  } = useWorkspaceArticle({
+    activeStage,
+    article: selectedArticle,
+    projectId: project?.id,
+  });
+
   useEffect(() => {
     if (!isDetailClosed) {
       setSelectedArticleId((currentId) => resolveSelectedArticle(filteredArticles, currentId)?.id ?? null);
@@ -876,7 +886,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         />}
         content={<ArticleReadingPane
           activeStage={activeStage}
-          article={selectedArticle}
+          article={workspaceArticle}
           onNext={() => {
             if (filteredArticles.length > 1) draftGuard.guard(() => selectAdjacent(1));
           }}
@@ -891,6 +901,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
             if (filteredArticles.length > 1) draftGuard.guard(() => selectAdjacent(-1));
           }}
           onUploadPdf={openUploadPdf}
+          pdfData={workspacePdfData}
           position={{ current: selectedIndex >= 0 ? selectedIndex + 1 : 0, total: filteredArticles.length }}
           project={project}
         />}
@@ -903,14 +914,14 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onRunDedup={handleDedupAndRefresh}
           summary={summary}
         /> : activeStage === "screening" ? <ScreeningDecisionTool
-          article={selectedArticle}
+          article={workspaceArticle}
           isSaving={isSavingDecision}
           onAdvance={() => { setIsReviewDraftDirty(false); selectAdjacent(1); }}
           onDirtyChange={setIsReviewDraftDirty}
           onSkip={() => draftGuard.guard(handleSkip)}
           onSubmit={saveScreeningDecision}
         /> : activeStage === "eligibility" ? <EligibilityDecisionTool
-          article={selectedArticle}
+          article={workspaceArticle}
           checklist={project?.eligibilityChecklist || []}
           isSaving={isSavingDecision}
           onAdvance={() => { setIsReviewDraftDirty(false); selectAdjacent(1); }}
@@ -918,7 +929,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onSubmit={saveEligibilityDecision}
           researchQuestions={project?.researchQuestions || []}
         /> : activeStage === "included" ? <IncludedExtractionTool
-          article={selectedArticle}
+          article={workspaceArticle}
           onExport={handleExportStage}
           onOpenExtraction={(articleId) => {
             const params = new URLSearchParams({ flow: activeStage, workspace: "extracao" });
