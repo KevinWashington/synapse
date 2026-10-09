@@ -58,6 +58,7 @@ describe("AppHeader", () => {
 
     await waitFor(() => expect(screen.getByText("Ana Rocha")).toBeInTheDocument());
     expect(screen.getByText("ana@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Configurações" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Sair" })).toBeInTheDocument();
   });
 

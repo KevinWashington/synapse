@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, LogOutIcon } from "lucide-react";
+import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, LogOutIcon, SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/Avatar";
 import {
@@ -105,6 +105,10 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
               <span className="block truncate text-xs font-normal text-muted-foreground">{user?.email}</span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/settings")}>
+              <SettingsIcon size={16} />
+              <span>Configurações</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout}>
               <LogOutIcon size={16} />
               <span>Sair</span>
