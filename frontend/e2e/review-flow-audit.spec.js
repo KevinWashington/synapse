@@ -109,30 +109,27 @@ test.describe("review workflow audit", () => {
 
       await openArticleFromRow(page, titles[0]);
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-      await capture(page, testInfo, "04", "screening-include-dialog");
-      await page.getByRole("button", { name: "Salvar decisão" }).click();
-      await expect(page.getByRole("dialog")).not.toBeVisible();
+      await capture(page, testInfo, "04", "screening-inline-decision");
+      await page.getByRole("button", { name: /Salvar e pr/ }).click();
 
       await openArticleFromRow(page, titles[1]);
       await page.getByRole("button", { name: "Excluir", exact: true }).click();
       await page.getByPlaceholder(/Obrigatório ao excluir/).fill("Não responde à pergunta de pesquisa.");
-      await page.getByRole("button", { name: "Salvar decisão" }).click();
-      await expect(page.getByRole("dialog")).not.toBeVisible();
+      await page.getByRole("button", { name: /Elegibilidade/ }).first().click();
+      await expect(page.getByRole("dialog", { name: /Descartar altera/ })).toBeVisible();
+      await page.getByRole("button", { name: "Cancelar" }).click();
+      await expect(page.getByRole("button", { name: /Triagem/ }).first()).toHaveAttribute("aria-current", "step");
+      await page.getByRole("button", { name: /Salvar e pr/ }).click();
       await expect(articleRow(page, titles[1])).toHaveCount(0);
       await expect(page.getByText("Selecione um artigo", { exact: true })).toBeVisible();
       observations.push("excluded-record-leaves-active-queue=true");
       await capture(page, testInfo, "05", "screening-after-decisions");
 
       await page.getByRole("button", { name: /Elegibilidade/ }).first().click();
-      await expect(page.getByRole("heading", { name: "Elegibilidade" })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Elegibilidade/ }).first()).toHaveAttribute("aria-current", "step");
       await expect(articleRow(page, titles[0])).toBeVisible();
-      await page.getByRole("button", { name: "Pular por agora", exact: true }).click();
-      await expect(page.getByText("Artigo mantido pendente. Próximo item aberto.")).toBeVisible();
-      await capture(page, testInfo, "06", "eligibility-pending-action");
-
-      await expect(page.getByRole("button", { name: "Incluir", exact: true })).toBeDisabled();
-      await expect(page.getByText("Envie o PDF para liberar a decisão de inclusão.")).toBeVisible();
+      await page.getByRole("button", { name: /Salvar e pr/ }).click();
+      await expect(page.getByText(/Envie o PDF antes de incluir/)).toBeVisible();
       await capture(page, testInfo, "07", "eligibility-inclusion-blocked-without-pdf");
 
       await page.getByRole("button", { name: "Enviar PDF" }).click();
@@ -150,11 +147,10 @@ test.describe("review workflow audit", () => {
       await capture(page, testInfo, "08", "eligibility-after-upload");
 
       await openArticleFromRow(page, titles[0]);
-      await page.getByRole("button", { name: "Incluir", exact: true }).click();
+      await page.getByRole("button", { name: "Incluir no corpus", exact: true }).click();
       await page.getByText("Sim", { exact: true }).click();
       await page.getByText("RQ 1", { exact: true }).click();
-      await page.getByRole("button", { name: "Salvar decisão" }).click();
-      await expect(page.getByRole("dialog")).not.toBeVisible();
+      await page.getByRole("button", { name: /Salvar e pr/ }).click();
 
       await page.getByRole("button", { name: /Inclus/ }).first().click();
       await expect(page.getByRole("heading", { name: /Inclus/ })).toBeVisible();

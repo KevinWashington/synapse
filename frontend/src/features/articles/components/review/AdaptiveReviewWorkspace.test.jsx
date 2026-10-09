@@ -70,5 +70,6 @@ describe("AdaptiveReviewWorkspace", () => {
     expect(screen.getByRole("region", { name: "Decisão" })).toHaveAttribute("data-active-region", "true");
     expect(screen.getByRole("textbox", { name: "Busca da fila" })).toHaveValue("idosos");
     expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveValue("rascunho");
+    expect(screen.getByRole("tab", { name: /Decis/ })).toHaveClass("focus-visible:ring-2");
   });
 });

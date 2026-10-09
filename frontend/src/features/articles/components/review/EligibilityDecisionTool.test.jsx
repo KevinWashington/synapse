@@ -22,6 +22,20 @@ function renderTool(overrides = {}) {
 }
 
 describe("EligibilityDecisionTool", () => {
+  it("does not mark persisted reason and RQs as a new draft", async () => {
+    const onDirtyChange = vi.fn();
+    renderTool({
+      article: { ...article, eligibilityReasonText: "Registrado", answeringRQs: [1] },
+      onDirtyChange,
+    });
+
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(false));
+    fireEvent.change(screen.getByRole("textbox", { name: "Justificativa" }), {
+      target: { value: "Alterado" },
+    });
+    await waitFor(() => expect(onDirtyChange).toHaveBeenLastCalledWith(true));
+  });
+
   it("blocks inclusion when the PDF is missing", async () => {
     const { onSubmit } = renderTool({ article: { ...article, hasPdf: false } });
 

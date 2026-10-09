@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
 import ProjectArticles from "./ProjectArticles";
@@ -58,6 +58,30 @@ function renderList(overrides = {}) {
 }
 
 describe("ProjectArticles work queue", () => {
+  it("keeps the current stage when a dirty decision navigation is cancelled", async () => {
+    const screeningArticle = { ...article, currentPhase: "screening", hasPdf: true };
+    vi.spyOn(articleService, "getArticlesByProject").mockResolvedValue({ articles: [screeningArticle], total: 1 });
+    vi.spyOn(articleService, "getSelectionSummary").mockResolvedValue({ screening: { total: 1 } });
+    vi.spyOn(articleService, "getSelectionReport").mockResolvedValue({});
+    vi.spyOn(articleService, "getDuplicateCandidates").mockResolvedValue([]);
+
+    render(<MemoryRouter initialEntries={["/projetos/7?flow=screening"]}>
+      <ProjectArticles project={{ id: 7, capabilities: ["edit_project"] }} />
+    </MemoryRouter>);
+
+    await screen.findByRole("button", { name: "Excluir", exact: true });
+    fireEvent.click(screen.getByRole("button", { name: "Excluir", exact: true }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Justificativa" }), {
+      target: { value: "Rascunho ainda não salvo" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Elegibilidade/ }));
+
+    expect(await screen.findByRole("dialog", { name: /Descartar alterações/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByRole("button", { name: /Triagem/ })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveValue("Rascunho ainda não salvo");
+  });
+
   it.each(["identification", "screening"])("hides corpus administration from assigned reviewers in %s", async (flow) => {
     vi.spyOn(articleService, "getArticlesByProject").mockResolvedValue({ articles: [{ ...article, currentPhase: flow,
       hasActiveReviewAssignments: true, myReviewAssignment: { reviewerUserId: 1, status: "pending" } }], total: 1 });

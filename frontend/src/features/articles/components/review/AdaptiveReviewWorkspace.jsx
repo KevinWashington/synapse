@@ -28,7 +28,7 @@ function AdaptiveReviewWorkspace({ queue, content, tool }) {
             aria-selected={activeRegion === region.key}
             onClick={() => setActiveRegion(region.key)}
             className={cn(
-              "border-b-2 px-3 py-3 text-sm font-semibold transition-colors",
+              "border-b-2 px-3 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff] focus-visible:ring-inset",
               activeRegion === region.key
                 ? "border-[#6259ff] bg-white text-[#554bea]"
                 : "border-transparent text-[#667391] hover:text-[#111936]"

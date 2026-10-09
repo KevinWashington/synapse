@@ -54,14 +54,18 @@ function EligibilityDecisionForm({
   }, [article, initialDecision]);
 
   useEffect(() => {
+    const initialReason = article?.eligibilityReasonText || "";
+    const initialRQs = article?.answeringRQs || [];
+    const hasChangedRQs = selectedRQs.length !== initialRQs.length
+      || selectedRQs.some((value) => !initialRQs.includes(value));
     onDirtyChange?.(
       decision !== initialDecision
-      || Boolean(reasonText)
+      || reasonText !== initialReason
       || Object.keys(statuses).length > 0
       || Object.values(evidence).some(Boolean)
-      || selectedRQs.length > 0
+      || hasChangedRQs
     );
-  }, [decision, evidence, initialDecision, onDirtyChange, reasonText, selectedRQs, statuses]);
+  }, [article?.answeringRQs, article?.eligibilityReasonText, decision, evidence, initialDecision, onDirtyChange, reasonText, selectedRQs, statuses]);
 
   async function assistWithAI() {
     if (!onAssist || isAssisting) return;

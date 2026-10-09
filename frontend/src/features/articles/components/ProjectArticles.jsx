@@ -38,6 +38,7 @@ import IncludedExtractionTool from "./review/IncludedExtractionTool";
 import ReviewQueuePanel, { getArticleBadge, getFilterOptions } from "./review/ReviewQueuePanel";
 import ReviewStageNavigator from "./review/ReviewStageNavigator";
 import ScreeningDecisionTool from "./review/ScreeningDecisionTool";
+import { useReviewDraftGuard } from "./review/useReviewDraftGuard";
 import { collaborativeReview } from "../utils/collaborativeReview";
 
 const STAGES = [
@@ -611,6 +612,12 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedArticleId, setSelectedArticleId] = useState(null);
   const [isDetailClosed, setIsDetailClosed] = useState(false);
+  const [isReviewDraftDirty, setIsReviewDraftDirty] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState("");
+  const draftGuard = useReviewDraftGuard({
+    isDirty: isReviewDraftDirty,
+    confirmDiscard: () => setIsReviewDraftDirty(false),
+  });
 
   const {
     activeFlowTab,
@@ -751,8 +758,33 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     toast.info("Artigo mantido pendente. Próximo item aberto.");
   }
 
+  async function saveScreeningDecision(articleId, payload) {
+    setReviewStatus("Salvando decisão de triagem.");
+    try {
+      const saved = await submitScreeningDecision(articleId, payload);
+      if (saved) setReviewStatus("Decisão de triagem salva. Próximo artigo aberto.");
+      return saved;
+    } catch (error) {
+      setReviewStatus("Não foi possível salvar a decisão de triagem.");
+      throw error;
+    }
+  }
+
+  async function saveEligibilityDecision(articleId, payload) {
+    setReviewStatus("Salvando decisão de elegibilidade.");
+    try {
+      const saved = await submitEligibilityDecision(articleId, payload);
+      if (saved) setReviewStatus("Decisão de elegibilidade salva. Próximo artigo aberto.");
+      return saved;
+    } catch (error) {
+      setReviewStatus("Não foi possível salvar a decisão de elegibilidade.");
+      throw error;
+    }
+  }
+
   return (
     <div className="space-y-5">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">{reviewStatus}</p>
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button variant="outline" className="h-10 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={handleExportStage}>
           <DownloadIcon className="h-4 w-4" />
@@ -770,7 +802,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
 
       <ReviewStageNavigator
         activeStage={activeStage}
-        onStageChange={setActiveFlowTab}
+        onStageChange={(stage) => draftGuard.guard(() => setActiveFlowTab(stage))}
         summary={summary}
       />
 
@@ -800,21 +832,27 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           isLoading={isLoadingArticles}
           isPromotingUnique={isPromotingUnique}
           onArticleSelect={(article) => {
-            setIsDetailClosed(false);
-            setSelectedArticleId(article.id);
+            draftGuard.guard(() => {
+              setIsDetailClosed(false);
+              setSelectedArticleId(article.id);
+            });
           }}
           onFilterChange={(filter) => {
-            setActiveFilter(filter);
-            setAssignedToMe(filter === "assigned");
+            draftGuard.guard(() => {
+              setActiveFilter(filter);
+              setAssignedToMe(filter === "assigned");
+            });
           }}
           onOpenArticle={(articleId) => {
-            const params = new URLSearchParams({ flow: activeStage });
-            if (activeStage === "included") {
-              params.set("workspace", "extracao");
-            }
-            onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
+            draftGuard.guard(() => {
+              const params = new URLSearchParams({ flow: activeStage });
+              if (activeStage === "included") {
+                params.set("workspace", "extracao");
+              }
+              onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
+            });
           }}
-          onPageChange={changeArticlePage}
+          onPageChange={(page) => draftGuard.guard(() => changeArticlePage(page))}
           onPromoteAllUnique={promoteAllUniqueToScreening}
           onPromoteSelected={promoteSelectedToScreening}
           onToggleAllIdentification={toggleAllIdentificationSelection}
@@ -828,13 +866,15 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         content={<ArticleReadingPane
           activeStage={activeStage}
           article={selectedArticle}
-          onNext={() => selectAdjacent(1)}
+          onNext={() => draftGuard.guard(() => selectAdjacent(1))}
           onOpenArticle={(articleId) => {
-            const params = new URLSearchParams({ flow: activeStage });
-            if (activeStage === "included") params.set("workspace", "extracao");
-            onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
+            draftGuard.guard(() => {
+              const params = new URLSearchParams({ flow: activeStage });
+              if (activeStage === "included") params.set("workspace", "extracao");
+              onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
+            });
           }}
-          onPrevious={() => selectAdjacent(-1)}
+          onPrevious={() => draftGuard.guard(() => selectAdjacent(-1))}
           onUploadPdf={openUploadPdf}
           position={{ current: selectedIndex >= 0 ? selectedIndex + 1 : 0, total: filteredArticles.length }}
           project={project}
@@ -850,15 +890,17 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         /> : activeStage === "screening" ? <ScreeningDecisionTool
           article={selectedArticle}
           isSaving={isSavingDecision}
-          onAdvance={() => selectAdjacent(1)}
-          onSkip={handleSkip}
-          onSubmit={submitScreeningDecision}
+          onAdvance={() => { setIsReviewDraftDirty(false); selectAdjacent(1); }}
+          onDirtyChange={setIsReviewDraftDirty}
+          onSkip={() => draftGuard.guard(handleSkip)}
+          onSubmit={saveScreeningDecision}
         /> : activeStage === "eligibility" ? <EligibilityDecisionTool
           article={selectedArticle}
           checklist={project?.eligibilityChecklist || []}
           isSaving={isSavingDecision}
-          onAdvance={() => selectAdjacent(1)}
-          onSubmit={submitEligibilityDecision}
+          onAdvance={() => { setIsReviewDraftDirty(false); selectAdjacent(1); }}
+          onDirtyChange={setIsReviewDraftDirty}
+          onSubmit={saveEligibilityDecision}
           researchQuestions={project?.researchQuestions || []}
         /> : activeStage === "included" ? <IncludedExtractionTool
           article={selectedArticle}
@@ -918,6 +960,16 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         }}
         project={project}
         article={pdfTarget}
+      />
+
+      <ConfirmationDialog
+        open={draftGuard.isConfirmOpen}
+        title="Descartar alterações da decisão?"
+        description="Você tem uma decisão ainda não salva. Ao continuar, essas alterações serão perdidas."
+        confirmLabel="Descartar e continuar"
+        tone="destructive"
+        onConfirm={draftGuard.confirm}
+        onOpenChange={(open) => { if (!open) draftGuard.cancel(); }}
       />
 
     </div>
