@@ -42,14 +42,14 @@ function ArticleReadingPane({
   return (
     <article className="min-h-[620px] bg-white">
       <header className="flex items-center justify-between border-b border-[#edf0f7] px-5 py-3">
-        <button type="button" onClick={onPrevious} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-[#667391] hover:bg-[#f4f6fb]">
+        <button type="button" onClick={onPrevious} disabled={position.total <= 1} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-[#667391] hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff] disabled:opacity-40">
           <ChevronLeftIcon className="h-4 w-4" />
           Anterior
         </button>
         <span className="text-xs font-medium text-[#667391]">
           {formatNumber(position.current)} de {formatNumber(position.total)}
         </span>
-        <button type="button" onClick={onNext} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-[#667391] hover:bg-[#f4f6fb]">
+        <button type="button" onClick={onNext} disabled={position.total <= 1} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-[#667391] hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff] disabled:opacity-40">
           Próximo
           <ChevronRightIcon className="h-4 w-4" />
         </button>

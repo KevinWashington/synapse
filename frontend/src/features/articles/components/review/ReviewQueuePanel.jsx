@@ -220,7 +220,7 @@ function ReviewQueuePanel({
                   type="button"
                   onClick={() => onFilterChange(option.key)}
                   className={cn(
-                    "relative whitespace-nowrap pb-2.5 text-xs font-semibold",
+                    "relative rounded-sm whitespace-nowrap pb-2.5 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]",
                     active ? "text-[#6259ff]" : "text-[#56627f] hover:text-[#111936]"
                   )}
                 >
@@ -302,7 +302,7 @@ function ReviewQueuePanel({
                     type="button"
                     aria-current={selected ? "true" : undefined}
                     onClick={() => onArticleSelect(article)}
-                    className="flex min-w-[min(100%,16rem)] flex-1 items-start gap-3 text-left"
+                    className="flex min-w-[min(100%,16rem)] flex-1 items-start gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]"
                   >
                     <span className={cn("mt-3 h-2 w-2 shrink-0 rounded-full", badge.dot)} />
                     <SourceBadge article={article} />

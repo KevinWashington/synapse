@@ -866,7 +866,9 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           searchTerm={searchTerm}
           selectedArticle={selectedArticle}
           selectedIdentificationIds={selectedIdentificationIds}
-          setSearchTerm={setSearchTerm}
+          setSearchTerm={(value) => {
+            if (value !== searchTerm) draftGuard.guard(() => setSearchTerm(value));
+          }}
           summary={summary}
         />}
         content={<ArticleReadingPane

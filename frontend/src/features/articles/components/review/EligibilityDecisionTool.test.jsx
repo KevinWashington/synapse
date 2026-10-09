@@ -112,4 +112,19 @@ describe("EligibilityDecisionTool", () => {
     expect(screen.getByRole("button", { name: "Sim" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Salvar e próximo" })).toBeEnabled();
   });
+
+  it("keeps every eligibility control read-only after this reviewer submitted", () => {
+    renderTool({
+      article: {
+        ...article,
+        hasActiveReviewAssignments: true,
+        myReviewAssignment: { reviewerUserId: 1, status: "submitted" },
+        reviewState: "waiting_for_reviewer",
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "RQ 1" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Justificativa" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Salvar e próximo" })).toBeDisabled();
+  });
 });

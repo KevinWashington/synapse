@@ -82,6 +82,11 @@ describe("ProjectArticles work queue", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(screen.getByRole("button", { name: /Triagem/ })).toHaveAttribute("aria-current", "step");
     expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveValue("Rascunho ainda não salvo");
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar artigos"), { target: { value: "novo filtro" } });
+    expect(await screen.findByRole("dialog", { name: /Descartar alterações/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByPlaceholderText("Buscar artigos")).toHaveValue("");
   });
 
   it.each(["identification", "screening"])("hides corpus administration from assigned reviewers in %s", async (flow) => {

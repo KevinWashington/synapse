@@ -150,7 +150,7 @@ function EligibilityDecisionForm({
       {decision === "included" && researchQuestions.length ? (
         <div><p className="text-xs font-semibold text-[#111936]">RQs respondidas</p><div className="mt-2 flex flex-wrap gap-2">{researchQuestions.map((question, index) => {
           const number = index + 1; const selected = selectedRQs.includes(number);
-          return <button key={number} type="button" aria-pressed={selected} className={cn("rounded-md border px-2 py-1 text-xs", selected ? "border-[#6259ff] bg-[#f0edff] text-[#554bea]" : "border-[#dfe4ef] text-[#667391]")} title={question} onClick={() => setSelectedRQs((current) => selected ? current.filter((value) => value !== number) : [...current, number])}>RQ {number}</button>;
+          return <button key={number} type="button" aria-pressed={selected} className={cn("rounded-md border px-2 py-1 text-xs", selected ? "border-[#6259ff] bg-[#f0edff] text-[#554bea]" : "border-[#dfe4ef] text-[#667391]")} title={question} disabled={isSaving || !canDecide} onClick={() => setSelectedRQs((current) => selected ? current.filter((value) => value !== number) : [...current, number])}>RQ {number}</button>;
         })}</div></div>
       ) : null}
 
