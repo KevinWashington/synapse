@@ -39,7 +39,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   const [synthesisReportData, setSynthesisReportData] = useState(null);
   const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
   const [selectedDuplicateMap, setSelectedDuplicateMap] = useState({});
-  const [screeningArticle, setScreeningArticle] = useState(null);
   const [eligibilityArticle, setEligibilityArticle] = useState(null);
   const searchTerm = searchTermsByFlow[activeFlowTab] || "";
   const articleContext = useRef(null);
@@ -369,17 +368,17 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   }, [project?.id, refreshAll]);
 
   const submitScreeningDecision = useCallback(
-    async (payload) => {
-      if (!project?.id || !screeningArticle?.id) {
-        return;
+    async (articleId, payload) => {
+      if (!project?.id || !articleId) {
+        return false;
       }
       try {
         setIsSavingDecision(true);
-        await articleService.submitScreeningDecision(project.id, screeningArticle.id, payload);
+        await articleService.submitScreeningDecision(project.id, articleId, payload);
         toast.success("Decisão de triagem registrada.");
-        setScreeningArticle(null);
         await refreshAll();
         await collaboration?.refreshAssignments?.();
+        return true;
       } catch (error) {
         toast.error("Erro ao salvar triagem: " + error.message);
         throw error;
@@ -387,7 +386,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
         setIsSavingDecision(false);
       }
     },
-    [collaboration, project?.id, refreshAll, screeningArticle]
+    [collaboration, project?.id, refreshAll]
   );
 
   const submitEligibilityDecision = useCallback(
@@ -496,14 +495,12 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     synthesisReportData,
     runBatchEvaluate,
     runDedupAnalysis,
-    screeningArticle,
     searchTerm,
     selectedDuplicateMap,
     selectedIdentificationIds,
     setActiveFlowTab,
     setAssignedToMe,
     setEligibilityArticle,
-    setScreeningArticle,
     setSearchTerm,
     setSelectedDuplicateMap,
     submitEligibilityDecision,

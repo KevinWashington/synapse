@@ -29,7 +29,6 @@ import { cn } from "@/lib/utils";
 import EligibilityDecisionDialog from "./EligibilityDecisionDialog";
 import ImportBibTeXModal from "./ImportBibTeXModal";
 import NewArticleModal from "./NewArticleModal";
-import ScreeningDecisionDialog from "./ScreeningDecisionDialog";
 import UploadPDFModal from "./UploadPDFModal";
 import ReviewAssignmentStatus from "./ReviewAssignmentStatus";
 import AdaptiveReviewWorkspace from "./review/AdaptiveReviewWorkspace";
@@ -38,6 +37,7 @@ import IdentificationTool from "./review/IdentificationTool";
 import IncludedExtractionTool from "./review/IncludedExtractionTool";
 import ReviewQueuePanel, { getArticleBadge, getFilterOptions } from "./review/ReviewQueuePanel";
 import ReviewStageNavigator from "./review/ReviewStageNavigator";
+import ScreeningDecisionTool from "./review/ScreeningDecisionTool";
 import { collaborativeReview } from "../utils/collaborativeReview";
 
 const STAGES = [
@@ -608,7 +608,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
   const [showImportModal, setShowImportModal] = useState(false);
   const [showUploadPdfModal, setShowUploadPdfModal] = useState(false);
   const [pdfTarget, setPdfTarget] = useState(null);
-  const [screeningInitialDecision, setScreeningInitialDecision] = useState("included");
   const [eligibilityInitialDecision, setEligibilityInitialDecision] = useState("included");
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedArticleId, setSelectedArticleId] = useState(null);
@@ -636,14 +635,12 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     refreshAll,
     runBatchEvaluate,
     runDedupAnalysis,
-    screeningArticle,
     searchTerm,
     selectedIdentificationIds,
     selectedDuplicateMap,
     setActiveFlowTab,
     setAssignedToMe,
     setEligibilityArticle,
-    setScreeningArticle,
     setSearchTerm,
     setSelectedDuplicateMap,
     submitEligibilityDecision,
@@ -836,7 +833,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           setSearchTerm={setSearchTerm}
           summary={summary}
         />}
-        content={activeStage === "identification" || activeStage === "included" ? <ArticleReadingPane
+        content={activeStage === "identification" || activeStage === "screening" || activeStage === "included" ? <ArticleReadingPane
           activeStage={activeStage}
           article={selectedArticle}
           onNext={() => selectAdjacent(1)}
@@ -864,13 +861,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
             onNavigate(`/projetos/${project.id}/artigos/${articleId}?${params.toString()}`);
           }}
           onOpenEligibility={openEligibilityDecision}
-          onOpenScreening={(article, initialDecision) => {
-            setScreeningInitialDecision(initialDecision);
-            setScreeningArticle(article);
-            if (initialDecision === "excluded") {
-              toast.info("Informe a justificativa na janela de decisão.");
-            }
-          }}
           onOpenUploadPdf={openUploadPdf}
           onPrevious={() => selectAdjacent(-1)}
           project={project}
@@ -884,6 +874,12 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onPromoteAllUnique={promoteAllUniqueToScreening}
           onRunDedup={handleDedupAndRefresh}
           summary={summary}
+        /> : activeStage === "screening" ? <ScreeningDecisionTool
+          article={selectedArticle}
+          isSaving={isSavingDecision}
+          onAdvance={() => selectAdjacent(1)}
+          onSkip={handleSkip}
+          onSubmit={submitScreeningDecision}
         /> : activeStage === "included" ? <IncludedExtractionTool
           article={selectedArticle}
           onExport={handleExportStage}
@@ -942,15 +938,6 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
         }}
         project={project}
         article={pdfTarget}
-      />
-
-      <ScreeningDecisionDialog
-        article={screeningArticle}
-        initialDecision={screeningInitialDecision}
-        isOpen={Boolean(screeningArticle)}
-        isSaving={isSavingDecision}
-        onClose={() => setScreeningArticle(null)}
-        onSubmit={submitScreeningDecision}
       />
 
       <EligibilityDecisionDialog

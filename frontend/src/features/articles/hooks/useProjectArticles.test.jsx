@@ -123,8 +123,10 @@ describe("useProjectArticles work queues", () => {
       wrapper: wrapperAt("/projetos/7?tab=artigos&flow=screening"),
     });
     await waitFor(() => expect(result.current.isLoadingArticles).toBe(false));
-    act(() => result.current.setScreeningArticle({ id: 11 }));
-    await act(async () => result.current.submitScreeningDecision({ decision: "included" }));
+    let saved;
+    await act(async () => { saved = await result.current.submitScreeningDecision(11, { decision: "included" }); });
+    expect(saved).toBe(true);
+    expect(mocks.submitScreeningDecision).toHaveBeenCalledWith(7, 11, { decision: "included" });
     expect(refreshAssignments).toHaveBeenCalledOnce();
   });
 
@@ -158,10 +160,9 @@ describe("useProjectArticles work queues", () => {
       wrapper: wrapperAt("/projetos/7?tab=artigos&flow=screening"),
     });
     await waitFor(() => expect(result.current.articles).toHaveLength(1));
-    act(() => result.current.setScreeningArticle({ id: 11 }));
     let finishing;
     act(() => { finishing = mutation === "batch" ? result.current.runBatchEvaluate()
-      : result.current.submitScreeningDecision({ decision: "included" }); });
+      : result.current.submitScreeningDecision(11, { decision: "included" }); });
     act(() => {
       if (change === "phase") result.current.setActiveFlowTab("eligibility");
       else result.current.setAssignedToMe(true);
