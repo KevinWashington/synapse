@@ -24,6 +24,7 @@ import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { articleService } from "@features/articles/services/articleService";
 import { useProjectArticles } from "@features/articles/hooks/useProjectArticles";
 import { resolveSelectedArticle } from "@features/articles/utils/reviewFlow";
+import { getExtractionProgress } from "@features/articles/utils/reviewWorkspace";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import ImportBibTeXModal from "./ImportBibTeXModal";
@@ -208,7 +209,7 @@ export function DuplicateReviewPanel({
   );
 }
 
-function filterArticles({ articles, duplicateIds, filter, searchTerm, stageKey }) {
+function filterArticles({ articles, duplicateIds, extractionSchema, filter, searchTerm, stageKey }) {
   const normalizedSearch = normalizeText(searchTerm);
 
   return articles.filter((article) => {
@@ -222,7 +223,7 @@ function filterArticles({ articles, duplicateIds, filter, searchTerm, stageKey }
     if (filter === "unique") return !duplicateIds.has(article.id) && !article.duplicateGroupKey;
     if (filter === "exclude") return badge === "Excluido";
     if (filter === "pending") return badge === "Pendente";
-    if (filter === "pending_extraction") return !Object.keys(article.extractionData || {}).length;
+    if (filter === "pending_extraction") return getExtractionProgress(article, extractionSchema).state !== "completed";
     return true;
   });
 }
@@ -700,11 +701,12 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     () => filterArticles({
       articles: stageArticles,
       duplicateIds,
+      extractionSchema: project?.dataExtractionSchema || [],
       filter: activeFilter,
       searchTerm,
       stageKey: activeStage,
     }),
-    [activeFilter, activeStage, duplicateIds, searchTerm, stageArticles]
+    [activeFilter, activeStage, duplicateIds, project?.dataExtractionSchema, searchTerm, stageArticles]
   );
 
   const selectedArticle = useMemo(
@@ -830,6 +832,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           articles={filteredArticles}
           canManageArticles={canManageArticles}
           duplicateIds={duplicateIds}
+          extractionSchema={project?.dataExtractionSchema || []}
           filterOptions={filterOptions}
           isLoading={isLoadingArticles}
           isPromotingUnique={isPromotingUnique}

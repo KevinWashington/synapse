@@ -175,16 +175,17 @@ describe("ProjectArticles work queue", () => {
     expect(footer).toHaveClass("mt-auto");
   });
 
-  it("keeps article metadata readable by moving status controls below the row on narrow screens", () => {
+  it("keeps article metadata readable by placing a compact status inside the article content", () => {
     renderList({ activeStage: "screening" });
 
     const row = screen.getByTestId("stage-article-row");
     const articleButton = row.querySelector("button");
-    const statusControls = screen.getByText("Pendente").parentElement;
+    const status = screen.getByText("Pendente");
 
-    expect(row).toHaveClass("flex-wrap", "sm:flex-nowrap");
-    expect(articleButton).toHaveClass("min-w-[min(100%,16rem)]");
-    expect(statusControls).toHaveClass("w-full", "sm:w-auto");
+    expect(row).toHaveClass("min-w-0");
+    expect(articleButton).toHaveClass("min-w-0", "flex-1");
+    expect(articleButton).toContainElement(status);
+    expect(row.querySelector(".max-w-44")).not.toBeInTheDocument();
   });
 
   it("labels the screening abstract as Resumo only once", () => {

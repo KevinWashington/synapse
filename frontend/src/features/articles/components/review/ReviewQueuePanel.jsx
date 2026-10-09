@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
-import { collaborativeReview } from "../../utils/collaborativeReview";
+import { getQueueStatus } from "../../utils/reviewWorkspace";
 
 const STAGE_LABELS = {
   identification: "Identificação",
@@ -57,51 +57,8 @@ function getStageCount(summary, stageKey) {
   return summary?.[stageKey]?.total || 0;
 }
 
-export function getArticleBadge(article, stageKey, duplicateIds) {
-  if (!article) {
-    return { label: "-", className: "bg-[#edf1f7] text-[#667391]", dot: "bg-[#a4adc2]" };
-  }
-
-  const review = collaborativeReview(article);
-  if (review.label) {
-    return {
-      label: review.label,
-      className: review.className,
-      dot: "bg-[#a4adc2]",
-      tooltip: review.explanation,
-    };
-  }
-
-  if (stageKey === "identification") {
-    const duplicate = duplicateIds.has(article.id)
-      || article.duplicateGroupKey
-      || article.reviewOutcome === "duplicate_removed";
-    return duplicate
-      ? { label: "Duplicata", className: "bg-[#fff3e0] text-[#d57a00]", dot: "bg-[#ff9f1c]" }
-      : { label: "Unico", className: "bg-[#e8f8ef] text-[#258c55]", dot: "bg-[#22b66f]" };
-  }
-
-  if (stageKey === "screening") {
-    return article.screeningDecision === "excluded"
-      ? { label: "Excluido", className: "bg-[#ffecef] text-[#d94343]", dot: "bg-[#f04444]" }
-      : { label: "Pendente", className: "bg-[#fff6e5] text-[#d48700]", dot: "bg-[#ff9f1c]" };
-  }
-
-  if (stageKey === "eligibility") {
-    if (
-      article.reviewOutcome === "excluded_eligibility"
-      || article.reviewOutcome === "full_text_unavailable"
-      || article.eligibilityDecision === "excluded"
-    ) {
-      return { label: "Excluido", className: "bg-[#ffecef] text-[#d94343]", dot: "bg-[#f04444]" };
-    }
-    if (article.reviewOutcome === "included") {
-      return { label: "Incluir", className: "bg-[#e8f8ef] text-[#258c55]", dot: "bg-[#22b66f]" };
-    }
-    return { label: "Pendente", className: "bg-[#edf1f7] text-[#667391]", dot: "bg-[#a4adc2]" };
-  }
-
-  return { label: "Incluido", className: "bg-[#e8f8ef] text-[#258c55]", dot: "bg-[#22b66f]" };
+export function getArticleBadge(article, stageKey, duplicateIds, extractionSchema = []) {
+  return getQueueStatus(article, stageKey, duplicateIds, extractionSchema);
 }
 
 export function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = articles.length) {
@@ -148,6 +105,7 @@ function ReviewQueuePanel({
   articles,
   canManageArticles = true,
   duplicateIds,
+  extractionSchema = [],
   filterOptions,
   isLoading,
   isPromotingUnique = false,
@@ -275,7 +233,7 @@ function ReviewQueuePanel({
             </div>
           ) : articles.length ? (
             articles.map((article) => {
-              const badge = getArticleBadge(article, activeStage, duplicateIds);
+              const badge = getArticleBadge(article, activeStage, duplicateIds, extractionSchema);
               const selected = selectedArticle?.id === article.id;
               const checked = selectedIdentificationIds.includes(article.id);
               return (
@@ -285,7 +243,7 @@ function ReviewQueuePanel({
                   data-article-title={article.title}
                   data-selected={String(selected)}
                   className={cn(
-                    "flex w-full flex-wrap items-start gap-3 border-b border-[#edf0f7] px-4 py-3.5 text-left last:border-b-0 hover:bg-[#fbfcff] sm:flex-nowrap",
+                    "flex min-w-0 w-full items-start gap-2 border-b border-[#edf0f7] px-4 py-3.5 text-left last:border-b-0 hover:bg-[#fbfcff]",
                     selected && "bg-[#fbfaff] ring-1 ring-inset ring-[#c9c3ff]"
                   )}
                 >
@@ -302,7 +260,7 @@ function ReviewQueuePanel({
                     type="button"
                     aria-current={selected ? "true" : undefined}
                     onClick={() => onArticleSelect(article)}
-                    className="flex min-w-[min(100%,16rem)] flex-1 items-start gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]"
+                    className="flex min-w-0 flex-1 items-start gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]"
                   >
                     <span className={cn("mt-3 h-2 w-2 shrink-0 rounded-full", badge.dot)} />
                     <SourceBadge article={article} />
@@ -310,22 +268,27 @@ function ReviewQueuePanel({
                       <span className="line-clamp-2 text-sm font-semibold leading-5 text-[#111936]">{article.title}</span>
                       <span className="mt-1 block line-clamp-1 text-xs text-[#56627f]">{article.authors}</span>
                       <span className="mt-1 block line-clamp-1 text-xs text-[#56627f]">{article.year} · {article.journal}</span>
+                      <span className="mt-2 flex min-w-0 items-center justify-between gap-2">
+                        <span
+                          title={badge.tooltip || badge.label}
+                          className={cn("min-w-0 truncate rounded-full px-2 py-0.5 text-[11px] font-semibold", badge.className)}
+                        >
+                          {badge.label}
+                        </span>
+                        <span className="shrink-0 text-[11px] text-[#7a849d]">{formatDate(article.updatedAt || article.createdAt)}</span>
+                      </span>
                     </span>
                   </button>
-                  <div className="ml-auto flex w-full shrink-0 items-center justify-end gap-2 sm:ml-0 sm:w-auto sm:flex-col sm:items-end">
-                    <span title={badge.tooltip || badge.label} className={cn("max-w-44 rounded-full px-2.5 py-1 text-right text-xs font-semibold", badge.className)}>{badge.label}</span>
-                    <span className="text-xs text-[#56627f]">{formatDate(article.updatedAt || article.createdAt)}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button type="button" aria-label={`Mais acoes para ${article.title}`} className="grid h-7 w-7 place-items-center rounded-full text-[#667391] hover:bg-[#eef1ff]">
-                          <MoreVerticalIcon className="h-4 w-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => onOpenArticle(article.id)}>Abrir artigo</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" aria-label={`Mais acoes para ${article.title}`} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[#667391] hover:bg-[#eef1ff]">
+                        <MoreVerticalIcon className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onOpenArticle(article.id)}>Abrir artigo</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               );
             })

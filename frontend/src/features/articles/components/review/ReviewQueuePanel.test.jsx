@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ReviewQueuePanel, { getFilterOptions } from "./ReviewQueuePanel";
 
@@ -124,8 +124,34 @@ describe("ReviewQueuePanel", () => {
     renderQueue({ activeStage: "screening" });
 
     const row = screen.getByTestId("stage-article-row");
-    expect(row).toHaveClass("flex-wrap", "sm:flex-nowrap");
-    expect(row.querySelector("button")).toHaveClass("min-w-[min(100%,16rem)]");
+    expect(row).toHaveClass("min-w-0");
+    expect(row.querySelector(".max-w-44")).not.toBeInTheDocument();
+  });
+
+  it("places a short collaborative status below the article metadata", () => {
+    renderQueue({
+      activeStage: "eligibility",
+      articles: [{
+        ...article,
+        currentPhase: "eligibility",
+        hasActiveReviewAssignments: true,
+        reviewState: "waiting_for_reviewer",
+        myReviewAssignment: { status: "pending" },
+      }],
+    });
+
+    const articleButton = screen.getByText("Estudo controlado").closest("button");
+    expect(within(articleButton).getByText("Minha vez")).toBeInTheDocument();
+  });
+
+  it("shows extraction progress in the included queue", () => {
+    renderQueue({
+      activeStage: "included",
+      articles: [{ ...article, extractionData: { sample: "120" }, reviewOutcome: "included" }],
+      extractionSchema: [{ key: "sample" }, { key: "result" }],
+    });
+
+    expect(screen.getByText("Em andamento 1/2")).toBeInTheDocument();
   });
 
   it.each(["screening", "eligibility"])(
