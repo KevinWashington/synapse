@@ -8,7 +8,17 @@ export function claimPendingInvitation(email, name) {
   const output = execFileSync(
     python,
     [script, "--email", email, "--name", name],
-    { cwd: backend, encoding: "utf8", env: process.env },
+    {
+      cwd: backend,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PYTHONPATH: [backend, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+        DATABASE_URL: process.env.E2E_DATABASE_URL
+          || process.env.DATABASE_URL
+          || "postgresql+asyncpg://synapse:synapse@127.0.0.1:5432/synapse",
+      },
+    },
   );
   return JSON.parse(output.trim());
 }
