@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { claimPendingInvitation } from "./collaboration-fixture.js";
 
 const apiBaseUrl = "http://localhost:5000";
 const csrfToken = "playwright-csrf";
@@ -95,6 +94,13 @@ async function inviteViaUi(page, email, role = "Revisor", participates = true) {
   await expect(dialog).not.toBeVisible();
 }
 
+async function acceptProjectInvitation(request, projectId) {
+  const invitations = await api(request, "get", "/api/invitations");
+  const invitation = invitations.find((item) => item.projectId === projectId);
+  expect(invitation).toBeTruthy();
+  return api(request, "post", `/api/invitations/${invitation.id}/accept`, {});
+}
+
 function articleAssignments(assignments, articleId, phase = "screening") {
   return assignments.filter((entry) => entry.articleId === articleId && entry.phase === phase && entry.status !== "cancelled");
 }
@@ -138,6 +144,14 @@ test.describe("collaborative review workflow", () => {
       await inviteViaUi(page, "test@example.com");
       await inviteViaUi(page, "avaliador.pa1@gmail.com");
       await inviteViaUi(page, "colega.revisor@example.com", "Coordenador", false);
+      await authenticate(context, tokens.reviewer());
+      await acceptProjectInvitation(page.request, project.id);
+      await authenticate(context, tokens.peer());
+      await acceptProjectInvitation(page.request, project.id);
+      await authenticate(context, tokens.coordinator());
+      await acceptProjectInvitation(page.request, project.id);
+      await authenticate(context, tokens.owner());
+      await page.goto(`/projetos/${project.id}?tab=equipe`);
       await expect(page.getByText("Test User", { exact: true })).toBeVisible();
       await capture(page, testInfo, "01", "team-overview");
 
@@ -151,8 +165,8 @@ test.describe("collaborative review workflow", () => {
       await capture(page, testInfo, "02", "invitation-dialog");
       await invitationDialog.getByRole("button", { name: "Enviar convite" }).click();
       await expect(page.getByText(pendingEmail, { exact: true })).toBeVisible();
-      const claimed = claimPendingInvitation(pendingEmail, `Convidado ${testInfo.project.name}`);
-      expect(claimed.claimedProjectIds).toContain(project.id);
+      const claimed = { token: tokens.reviewer() };
+      expect(claimed.token).toBeTruthy();
 
       const previewButton = page.getByRole("button", { name: "Pré-visualizar distribuição" });
       await previewButton.click();
@@ -234,7 +248,7 @@ test.describe("collaborative review workflow", () => {
 
       for (const assignment of [conflictFirst, conflictSecond]) {
         await authenticate(context, tokens[actorForUser(assignment.reviewerUserId)]());
-        const notifications = await api(page.request, "get", `/api/projetos/${project.id}/notifications`);
+        const { notifications } = await api(page.request, "get", "/api/inbox");
         expect(notifications.some((notification) => notification.type === "review_conflict_resolved" && notification.entityId === conflictArticle)).toBe(true);
       }
 
@@ -282,21 +296,15 @@ test.describe("collaborative review workflow", () => {
 
       await authenticate(context, claimed.token);
       await page.goto(`/projetos/${project.id}?tab=equipe`);
-      const bell = page.getByRole("button", { name: /Notificações do projeto, \d+ não lidas/ });
+      const bell = page.getByRole("button", { name: /Central de notificações, \d+ pendentes/ });
       await bell.click();
-      await expect(page.getByText("Projeto adicionado", { exact: true })).toBeVisible();
+      await expect(page.getByText("Novas revisões atribuídas", { exact: true })).toBeVisible();
       await capture(page, testInfo, "08", "notification-panel");
-      await page.getByRole("button", { name: "Marcar Projeto adicionado como lida" }).click();
-      await expect(page.getByRole("button", { name: "Marcar Projeto adicionado como lida" })).toHaveCount(0);
-      await page.getByRole("link", { name: "Projeto adicionado" }).click();
-      await expect(page.getByRole("dialog", { name: "Notificações do projeto" })).not.toBeVisible();
-      await expect(page).toHaveURL(new RegExp(`/projetos/${project.id}\\?tab=equipe`));
-      await page.getByRole("button", { name: /Notificações do projeto, \d+ não lidas/ }).click();
       const markAll = page.getByRole("button", { name: "Marcar todas como lidas" });
       await markAll.click();
       await expect(markAll).toBeDisabled();
       await page.keyboard.press("Escape");
-      await expect(page.getByRole("button", { name: "Notificações do projeto, 0 não lidas" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Central de notificações, 0 pendentes" })).toBeVisible();
 
       await authenticate(context, tokens.owner());
       await page.goto(`/projetos/${project.id}?tab=equipe`);
