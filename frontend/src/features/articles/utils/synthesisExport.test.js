@@ -66,7 +66,7 @@ const sampleData = {
 test("buildExtractionMatrixCsv serializes base and dynamic extraction columns", () => {
   const csv = buildExtractionMatrixCsv(sampleData);
 
-  assert.match(csv, /"articleId","paperId","title","year","sourceName","rqs","qualityScore","qualityRating","country","techniques","peer_reviewed"/);
+  assert.match(csv, /"Código do estudo","Identificador","Título","Ano","Fonte","Perguntas respondidas","Pontuação","Avaliação","country","techniques","peer_reviewed"/);
   assert.match(csv, /"Study A"/);
   assert.match(csv, /"BR"/);
   assert.match(csv, /"survey\|case study"/);

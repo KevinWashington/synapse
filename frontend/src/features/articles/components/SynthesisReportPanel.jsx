@@ -47,9 +47,9 @@ function formatDistributionLabel(value) {
   return value;
 }
 
-function formatCellValue(value) {
+function formatCellValue(value, key) {
   if (Array.isArray(value)) {
-    return value.join(", ");
+    return key === "rqs" ? value.map((rq) => `RQ ${rq}`).join(", ") : value.join(", ");
   }
   if (value === true) {
     return "Sim";
@@ -60,6 +60,12 @@ function formatCellValue(value) {
   if (value == null || value === "") {
     return "-";
   }
+  if (key === "qualityRating") {
+    return formatDistributionLabel(value);
+  }
+  if (key === "qualityScore") {
+    return `${value}%`;
+  }
   return String(value);
 }
 
@@ -68,6 +74,16 @@ function MiniMetric({ label, value }) {
     <div className="rounded-lg border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] p-3">
       <p className="text-xs uppercase tracking-wide text-[var(--syn-text-secondary)]">{label}</p>
       <p className="mt-2 text-2xl font-semibold text-[var(--syn-text-primary)]">{value}</p>
+    </div>
+  );
+}
+
+function SynthesisMetric({ label, value, description }) {
+  return (
+    <div className="rounded-xl border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] px-4 py-3">
+      <p className="text-xs font-medium text-[var(--syn-text-secondary)]">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-[var(--syn-text-primary)]">{value}</p>
+      <p className="mt-1 text-xs text-[var(--syn-text-secondary)]">{description}</p>
     </div>
   );
 }
@@ -292,7 +308,12 @@ function SuggestedVisualizationCard({ suggestion, onOpenArticle }) {
 
 function ExtractionMatrixTab({ data, onOpenArticle }) {
   const columns = useMemo(
-    () => [...BASE_EXTRACTION_COLUMNS, ...(data?.extractionColumns || [])],
+    () => [
+      ...BASE_EXTRACTION_COLUMNS.filter(
+        (column) => !["articleId", "paperId"].includes(column.key),
+      ),
+      ...(data?.extractionColumns || []),
+    ],
     [data]
   );
 
@@ -309,7 +330,7 @@ function ExtractionMatrixTab({ data, onOpenArticle }) {
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-[var(--syn-text-secondary)]">
-          {(data?.extractionRows || []).length} linha(s) na matriz de extracao.
+          {(data?.extractionRows || []).length} estudo(s) incluído(s) na matriz.
         </p>
         <Button
           variant="outline"
@@ -324,7 +345,7 @@ function ExtractionMatrixTab({ data, onOpenArticle }) {
           }
         >
           <DownloadIcon className="h-3.5 w-3.5" />
-          CSV de extracao
+          Exportar CSV
         </Button>
       </div>
 
@@ -366,7 +387,7 @@ function ExtractionMatrixTab({ data, onOpenArticle }) {
                       key={`${row.articleId}-${column.key}`}
                       className="text-sm text-[var(--syn-text-secondary)]"
                     >
-                      {formatCellValue(value)}
+                      {formatCellValue(value, column.key)}
                     </TableCell>
                   );
                 })}
@@ -543,17 +564,28 @@ function SynthesisReportPanel({
 }) {
   const [activeTab, setActiveTab] = useState("rqs");
 
+  const rows = data?.extractionRows || [];
+  const includedArticles = data?.coverage?.includedArticles ?? rows.length;
+  const studiesWithExtraction = rows.filter((row) =>
+    Object.values(row.values || {}).some((value) =>
+      Array.isArray(value) ? value.length > 0 : value != null && value !== "",
+    ),
+  ).length;
+  const answeredQuestions = data?.coverage?.answeredRQCount ?? new Set(rows.flatMap((row) => row.rqs || [])).size;
+  const totalQuestions = data?.rqCount || 0;
+  const ratedArticles = data?.qualitySummary?.ratedArticles || 0;
+
   if (!data && !isLoading) {
     return null;
   }
 
   return (
-    <div className="space-y-3 rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="space-y-5 rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-[var(--syn-text-primary)]">Workspace de sintese</p>
-          <p className="text-xs text-[var(--syn-text-secondary)]">
-            Reune RQs, matriz de extracao, distribuicoes e qualidade em um unico lugar.
+          <h2 className="text-lg font-semibold text-[var(--syn-text-primary)]">Síntese da revisão</h2>
+          <p className="mt-1 text-sm text-[var(--syn-text-secondary)]">
+            Evidências, perguntas de pesquisa e qualidade dos estudos em um só lugar.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -574,41 +606,50 @@ function SynthesisReportPanel({
               }
             >
               <DownloadIcon className="h-3.5 w-3.5" />
-              JSON
+              Exportar JSON
             </Button>
           ) : null}
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex w-full flex-wrap gap-2 bg-transparent p-0">
+      {data ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SynthesisMetric label="Estudos incluídos" value={includedArticles} description="presentes na síntese" />
+          <SynthesisMetric label="Com dados extraídos" value={studiesWithExtraction} description="com ao menos um campo preenchido" />
+          <SynthesisMetric label="Perguntas cobertas" value={totalQuestions ? `${answeredQuestions}/${totalQuestions}` : "—"} description="com evidência vinculada" />
+          <SynthesisMetric label="Com avaliação de qualidade" value={`${ratedArticles}/${includedArticles}`} description="com pontuação calculada" />
+        </div>
+      ) : null}
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-0">
+        <TabsList className="h-auto w-full justify-start gap-5 overflow-x-auto rounded-none border-b border-[var(--syn-border)] bg-transparent p-0">
           <TabsTrigger
             value="rqs"
-            className="border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] data-[state=active]:bg-[var(--syn-sidebar-accent)] data-[state=active]:text-white"
+            className="h-10 flex-none rounded-none border-0 border-b-2 border-transparent px-1 text-sm text-[var(--syn-text-secondary)] shadow-none data-[state=active]:border-[var(--syn-sidebar-accent)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--syn-sidebar-accent)] data-[state=active]:shadow-none"
           >
-            RQs
+            Perguntas de pesquisa
           </TabsTrigger>
           <TabsTrigger
             value="extraction"
-            className="border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] data-[state=active]:bg-[var(--syn-sidebar-accent)] data-[state=active]:text-white"
+            className="h-10 flex-none rounded-none border-0 border-b-2 border-transparent px-1 text-sm text-[var(--syn-text-secondary)] shadow-none data-[state=active]:border-[var(--syn-sidebar-accent)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--syn-sidebar-accent)] data-[state=active]:shadow-none"
           >
-            Extracao
+            Matriz de extração
           </TabsTrigger>
           <TabsTrigger
             value="distributions"
-            className="border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] data-[state=active]:bg-[var(--syn-sidebar-accent)] data-[state=active]:text-white"
+            className="h-10 flex-none rounded-none border-0 border-b-2 border-transparent px-1 text-sm text-[var(--syn-text-secondary)] shadow-none data-[state=active]:border-[var(--syn-sidebar-accent)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--syn-sidebar-accent)] data-[state=active]:shadow-none"
           >
-            Graficos
+            Visualizações
           </TabsTrigger>
           <TabsTrigger
             value="quality"
-            className="border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] data-[state=active]:bg-[var(--syn-sidebar-accent)] data-[state=active]:text-white"
+            className="h-10 flex-none rounded-none border-0 border-b-2 border-transparent px-1 text-sm text-[var(--syn-text-secondary)] shadow-none data-[state=active]:border-[var(--syn-sidebar-accent)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--syn-sidebar-accent)] data-[state=active]:shadow-none"
           >
-            Qualidade
+            Avaliação da qualidade
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="rqs" className="mt-3">
+        <TabsContent value="rqs" className="mt-5">
           <RQSynthesisPanel
             data={data}
             isLoading={isLoading}
@@ -617,15 +658,15 @@ function SynthesisReportPanel({
           />
         </TabsContent>
 
-        <TabsContent value="extraction" className="mt-3">
+        <TabsContent value="extraction" className="mt-5">
           <ExtractionMatrixTab data={data} onOpenArticle={onOpenArticle} />
         </TabsContent>
 
-        <TabsContent value="distributions" className="mt-3">
+        <TabsContent value="distributions" className="mt-5">
           <GraphsTab data={data} onOpenArticle={onOpenArticle} />
         </TabsContent>
 
-        <TabsContent value="quality" className="mt-3">
+        <TabsContent value="quality" className="mt-5">
           <QualityTab data={data} />
         </TabsContent>
       </Tabs>

@@ -1,12 +1,12 @@
 const BASE_EXTRACTION_COLUMNS = [
-  { key: "articleId", label: "articleId" },
-  { key: "paperId", label: "paperId" },
-  { key: "title", label: "title" },
-  { key: "year", label: "year" },
-  { key: "sourceName", label: "sourceName" },
-  { key: "rqs", label: "rqs" },
-  { key: "qualityScore", label: "qualityScore" },
-  { key: "qualityRating", label: "qualityRating" },
+  { key: "articleId", label: "Código do estudo" },
+  { key: "paperId", label: "Identificador" },
+  { key: "title", label: "Título" },
+  { key: "year", label: "Ano" },
+  { key: "sourceName", label: "Fonte" },
+  { key: "rqs", label: "Perguntas respondidas" },
+  { key: "qualityScore", label: "Pontuação" },
+  { key: "qualityRating", label: "Avaliação" },
 ];
 
 function escapeCsvValue(value) {
