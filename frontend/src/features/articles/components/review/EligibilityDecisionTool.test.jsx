@@ -126,5 +126,6 @@ describe("EligibilityDecisionTool", () => {
     expect(screen.getByRole("button", { name: "RQ 1" })).toBeDisabled();
     expect(screen.getByRole("textbox", { name: "Justificativa" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Salvar e próximo" })).toBeDisabled();
+    expect(screen.getByText("Sua decisão e justificativa aparecem no painel do artigo.")).toBeInTheDocument();
   });
 });

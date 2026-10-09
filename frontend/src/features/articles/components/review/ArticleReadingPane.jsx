@@ -6,6 +6,7 @@ import {
   UploadIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import DecisionHistory from "./DecisionHistory";
 
 function formatNumber(value) {
   return new Intl.NumberFormat("pt-BR").format(value || 0);
@@ -55,7 +56,7 @@ function ArticleReadingPane({
         </button>
       </header>
 
-      <div className="mx-auto max-w-[760px] px-6 py-7 lg:px-8">
+      <div data-testid="article-reading-content" className="w-full px-6 py-7 lg:px-8">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8a94aa]">
           {article.year} · {article.journal}
         </p>
@@ -104,6 +105,7 @@ function ArticleReadingPane({
             {article.abstract || "Resumo não cadastrado para este artigo."}
           </p>
         )}
+        {!isIncluded ? <DecisionHistory article={article} phase={activeStage} /> : null}
       </div>
     </article>
   );

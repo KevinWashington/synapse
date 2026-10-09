@@ -13,6 +13,7 @@ function EligibilityDecisionTool({ article, checklist, researchQuestions, isSavi
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8a94aa]">Elegibilidade</p>
       <h2 className="mt-2 text-base font-semibold text-[#111936]">Validar texto completo</h2>
       {review.explanation ? <p className="mt-3 rounded-lg bg-[#fff9ed] px-3 py-2 text-xs text-[#8a5a00]">{review.explanation}</p> : null}
+      {article.myReviewAssignment?.status === "submitted" ? <p className="mt-2 text-xs leading-5 text-[#667391]">Sua decisão e justificativa aparecem no painel do artigo.</p> : null}
       <div className="mt-5"><EligibilityDecisionForm article={article} canDecide={review.canDecide} checklist={checklist} isSaving={isSaving} onAssist={onAssist} onDirtyChange={onDirtyChange} onSubmit={handleSubmit} researchQuestions={researchQuestions} submitLabel="Salvar e próximo" /></div>
     </aside>
   );

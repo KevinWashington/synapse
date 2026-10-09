@@ -85,6 +85,19 @@ describe("ScreeningDecisionTool", () => {
     expect(screen.getByRole("button", { name: "Excluir" })).toBeDisabled();
   });
 
+  it("points submitted reviewers to the visible decision history", () => {
+    renderTool({
+      article: {
+        ...article,
+        hasActiveReviewAssignments: true,
+        myReviewAssignment: { reviewerUserId: 1, status: "submitted" },
+        reviewState: "waiting_for_reviewer",
+      },
+    });
+
+    expect(screen.getByText("Sua decisão e justificativa aparecem no painel do artigo.")).toBeInTheDocument();
+  });
+
   it.each([
     ["i", "Incluir"],
     ["e", "Excluir"],

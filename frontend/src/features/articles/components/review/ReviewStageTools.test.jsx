@@ -36,6 +36,49 @@ describe("ArticleReadingPane", () => {
 
     expect(screen.getAllByText(label)).toHaveLength(1);
   });
+
+  it("shows the current reviewer's saved screening justification", () => {
+    render(
+      <ArticleReadingPane
+        activeStage="screening"
+        article={{
+          ...article,
+          hasActiveReviewAssignments: true,
+          reviewState: "waiting_for_reviewer",
+          myReviewAssignment: { reviewerUserId: 7, status: "submitted" },
+          reviewDecisions: [{ reviewerUserId: 7, decision: "included", reasonText: "Minha justificativa" }],
+        }}
+        project={{}}
+        position={{ current: 1, total: 1 }}
+        onNext={vi.fn()}
+        onOpenArticle={vi.fn()}
+        onPrevious={vi.fn()}
+        onUploadPdf={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Sua decisão")).toBeInTheDocument();
+    expect(screen.getByText("Minha justificativa")).toBeInTheDocument();
+  });
+
+  it("uses the full central width instead of constraining the whole reading pane", () => {
+    render(
+      <ArticleReadingPane
+        activeStage="screening"
+        article={article}
+        project={{}}
+        position={{ current: 1, total: 1 }}
+        onNext={vi.fn()}
+        onOpenArticle={vi.fn()}
+        onPrevious={vi.fn()}
+        onUploadPdf={vi.fn()}
+      />
+    );
+
+    const content = screen.getByTestId("article-reading-content");
+    expect(content).toHaveClass("w-full");
+    expect(content).not.toHaveClass("max-w-[760px]");
+  });
 });
 
 describe("IdentificationTool", () => {

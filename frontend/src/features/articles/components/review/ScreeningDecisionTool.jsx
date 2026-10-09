@@ -46,6 +46,9 @@ function ScreeningDecisionTool({
           {review.explanation}
         </p>
       ) : null}
+      {article.myReviewAssignment?.status === "submitted" ? (
+        <p className="mt-2 text-xs leading-5 text-[#667391]">Sua decisão e justificativa aparecem no painel do artigo.</p>
+      ) : null}
       <div className="mt-5">
         <ScreeningDecisionForm
           article={article}
