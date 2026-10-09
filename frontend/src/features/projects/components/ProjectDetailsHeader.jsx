@@ -36,7 +36,6 @@ function ProjectDetailsHeader({
   onTabChange,
   project,
   capabilities = [],
-  notifications,
 }) {
   const activeTabRef = useRef(null);
   useEffect(() => {
@@ -63,7 +62,6 @@ function ProjectDetailsHeader({
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {notifications}
           {capabilities.includes("edit_project") && (
             <Button
               variant="outline"

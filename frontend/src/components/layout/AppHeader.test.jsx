@@ -14,6 +14,10 @@ vi.mock("@/features/auth", () => ({
   useAuth: () => ({ logout, user: currentUser }),
 }));
 
+vi.mock("@/features/inbox/components/UserInbox", () => ({
+  default: () => <button type="button" aria-label="Central de notificações, 0 pendentes" />,
+}));
+
 function renderHeader(props = {}) {
   return render(
     <MemoryRouter>

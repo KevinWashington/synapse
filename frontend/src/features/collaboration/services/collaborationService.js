@@ -10,9 +10,6 @@ class CollaborationService {
   updateMember(id, memberId, data) { return apiService.patch(`${base(id)}/members/${memberId}`, data); }
   removeMember(id, memberId) { return apiService.delete(`${base(id)}/members/${memberId}`); }
   transferOwnership(id, data) { return apiService.post(`${base(id)}/transfer-ownership`, data); }
-  getNotifications(id) { return apiService.get(`${base(id)}/notifications`); }
-  markNotificationRead(id, notificationId) { return apiService.patch(`${base(id)}/notifications/${notificationId}/read`, {}); }
-  markAllNotificationsRead(id) { return apiService.post(`${base(id)}/notifications/read-all`, {}); }
   previewAssignments(id, data) { return apiService.post(`${base(id)}/assignments/preview`, data); }
   distributeAssignments(id, data) { return apiService.post(`${base(id)}/assignments/distribute`, data); }
   getMyAssignments(id, phase) {

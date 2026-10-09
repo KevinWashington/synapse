@@ -7,7 +7,6 @@ const emptyState = () => ({
   invitations: [],
   assignments: [],
   conflicts: [],
-  notifications: [],
   capabilities: [],
   loading: false,
   error: null,
@@ -27,12 +26,10 @@ const MUTATIONS = {
   removeMember: ["team", "assignments"],
   transferOwnership: ["team", "access"],
   previewAssignments: [],
-  distributeAssignments: ["assignments", "notifications"],
+  distributeAssignments: ["assignments"],
   reassignAssignment: ["assignments"],
-  markNotificationRead: ["notifications"],
-  markAllNotificationsRead: ["notifications"],
-  resolveConflict: ["assignments", "conflicts", "notifications"],
-  reopenReview: ["assignments", "conflicts", "notifications"],
+  resolveConflict: ["assignments", "conflicts"],
+  reopenReview: ["assignments", "conflicts"],
 };
 
 export function useProjectCollaboration(project) {
@@ -82,7 +79,6 @@ export function useProjectCollaboration(project) {
             ? collaborationService.getAssignments(session.id)
             : collaborationService.getMyAssignments(session.id),
         conflicts: () => collaborationService.getConflicts(session.id),
-        notifications: () => collaborationService.getNotifications(session.id),
         access: () => projectService.getProjectAccess(session.id),
       };
       let assignmentsChanged = false;
@@ -157,19 +153,15 @@ export function useProjectCollaboration(project) {
     });
     if (!projectId) return;
     Promise.allSettled(
-      ["team", "notifications", "assignments", "conflicts"].map((collection) =>
+      ["team", "assignments", "conflicts"].map((collection) =>
         loadCollection(session, collection),
       ),
     ).then(() => {
       if (session.active)
         setState((current) => ({ ...current, loading: false }));
     });
-    session.timer = setInterval(() => {
-      loadCollection(session, "notifications").catch(() => {});
-    }, 30000);
     return () => {
       session.active = false;
-      clearInterval(session.timer);
     };
   }, [projectId, capabilityKey, loadCollection]);
 
@@ -219,21 +211,12 @@ export function useProjectCollaboration(project) {
     () => loadCollection(sessionRef.current, "conflicts"),
     [loadCollection],
   );
-  const refreshNotifications = useCallback(
-    () => loadCollection(sessionRef.current, "notifications"),
-    [loadCollection],
-  );
-
   return {
     ...state,
-    unreadCount: state.notifications.filter(
-      (notification) => !notification.readAt,
-    ).length,
     ...actions,
     refreshTeam,
     refreshAssignments,
     refreshConflicts,
-    refreshNotifications,
   };
 }
 

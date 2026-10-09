@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { useAuth } from "@/features/auth";
+import UserInbox from "@/features/inbox/components/UserInbox";
 
 function getInitials(name, email) {
   const source = name?.trim() || email?.split("@")[0] || "Conta";
@@ -82,6 +83,7 @@ function AppHeader({ actions, backUrl, breadcrumbs = [], compact = false, title 
 
       <div className="flex shrink-0 items-center gap-3">
         {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+        <UserInbox />
         <ThemeToggle className="h-10 w-10 rounded-full border-[#edf0f7] bg-white text-[#182344] shadow-none hover:bg-[#f6f7fb]" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

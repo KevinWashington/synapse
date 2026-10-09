@@ -13,7 +13,6 @@ import { usePageTitle } from "@hooks/usePageTitle";
 import { articleService } from "@features/articles/services/articleService";
 import { useSearchParams } from "react-router-dom";
 import { useProjectCollaboration } from "@features/collaboration/hooks/useProjectCollaboration";
-import ProjectNotifications from "@features/collaboration/components/ProjectNotifications";
 
 const ProjectTeam = lazy(
   () => import("@features/collaboration/components/ProjectTeam"),
@@ -93,12 +92,6 @@ function ProjectDetails() {
   const [planningDirty, setPlanningDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState(null);
   const [pendingNavigation, setPendingNavigation] = useState(null);
-  const requestNavigation = (destination) => {
-    if (activeTab === "planejamento" && planningDirty)
-      setPendingNavigation(destination);
-    else navigate(destination);
-  };
-
   const requestTabChange = useCallback(
     (nextTab) => {
       if (nextTab === activeTab) {
@@ -188,14 +181,6 @@ function ProjectDetails() {
         activeTab={activeTab}
         project={project}
         capabilities={collaboration.capabilities}
-        notifications={
-          <ProjectNotifications
-            key={project.id}
-            projectId={project.id}
-            collaboration={collaboration}
-            onNavigate={requestNavigation}
-          />
-        }
         onContinueScreening={() =>
           navigate(`/projetos/${project.id}?tab=artigos&flow=screening`)
         }
