@@ -1,7 +1,7 @@
 import { CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export const REVIEW_STAGES = [
+const REVIEW_STAGES = [
   { key: "identification", number: 1, label: "Identificação" },
   { key: "screening", number: 2, label: "Triagem" },
   { key: "eligibility", number: 3, label: "Elegibilidade" },

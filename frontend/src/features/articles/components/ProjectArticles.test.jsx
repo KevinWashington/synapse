@@ -5,11 +5,12 @@ import ProjectArticles from "./ProjectArticles";
 import { describe, expect, it, vi } from "vitest";
 import {
   ArticleDetailPanel,
-  getFilterOptions,
-  StageListPanel,
   StageSidebar,
 } from "./ProjectArticles";
+import ReviewQueuePanel, { getFilterOptions } from "./review/ReviewQueuePanel";
 import * as ProjectArticlesComponents from "./ProjectArticles";
+
+const StageListPanel = ReviewQueuePanel;
 
 const article = {
   id: 1,
@@ -138,7 +139,7 @@ describe("ProjectArticles work queue", () => {
     const panel = scrollRegion.closest("section");
 
     expect(scrollRegion.parentElement).toHaveClass("flex", "h-full", "flex-col");
-    expect(panel).toHaveClass("xl:h-[720px]");
+    expect(panel).toHaveClass("lg:h-[720px]");
     expect(scrollRegion).toHaveClass("min-h-0", "flex-1");
     expect(footer).toHaveClass("mt-auto");
   });
