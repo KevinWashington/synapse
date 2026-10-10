@@ -468,7 +468,7 @@ async def cancel_generation(db, *, project: Project, user: User, job_id: int) ->
         .with_for_update()
     )
     if job is None:
-        raise SynthesisConflict("Generation job not found")
+        raise LookupError("Generation job not found")
     if job.status in {"succeeded", "failed", "cancelled", "conflict"}:
         return job
     if job.status == "queued":

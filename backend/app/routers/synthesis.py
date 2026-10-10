@@ -130,6 +130,8 @@ async def generate(projectId: int, rqNumber: int, request: GenerationRequest, cu
         job = await enqueue_generation(db, project=access.project, user=current_user, rq_number=rqNumber, request=request)
     except SynthesisConflict as exc:
         raise _conflict(exc)
+    await db.commit()
+    await db.refresh(job)
     return _job_payload(job)
 
 
@@ -149,6 +151,7 @@ async def cancel(projectId: int, generationId: int, current_user: User = Depends
         job = await cancel_generation(db, project=access.project, user=current_user, job_id=generationId)
     except LookupError:
         raise HTTPException(404, detail={"code": "SYNTHESIS_GENERATION_NOT_FOUND"})
+    await db.commit()
     return _job_payload(job)
 
 
@@ -156,10 +159,12 @@ async def cancel(projectId: int, generationId: int, current_user: User = Depends
 async def save_draft(projectId: int, rqNumber: int, request: ManualSynthesisUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await _access(db, projectId, current_user, CAP_EDIT_PROJECT)
     try:
-        draft = await save_manual_draft(db, project=access.project, user=current_user, rq_number=rqNumber, request=request)
+        saved = await save_manual_draft(db, project=access.project, user=current_user, rq_number=rqNumber, request=request)
     except SynthesisConflict as exc:
         raise _conflict(exc)
-    return {"content": draft.content, "version": draft.version, "questionFingerprint": draft.questionFingerprint, "evidenceFingerprint": draft.evidenceFingerprint, "updatedAt": draft.updatedAt, "updatedByUserId": draft.updatedByUserId}
+    await db.commit()
+    draft = saved["draft"]
+    return {"content": draft["content"], "version": draft["version"], "questionFingerprint": draft["questionFingerprint"], "evidenceFingerprint": draft["evidenceFingerprint"], "updatedAt": draft["updatedAt"], "updatedByUserId": draft["updatedByUserId"]}
 
 
 @router.delete("/{projectId}/synthesis/rqs/{rqNumber}")

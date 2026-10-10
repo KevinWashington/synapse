@@ -72,11 +72,13 @@ vi.mock("@features/articles/components/ProjectPrismaFlow", () => ({
 vi.mock("@features/projects/components/ProjectAnalytics", () => ({
   default: () => null,
 }));
-vi.mock("@features/articles/components/SynthesisReportPanel", () => ({
-  default: () => null,
-}));
-vi.mock("@features/articles/services/articleService", () => ({
-  articleService: { getProjectSynthesisReport: vi.fn() },
+vi.mock("@features/articles/components/SynthesisWorkspacePanel", () => ({
+  default: ({ onDirtyChange }) => (
+    <div>
+      <span>Workspace de síntese</span>
+      <button type="button" onClick={() => onDirtyChange(true)}>Editar síntese</button>
+    </div>
+  ),
 }));
 
 function renderPage() {
@@ -131,6 +133,24 @@ describe("ProjectDetails unsaved Planning navigation", () => {
     );
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it("opens the paged synthesis workspace without fetching the legacy whole report", async () => {
+    mocks.activeTab = "sintese";
+    renderPage();
+    expect(await screen.findByText("Workspace de síntese")).toBeInTheDocument();
+    expect(vi.mocked(apiService.get).mock.calls.map(([url]) => url)).not.toContain(
+      "/api/projetos/7/artigos/synthesis-report",
+    );
+  });
+
+  it("protects a dirty synthesis when leaving the project tab", async () => {
+    mocks.activeTab = "sintese";
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Editar síntese" }));
+    fireEvent.click(screen.getByRole("button", { name: "Artigos" }));
+    expect(await screen.findByRole("heading", { name: "Sair sem salvar?" })).toBeInTheDocument();
+    expect(mocks.setActiveTab).not.toHaveBeenCalled();
+  });
 
   it("asks before leaving dirty Planning", async () => {
     renderPage();

@@ -29,7 +29,7 @@ const ProjectAnalytics = lazy(
 const ProjectPlanning = lazy(
   () => import("@features/projects/components/ProjectPlanning"),
 );
-const SynthesisReportPanel = lazy(
+const SynthesisWorkspacePanel = lazy(
   () => import("@features/articles/components/SynthesisWorkspacePanel"),
 );
 
@@ -229,7 +229,7 @@ function ProjectDetails() {
             />
           )}
           {activeTab === "sintese" && (
-            <SynthesisReportPanel
+            <SynthesisWorkspacePanel
               key={project.id}
               project={project}
               canEdit={collaboration.capabilities.includes("edit_project")}

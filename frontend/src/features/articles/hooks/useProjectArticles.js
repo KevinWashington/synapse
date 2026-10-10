@@ -35,8 +35,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
   const [isPromotingUnique, setIsPromotingUnique] = useState(false);
-  const [isLoadingSynthesisReport, setIsLoadingSynthesisReport] = useState(false);
-  const [synthesisReportData, setSynthesisReportData] = useState(null);
   const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
   const [selectedDuplicateMap, setSelectedDuplicateMap] = useState({});
   const searchTerm = searchTermsByFlow[activeFlowTab] || "";
@@ -209,7 +207,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   }, [activeFlowTab, articlePage, assignedToMe, loadArticles, searchTermsByFlow]);
 
   const refreshAll = useCallback(
-    async ({ refreshSynthesisReport = false, targetFlowTab } = {}) => {
+    async ({ targetFlowTab } = {}) => {
       const context = articleContext.current;
       const flowToLoad = targetFlowTab || context.activeFlowTab;
       const pageToLoad = targetFlowTab ? 1 : context.articlePage;
@@ -224,19 +222,13 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
         loadDuplicateCandidates(),
         loadArticles(flowToLoad, pageToLoad),
       ]);
-      if (refreshSynthesisReport && synthesisReportData) {
-        const synthesis = await articleService.getProjectSynthesisReport(project.id);
-        setSynthesisReportData(synthesis);
-      }
     },
     [
       loadArticles,
       loadDuplicateCandidates,
       loadReport,
       loadSummary,
-      project?.id,
       setActiveFlowTab,
-      synthesisReportData,
     ]
   );
 
@@ -398,7 +390,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
         await articleService.submitEligibilityDecision(project.id, articleId, payload);
         toast.success("Decisão de elegibilidade registrada.");
         onGraphNeedsRefresh?.();
-        await refreshAll({ refreshSynthesisReport: true });
+        await refreshAll();
         await collaboration?.refreshAssignments?.();
         return true;
       } catch (error) {
@@ -451,21 +443,6 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     }
   }, [project?.id, refreshAll]);
 
-  const loadSynthesisReport = useCallback(async () => {
-    if (!project?.id) {
-      return;
-    }
-    try {
-      setIsLoadingSynthesisReport(true);
-      const response = await articleService.getProjectSynthesisReport(project.id);
-      setSynthesisReportData(response || null);
-    } catch (error) {
-      toast.error("Erro ao carregar sintese estruturada: " + error.message);
-    } finally {
-      setIsLoadingSynthesisReport(false);
-    }
-  }, [project?.id]);
-
   return {
     activeFlowTab,
     applyDuplicateReview,
@@ -481,16 +458,13 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     isLoadingArticles,
     isLoadingDuplicates,
     isLoadingReport,
-    isLoadingSynthesisReport,
     isLoadingSummary,
     isPromotingUnique,
     isSavingDecision,
-    loadSynthesisReport,
     promoteAllUniqueToScreening,
     promoteSelectedToScreening,
     report,
     refreshAll,
-    synthesisReportData,
     runBatchEvaluate,
     runDedupAnalysis,
     searchTerm,

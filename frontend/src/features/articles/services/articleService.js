@@ -225,14 +225,6 @@ class ArtigosService {
     return apiService.patch(`${this.getProjectEndpoint(projectId)}/${articleId}/evidence`, data);
   }
 
-  async getProjectRQSynthesis(projectId) {
-    return apiService.get(`${this.getProjectEndpoint(projectId)}/rq-synthesis`);
-  }
-
-  async getProjectSynthesisReport(projectId) {
-    return apiService.get(`${this.getProjectEndpoint(projectId)}/synthesis-report`);
-  }
-
   async deleteArticle(projectId, articleId) {
     return apiService.delete(`${this.getProjectEndpoint(projectId)}/${articleId}`);
   }

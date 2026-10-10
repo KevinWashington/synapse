@@ -7,11 +7,11 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
   const [mode, setMode] = useState("rqs");
   const [selection, setSelection] = useState({ rqNumber: null, articleId: null, chartKey: null, criterionKey: "overall" });
   const [filters, setFilters] = useState({});
-  const [pages, setPages] = useState({ rqs: 1, evidence: 1, matrix: 1, quality: 1 });
+  const [pages, setPages] = useState({ rqs: 1, evidence: 1, matrix: 1, chart: 1, quality: 1 });
   const [resources, setResources] = useState({ overview: emptyResource, rqs: emptyResource, detail: emptyResource, evidence: emptyResource, matrix: emptyResource, chartCatalog: emptyResource, chart: emptyResource, criteria: emptyResource, quality: emptyResource, study: emptyResource });
   const [draft, setDraftState] = useState({ content: null, baseVersion: 0, dirty: false, conflict: null });
   const requestSequence = useRef({});
-  const updateResource = useCallback((key, patch) => setResources((current) => ({ ...current, [key]: { ...current[key], ...patch } })), []);
+  const updateResource = useCallback((key, patch) => setResources((current) => ({ ...current, [key]: { ...current[key], ...(typeof patch === "function" ? patch(current[key]) : patch) } })), []);
   const load = useCallback(async (key, fn) => {
     if (!projectId) return null;
     const id = (requestSequence.current[key] || 0) + 1;
@@ -19,8 +19,11 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
     updateResource(key, { loading: true, error: null });
     try {
       const data = await fn();
-      if (requestSequence.current[key] === id) updateResource(key, { data, loading: false });
-      return data;
+      if (requestSequence.current[key] === id) {
+        updateResource(key, { data, loading: false });
+        return data;
+      }
+      return null;
     } catch (error) {
       if (requestSequence.current[key] === id) updateResource(key, { loading: false, error });
       return null;
@@ -32,7 +35,7 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
     setMode("rqs");
     setSelection({ rqNumber: null, articleId: null, chartKey: null, criterionKey: "overall" });
     setFilters({});
-    setPages({ rqs: 1, evidence: 1, matrix: 1, quality: 1 });
+    setPages({ rqs: 1, evidence: 1, matrix: 1, chart: 1, quality: 1 });
     setDraftState({ content: null, baseVersion: 0, dirty: false, conflict: null });
     setResources({ overview: emptyResource, rqs: emptyResource, detail: emptyResource, evidence: emptyResource, matrix: emptyResource, chartCatalog: emptyResource, chart: emptyResource, criteria: emptyResource, quality: emptyResource, study: emptyResource });
     Object.keys(requestSequence.current).forEach((key) => { requestSequence.current[key] += 1; });
@@ -48,7 +51,7 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
         const chartKey = selection.chartKey || catalog?.[0]?.key;
         if (chartKey) {
           setSelection((old) => ({ ...old, chartKey }));
-          load("chart", () => synthesisService.getChart(projectId, chartKey, filters));
+          load("chart", () => synthesisService.getChart(projectId, chartKey, { ...filters, page: pages.chart, pageSize: 20 }));
         }
       });
     }
@@ -56,12 +59,17 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
       load("criteria", () => synthesisService.getQualityCriteria(projectId, filters));
       load("quality", () => synthesisService.getQualityStudies(projectId, { ...filters, criterionKey: selection.criterionKey, page: pages.quality, pageSize: 20 }));
     }
-  }, [filters, load, mode, pages.matrix, pages.quality, projectId, selection.chartKey, selection.criterionKey]);
+  }, [filters, load, mode, pages.chart, pages.matrix, pages.quality, projectId, selection.chartKey, selection.criterionKey]);
 
   useEffect(() => {
     if (!projectId || mode !== "rqs") return;
     load("rqs", () => synthesisService.getRQs(projectId, { search: filters.search, state: filters.state, page: pages.rqs, pageSize: 20 }));
   }, [filters.search, filters.state, load, mode, pages.rqs, projectId]);
+
+  useEffect(() => {
+    if (!projectId || mode !== "rqs" || !selection.rqNumber) return;
+    load("evidence", () => synthesisService.getEvidence(projectId, selection.rqNumber, { ...filters, page: pages.evidence, pageSize: 20 }));
+  }, [filters, load, mode, pages.evidence, projectId, selection.rqNumber]);
 
   useEffect(() => {
     if (!projectId || !selection.articleId || !["matrix", "quality"].includes(mode)) return;
@@ -70,6 +78,10 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
 
   useEffect(() => { onDirtyChange?.(draft.dirty); }, [draft.dirty, onDirtyChange]);
   const setDraft = useCallback((content) => setDraftState((old) => ({ ...old, content: { ...(old.content || {}), ...content }, dirty: true, conflict: null })), []);
+  const discardDraft = useCallback(() => {
+    const detail = resources.detail.data;
+    setDraftState({ content: detail?.draft?.content || { narrative: "", keyFindings: [], divergences: [], limitations: [] }, baseVersion: detail?.draft?.version || 0, dirty: false, conflict: null });
+  }, [resources.detail.data]);
   const selectRQ = useCallback(async (rqNumber) => {
     setSelection((old) => ({ ...old, rqNumber, articleId: null }));
     const [detail] = await Promise.all([
@@ -97,7 +109,8 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
       return saved;
     } catch (error) {
       if (error.status === 409) setDraftState((old) => ({ ...old, conflict: error.detail }));
-      throw error;
+      else setDraftState((old) => ({ ...old, conflict: { code: "SAVE_FAILED", message: error.message || "Não foi possível salvar o rascunho." } }));
+      return null;
     }
   }, [canEdit, draft, projectId, resources.detail.data, selection.rqNumber]);
   const generate = useCallback(async (replaceExisting = false) => {
@@ -115,23 +128,29 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
     const timer = window.setInterval(async () => {
       const job = await synthesisService.getGeneration(projectId, active.id);
       if (disposed) return;
+      updateResource("detail", (current) => ({ data: { ...current.data, activeGeneration: job } }));
       if (!["queued", "running"].includes(job.status)) {
         window.clearInterval(timer);
-        await refresh();
+        const detail = await synthesisService.getRQDetail(projectId, selection.rqNumber);
+        updateResource("detail", { data: { ...detail, lastGeneration: job }, loading: false });
+        if (detail) setDraftState((old) => old.dirty
+          ? { ...old, conflict: { code: "SYNTHESIS_VERSION_CONFLICT", message: "A síntese foi atualizada enquanto você editava. Seu texto local foi preservado." } }
+          : { content: detail.draft?.content || { narrative: "", keyFindings: [], divergences: [], limitations: [] }, baseVersion: detail.draft?.version || 0, dirty: false, conflict: null });
+        await Promise.all([load("overview", () => synthesisService.getOverview(projectId)), load("rqs", () => synthesisService.getRQs(projectId, { ...filters, page: pages.rqs, pageSize: 20 }))]);
       }
     }, 2000);
     return () => { disposed = true; window.clearInterval(timer); };
-  }, [projectId, refresh, resources.detail.data?.activeGeneration, selection.rqNumber]);
+  }, [filters, load, pages.rqs, projectId, resources.detail.data?.activeGeneration, selection.rqNumber, updateResource]);
 
   const actions = useMemo(() => ({
-    selectRQ, setDraft, save, generate, refresh,
-    setFilter: (key, value) => { setFilters((old) => ({ ...old, [key]: value })); setPages((old) => ({ ...old, rqs: 1, evidence: 1, matrix: 1, quality: 1 })); },
+    selectRQ, setDraft, discardDraft, save, generate, refresh,
+    setFilter: (key, value) => { setFilters((old) => ({ ...old, [key]: value })); setPages((old) => ({ ...old, rqs: 1, evidence: 1, matrix: 1, chart: 1, quality: 1 })); },
     setPage: (key, page) => setPages((old) => ({ ...old, [key]: page })),
     selectArticle: (articleId) => setSelection((old) => ({ ...old, articleId })),
-    selectChart: (chartKey) => { setSelection((old) => ({ ...old, chartKey })); load("chart", () => synthesisService.getChart(projectId, chartKey, filters)); },
-    selectCriterion: (criterionKey) => { setSelection((old) => ({ ...old, criterionKey, articleId: null })); load("quality", () => synthesisService.getQualityStudies(projectId, { ...filters, criterionKey, page: 1, pageSize: 20 })); },
+    selectChart: (chartKey) => { setSelection((old) => ({ ...old, chartKey })); setPages((old) => ({ ...old, chart: 1 })); load("chart", () => synthesisService.getChart(projectId, chartKey, { ...filters, page: 1, pageSize: 20 })); },
+    selectCriterion: (criterionKey) => { setSelection((old) => ({ ...old, criterionKey, articleId: null })); setPages((old) => ({ ...old, quality: 1 })); load("quality", () => synthesisService.getQualityStudies(projectId, { ...filters, criterionKey, page: 1, pageSize: 20 })); },
     cancel: (id) => synthesisService.cancel(projectId, id),
     export: (kind, params = {}) => synthesisService.export(projectId, kind, { ...filters, ...params }),
-  }), [filters, generate, load, projectId, refresh, save, selectRQ, setDraft]);
+  }), [discardDraft, filters, generate, load, projectId, refresh, save, selectRQ, setDraft]);
   return { mode, setMode, selection, selections: selection, filters, setFilters, pages, resources, draft, actions };
 }

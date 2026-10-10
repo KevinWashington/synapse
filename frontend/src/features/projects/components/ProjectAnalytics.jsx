@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { articleService } from "@/features/articles/services/articleService";
+import { synthesisService } from "@/features/articles/services/synthesisService";
 import ArticleGraph from "@/features/articles/components/ArticleGraph";
 import { projectService } from "@/features/projects/services/projectService";
 import { toast } from "@/lib/toast";
@@ -722,7 +723,7 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
   const [activeView, setActiveView] = useState("dashboard");
   const [articles, setArticles] = useState([]);
   const [overview, setOverview] = useState(null);
-  const [synthesisReport, setSynthesisReport] = useState(null);
+  const [visualizationSuggestions, setVisualizationSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [yearFilter, setYearFilter] = useState("all");
@@ -737,11 +738,25 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
       try {
         setLoading(true);
         setError(null);
-        const [overviewResponse, firstPage, synthesisResponse] = await Promise.all([
+        const [overviewResponse, firstPage, catalog] = await Promise.all([
           projectService.getProjectOverview(project.id),
           articleService.getArticlesByProject(project.id, { limit: 500, page: 1 }),
-          articleService.getProjectSynthesisReport(project.id),
+          synthesisService.getChartCatalog(project.id),
         ]);
+
+        const rqCharts = await Promise.all((catalog || []).filter((item) => item.type === "rq").map(async (item) => {
+          const chart = await synthesisService.getChart(project.id, item.key);
+          const rows = Array.isArray(chart.rows) ? chart.rows : chart.rows?.items || [];
+          return {
+            rqNumber: item.rqNumber,
+            question: item.label,
+            field: chart.field,
+            visualizationType: chart.field?.type === "text" ? "qualitative_table" : "category_bar_chart",
+            status: rows.length ? "ready" : "needs_data",
+            reason: "Distribuição calculada sobre estudos incluídos.",
+            rows,
+          };
+        }));
 
         const pageSize = firstPage.limit || 500;
         const pageCount = Math.ceil((firstPage.total || 0) / pageSize);
@@ -760,7 +775,7 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
         if (!ignore) {
           setOverview(overviewResponse);
           setArticles(allArticles);
-          setSynthesisReport(synthesisResponse || null);
+          setVisualizationSuggestions(rqCharts);
         }
       } catch (currentError) {
         if (!ignore) {
@@ -819,7 +834,6 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
     () => buildTrendData(hasFilters ? null : overview, filteredArticles),
     [filteredArticles, hasFilters, overview]
   );
-  const visualizationSuggestions = synthesisReport?.visualizationSuggestions || [];
 
   async function handleExport(format = "csv") {
     try {
