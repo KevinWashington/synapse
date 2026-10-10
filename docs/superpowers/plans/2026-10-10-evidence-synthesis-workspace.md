@@ -84,7 +84,7 @@ Definir os contratos na tarefa 1; as tarefas seguintes consomem esses nomes. JSO
 
 Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m pytest ...`. Comandos frontend partem de `frontend/`. Antes de executar, ler spec e plano completos, verificar status Git e preservar alterações alheias. Cada commit inclui somente os arquivos daquela tarefa, nunca `git add .`.
 
-### Tarefa 1: Persistência e contratos da síntese
+### Task 1: Persistência e contratos da síntese
 
 **Arquivos:** modelos, schemas, migration, registros de metadata; `backend/tests/test_synthesis_models.py`, `test_migrations.py`, `synthesis_test_support.py`.
 
@@ -96,7 +96,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Implementar schemas com limites de tamanho, enumerações e rejeição de IDs/tipos inválidos; fixtures de integração usam apenas banco explicitamente terminado em `_test`, sem fixture destrutiva autouse.
 - [ ] Repetir testes; exigir PASS e upgrade até head. Commit: `feat: persist versioned research question syntheses`.
 
-### Tarefa 2: Identidade de perguntas e freshness
+### Task 2: Identidade de perguntas e freshness
 
 **Arquivos:** `synthesis_identity_service.py`, `projects.py`; `backend/tests/test_synthesis_identity.py`.
 
@@ -108,7 +108,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Integrar antes do commit de `update_project` apenas quando `researchQuestions` muda. Remapear os vínculos atuais `Article.answeringRQs` das perguntas reconhecidas, remover vínculos de perguntas removidas e manter posição para edição da mesma pergunta; não reescrever decisões históricas. Dados sugeridos por IA não se tornam vínculos finais por esse remapeamento.
 - [ ] Repetir testes incluindo rollback; exigir PASS. Commit: `feat: preserve synthesis identity across planning changes`.
 
-### Tarefa 3: Consultas escaláveis e agregados consistentes
+### Task 3: Consultas escaláveis e agregados consistentes
 
 **Arquivos:** `synthesis_query_service.py`; `backend/tests/test_synthesis_queries.py`.
 
@@ -120,7 +120,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Paginar RQs e linhas no servidor; manter catálogos de campos/critério limitados ao schema configurado. Charts categóricos: top 12 + `Outros`, com regra declarada; qualitativos retornam tabela paginada. Não atribuir campo a RQ por semelhança textual: conservar regra existente e expor o mapeamento no contexto.
 - [ ] Repetir testes; exigir PASS e nenhuma consulta de corpus com ORM completo. Commit: `feat: query bounded synthesis evidence and aggregates`.
 
-### Tarefa 4: Geração estruturada com fontes e lotes limitados
+### Task 4: Geração estruturada com fontes e lotes limitados
 
 **Arquivos:** `synthesis_generation_service.py`, `config.py`; `backend/tests/test_synthesis_generation.py`.
 
@@ -132,7 +132,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Implementar geração via `AIService` existente, saída validada por Pydantic. Budget inicial configurável de 24.000 caracteres de payload, 6.000 por pacote, 2 chamadas concorrentes, timeout por chamada de 90 s; contar prompt e entrada serializados antes de enviar. Reduzir hierarquicamente saídas limitadas até caber; rejeitar ausência de progresso na redução. Preservar IDs em cada nível e validar também resultado final contra o corpus original.
 - [ ] Prompt distingue evidência extraída de justificativa/nota/avaliação automática; proíbe citações literais e conclusões não sustentadas. Ausência de evidência curada gera limitação explícita, não certeza. Repetir testes; exigir PASS e nenhuma chamada real DeepSeek. Commit: `feat: generate bounded traceable synthesis drafts`.
 
-### Tarefa 5: Trabalho durável e substituição atômica
+### Task 5: Trabalho durável e substituição atômica
 
 **Arquivos:** `synthesis_job_service.py`, `workers/synthesis_worker.py`, `workers/__init__.py`, `docker-compose.yml`; `backend/tests/test_synthesis_jobs.py`.
 
@@ -144,7 +144,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Claim com `FOR UPDATE SKIP LOCKED`, lease de 180 s/heartbeat a cada 30 s e token CAS; recuperar leases expirados com no máximo 2 tentativas totais. Antes de aplicar, validar cancelamento, token, identidade, versão e fingerprint atual: mudança retorna `EVIDENCE_CHANGED`/conflict e preserva conteúdo. Sucesso grava draft e job na mesma transação.
 - [ ] Adicionar worker ao Compose usando mesma imagem/env do backend, sem nova fila externa; `python -m app.workers.synthesis_worker`, encerramento gracioso e verificação da revisão do banco. Repetir testes e smoke com worker/modelo falso; exigir PASS. Commit: `feat: persist and safely execute synthesis generation jobs`.
 
-### Tarefa 6: API autorizada, exports e transição do relatório antigo
+### Task 6: API autorizada, exports e transição do relatório antigo
 
 **Arquivos:** `routers/synthesis.py`, `main.py`, `articles.py`, `synthesis_export_service.py`; `backend/tests/test_synthesis_routes.py`, `test_synthesis_exports.py`.
 
@@ -156,7 +156,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Exportar iterativamente sem acumular corpus completo; CSV com quoting e proteção a fórmula; JSON streaming válido. Export filtrado inclui todas as páginas do filtro; full ignora filtros explicitamente. Fontes e autoria do rascunho entram no relatório.
 - [ ] Alterar `/{projectId}/artigos/synthesis-report` e `/rq-synthesis` para usar agregados e páginas com defaults limitados, mantendo campos legados necessários até a tarefa 13. Documentar metadados de paginação; nenhum consumidor pode interpretar primeira página como corpus completo. Repetir testes; exigir PASS. Commit: `feat: expose authorized synthesis workspace APIs and exports`.
 
-### Tarefa 7: Cliente e estado assíncrono por seleção
+### Task 7: Cliente e estado assíncrono por seleção
 
 **Arquivos:** `services/synthesisService.js`, `hooks/useSynthesisWorkspace.js` e respectivos `.test.js`/`.test.jsx`.
 
@@ -167,7 +167,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Usar `api.js` existente e AbortController/identificador de requisição; chavear cada cache por seleção e filtros. Buscar apenas região ativa e pré-requisitos agregados; não pré-carregar corpus dos quatro modos. Poll a cada 2 s só enquanto job ativo; retomar job conhecido ao voltar à RQ. Export usa `requestRaw`/Blob com download e liberação de URL.
 - [ ] Estado editável conserva versão base e dirty; geração não sobrescreve edição local posterior ao clique. Em conflito, expor comparação entre local e salvo e ação explícita de recarregar, nunca retry que force overwrite. Repetir testes; exigir PASS. Commit: `feat: manage synthesis workspace queries and drafts`.
 
-### Tarefa 8: Shell comum e cabeçalho compacto
+### Task 8: Shell comum e cabeçalho compacto
 
 **Arquivos:** `SynthesisReportPanel.jsx`, `synthesis/SynthesisWorkspaceShell.jsx`, `synthesis/SynthesisHeader.jsx`, `SynthesisReportPanel.test.jsx` e teste do shell.
 
@@ -178,7 +178,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Compor grid de três regiões no breakpoint `xl`, seguindo `AdaptiveReviewWorkspace`; abaixo, tabs Lista/Conteúdo/Contexto com painéis mantidos montados e só painel ativo acessível. Usar `min-w-0`, alturas/scroll contidos e switcher horizontal limitado. Não editar o shell de Artigos.
 - [ ] Implementar copy aprovada, compactar métricas no cabeçalho e agrupar refresh/export; estados vazio e erro explicam dependência de estudos incluídos. Repetir testes; exigir PASS. Commit: `feat: compose adaptive evidence synthesis workspace`.
 
-### Tarefa 9: RQs, editor e geração segura
+### Task 9: RQs, editor e geração segura
 
 **Arquivos:** `synthesis/SynthesisRQMode.jsx`, `synthesis/SynthesisDraftEditor.jsx` e testes colocalizados.
 
@@ -190,7 +190,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Evidências paginadas com busca/filtros/ordenação por qualidade, título, ano, valores e rótulo de proveniência. Contexto traz cobertura, lacunas e freshness sem inferir consenso dos percentuais. Antes de trocar RQ com dirty, oferecer salvar/descartar/cancelar; primeira abertura de uma RQ mostra Conteúdo no layout estreito.
 - [ ] Repetir testes; exigir PASS, live status de geração e fontes com nomes acessíveis incluindo título. Commit: `feat: edit and generate traceable research question findings`.
 
-### Tarefa 10: Matriz contida, paginada e legível
+### Task 10: Matriz contida, paginada e legível
 
 **Arquivos:** `synthesis/SynthesisMatrixMode.jsx`, `synthesis/SynthesisDataTable.jsx` e testes colocalizados.
 
@@ -201,7 +201,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Implementar tabela própria com colgroup, largura fixa por coluna, header sticky e título/ano pinned; título tem elemento block truncado dentro de célula limitada. Container com overflow-x auto não expande grid/documento. Não modificar `components/ui/Table.jsx` globalmente.
 - [ ] Contexto mostra valor integral e metadados do campo/estudo; índice agrupa campos base, por RQ e apoio. Página padrão 20 e anúncio da faixa; export usa endpoint, não array de linhas renderizadas. Repetir testes; exigir PASS. Commit: `feat: build scalable contained extraction matrix`.
 
-### Tarefa 11: Visualizações com contexto e dados subjacentes
+### Task 11: Visualizações com contexto e dados subjacentes
 
 **Arquivos:** `synthesis/SynthesisVisualizationsMode.jsx` e teste colocalizado.
 
@@ -212,7 +212,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Usar Recharts existente, apenas agregados retornados; contexto informa origem/tipo/filtros/amostra/ausentes/agregação. Disponibilizar tabela dos dados e resumo textual, incluindo vazio/sem valores. Tabelas qualitativas reutilizam `SynthesisDataTable`, sem gráficos comprimidos.
 - [ ] Repetir testes; exigir PASS e nenhum cálculo baseado somente na página atual. Commit: `feat: explain synthesis visualizations with evidence context`.
 
-### Tarefa 12: Qualidade conectada aos estudos
+### Task 12: Qualidade conectada aos estudos
 
 **Arquivos:** `synthesis/SynthesisQualityMode.jsx` e teste colocalizado.
 
@@ -223,7 +223,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Índice lista geral e critérios; centro mostra distribuição e estudos; contexto mostra respostas/justificativa/score do estudo selecionado e Abrir no workspace. Não criar edição de qualidade nesta aba. Ao filtro remover estudo selecionado, limpar detalhe com mensagem, sem mostrar dado de outra seleção.
 - [ ] Repetir testes; exigir PASS e métricas independentes da página. Commit: `feat: connect quality distributions to source studies`.
 
-### Tarefa 13: Integração e proteção de alterações locais
+### Task 13: Integração e proteção de alterações locais
 
 **Arquivos:** `frontend/src/pages/ProjectDetails.jsx`, `ProjectDetails.test.jsx`, `hooks/useProjectArticles.js`, `services/articleService.js`, `utils/synthesisExport.js`, `utils/synthesisExport.test.js`, `RQSynthesisPanel.jsx` e consumidores encontrados por `rg`.
 
@@ -235,7 +235,7 @@ Comandos backend abaixo partem de `backend/`: `..\.venv\Scripts\python.exe -m py
 - [ ] Migrar todos os consumidores antes de retirar `RQSynthesisPanel`/helpers mortos. Preservar exports públicos úteis e CSV/JSON existentes; downloads de corpus usam servidor. Conferir com `rg` ausência de consumidor dependente de listas completas do relatório antigo.
 - [ ] Repetir testes e `npm run test:ci`; exigir PASS. Commit: `feat: integrate synthesis with project navigation safely`.
 
-### Tarefa 14: Verificação integrada e revisão visual
+### Task 14: Verificação integrada e revisão visual
 
 **Arquivos:** `frontend/e2e/synthesis-workspace.spec.js`, `docs/superpowers/reviews/2026-10-10-evidence-synthesis-workspace.md`; ajustes focados nos arquivos anteriores conforme evidência.
 
