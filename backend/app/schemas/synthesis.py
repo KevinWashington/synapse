@@ -28,7 +28,7 @@ class GenerationRequest(StrictSchema):
 
 
 class ManualSynthesisUpdate(StrictSchema):
-    expectedVersion: int = Field(ge=1)
+    expectedVersion: int = Field(ge=0)
     questionFingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     content: SynthesisContent
 
