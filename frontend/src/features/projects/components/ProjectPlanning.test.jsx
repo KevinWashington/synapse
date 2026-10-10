@@ -97,6 +97,14 @@ describe("ProjectPlanning", () => {
     expect(onDirtyChange).toHaveBeenLastCalledWith(true);
   });
 
+  it("keeps mobile clearance and stacks dirty actions without horizontal overflow", () => {
+    mocks.hookState = buildHookState({ isDirty: true });
+    const { container } = render(<ProjectPlanning project={project} />);
+
+    expect(container.firstElementChild).toHaveClass("pb-24", "min-w-0");
+    expect(screen.getByRole("button", { name: "Descartar" }).parentElement).toHaveClass("grid", "w-full", "grid-cols-2", "sm:flex");
+  });
+
   it("discards local changes", () => {
     const discardChanges = vi.fn();
     mocks.hookState = buildHookState({ discardChanges, isDirty: true });

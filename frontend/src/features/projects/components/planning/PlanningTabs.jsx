@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 function PlanningTabs({ activeTab, onTabChange, panels, tabs }) {
   return (
     <div className="overflow-hidden rounded-xl border border-[#e2e6ef] bg-white">
-      <div role="tablist" aria-label="Áreas do planejamento" className="grid grid-cols-3 border-b border-[#e7ebf4] bg-[#fbfcff]">
+      <div role="tablist" aria-label="Áreas do planejamento" className="grid min-w-0 grid-cols-3 border-b border-[#e7ebf4] bg-[#fbfcff]">
         {tabs.map((tab) => {
           const active = activeTab === tab.key;
           return (

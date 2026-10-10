@@ -25,7 +25,7 @@ function PlanningAccordionSection({ actions, children, expanded, onExpandedChang
           </span>
           <ChevronDownIcon className={cn("h-4 w-4 shrink-0 text-[#667391] transition-transform", expanded && "rotate-180")} />
         </button>
-        {actions ? <div className="ml-11 flex min-w-0 flex-wrap items-center gap-2 sm:ml-0">{actions}</div> : null}
+        {actions ? <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-none">{actions}</div> : null}
       </div>
       <div id={panelId} role="region" aria-labelledby={triggerId} hidden={!expanded} className="border-t border-[#edf0f7] px-4 py-5 sm:px-5">
         <p className="mb-4 text-xs leading-5 text-[#667391]">{section.description}</p>

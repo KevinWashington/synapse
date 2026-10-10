@@ -58,6 +58,36 @@ describe("compact planning shell", () => {
     expect(onExport).toHaveBeenCalledOnce();
   });
 
+  it("contains header, tabs, and accordion actions at mobile width", () => {
+    const { rerender } = render(
+      <PlanningEditorHeader completed={1} onExport={vi.fn()} onOpenSearch={vi.fn()} percent={14} total={7} />
+    );
+
+    expect(screen.getByRole("button", { name: /Buscar se/ }).parentElement).toHaveClass("w-full", "sm:w-auto");
+
+    rerender(
+      <PlanningTabs
+        activeTab="foundation"
+        onTabChange={vi.fn()}
+        panels={{ foundation: null, selection: null, data: null }}
+        tabs={tabs}
+      />
+    );
+    expect(screen.getByRole("tablist")).toHaveClass("min-w-0", "grid-cols-3");
+
+    rerender(
+      <PlanningAccordionSection
+        actions={<button type="button">Gerar conteúdo</button>}
+        expanded
+        onExpandedChange={vi.fn()}
+        section={sections[0]}
+      >
+        <p>Editor</p>
+      </PlanningAccordionSection>
+    );
+    expect(screen.getByRole("button", { name: "Gerar conteúdo" }).parentElement).toHaveClass("w-full", "sm:w-auto");
+  });
+
   it("keeps every tab panel mounted and exposes completion in tab labels", () => {
     const onTabChange = vi.fn();
     render(

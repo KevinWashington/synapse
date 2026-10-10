@@ -32,3 +32,26 @@ Data: 2026-10-09
 - Severidade P0/P1/P2 pendente: nenhuma.
 
 final result: passed
+
+---
+
+# Design QA — editor compacto de planejamento
+
+Data: 2026-10-10
+
+## Matriz verificada
+
+| Viewport | Cenário | Resultado |
+| --- | --- | --- |
+| 1440 × 1024 | Abas, busca de seção, dois accordions abertos, critérios inline e barra de alterações | Conteúdo central fluido, ações alinhadas e sem overflow horizontal. |
+| 390 × 844 | Mesmo fluxo e mesma hierarquia de informação | Abas em três colunas, ações quebram linha, critérios empilham e a barra de salvar permanece inteiramente acessível. |
+
+## Evidências
+
+- Capturas: `.superpowers/visual-evidence/planning-desktop.png` e `.superpowers/visual-evidence/planning-mobile.png`.
+- Em ambas as larguras, `documentWidth === viewportWidth`.
+- Busca por “qualidade” abriu a aba Dados e expandiu a seção correta; o retorno para Seleção preservou os accordions e o rascunho.
+- A inclusão rápida de um critério acionou corretamente o estado sujo e exibiu as ações Descartar / Salvar alterações.
+- Console, erros de página e falhas de rede: nenhum erro.
+
+final result: passed
