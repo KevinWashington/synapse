@@ -12,6 +12,8 @@ class CollaborationService {
   transferOwnership(id, data) { return apiService.post(`${base(id)}/transfer-ownership`, data); }
   previewAssignments(id, data) { return apiService.post(`${base(id)}/assignments/preview`, data); }
   distributeAssignments(id, data) { return apiService.post(`${base(id)}/assignments/distribute`, data); }
+  previewAdaptation(id, data) { return apiService.post(`${base(id)}/assignments/adapt/preview`, data); }
+  adaptAssignments(id, data) { return apiService.post(`${base(id)}/assignments/adapt`, data); }
   getMyAssignments(id, phase) {
     return phase
       ? apiService.get(`${base(id)}/assignments/me`, { phase })

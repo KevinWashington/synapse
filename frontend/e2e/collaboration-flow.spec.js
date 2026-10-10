@@ -164,11 +164,13 @@ test.describe("collaborative review workflow", () => {
       await invitationDialog.getByRole("checkbox", { name: "Participa da revisão" }).uncheck();
       await capture(page, testInfo, "02", "invitation-dialog");
       await invitationDialog.getByRole("button", { name: "Enviar convite" }).click();
+      await page.getByRole("navigation", { name: "Seções da equipe" }).getByRole("button", { name: /Convites/ }).click();
       await expect(page.getByText(pendingEmail, { exact: true })).toBeVisible();
       const claimed = { token: tokens.reviewer() };
       expect(claimed.token).toBeTruthy();
 
       const previewButton = page.getByRole("button", { name: "Pré-visualizar distribuição" });
+      await page.getByRole("navigation", { name: "Seções da equipe" }).getByRole("button", { name: /Distribuição/ }).click();
       await previewButton.click();
       await expect(page.getByText(/23 artigos · 3 revisores/)).toBeVisible();
       await capture(page, testInfo, "03", "distribution-preview");
@@ -237,6 +239,7 @@ test.describe("collaborative review workflow", () => {
 
       await authenticate(context, tokens.coordinator());
       await page.goto(`/projetos/${project.id}?tab=equipe`);
+      await page.getByRole("navigation", { name: "Seções da equipe" }).getByRole("button", { name: /Discordâncias/ }).click();
       await expect(page.getByText("Aguardando arbitragem", { exact: true })).toBeVisible();
       await page.getByRole("button", { name: new RegExp(`Inspecionar discordância do artigo ${conflictArticle}`) }).click();
       const conflictDialog = page.getByRole("dialog", { name: new RegExp(`Discordância do artigo ${conflictArticle}`) });
@@ -308,15 +311,19 @@ test.describe("collaborative review workflow", () => {
 
       await authenticate(context, tokens.owner());
       await page.goto(`/projetos/${project.id}?tab=equipe`);
+      await page.getByRole("navigation", { name: "Seções da equipe" }).getByRole("button", { name: /Distribuição/ }).click();
       await page.getByRole("button", { name: "Pré-visualizar distribuição" }).click();
       const team = await api(page.request, "get", `/api/projetos/${project.id}/members`);
       const removable = team.members.find((member) => member.userId === actorIds.peer);
+      await page.getByRole("navigation", { name: "Seções da equipe" }).getByRole("button", { name: /Participantes/ }).click();
       await page.getByRole("button", { name: `Remover ${removable.name}` }).click();
       const removeDialog = page.getByRole("dialog", { name: "Remover pessoa?" });
       await removeDialog.getByRole("button", { name: "Remover pessoa" }).click();
       await expect(removeDialog).not.toBeVisible();
+      await page.getByRole("navigation", { name: "Seções da equipe" }).getByRole("button", { name: /Distribuição/ }).click();
       await expect(page.getByRole("button", { name: "Confirmar distribuição" })).toHaveCount(0);
       await page.reload();
+      await page.getByRole("navigation", { name: "Seções da equipe" }).getByRole("button", { name: /Distribuição/ }).click();
       await expect(page.getByText(/vaga\(s\) precisa de reatribuição/)).toBeVisible();
       const reassign = page.getByRole("button", { name: /Reatribuir artigo/ }).first();
       const row = reassign.locator("xpath=ancestor::li");

@@ -1,9 +1,34 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import DistributionPanel from "./DistributionPanel";
 import { collaboration } from "./testFixtures";
 
 describe("controlled distribution", () => {
+  it("previews adapting to a solo reviewer before explicitly applying it", async () => {
+    const state = collaboration({ members: [collaboration().members[0]] });
+    state.previewAdaptation = vi.fn().mockResolvedValue({ phase: "screening", reviewerCount: 1, reviewsPerArticle: 1,
+      articleCount: 118, cancelledCount: 118, assignedCount: 0, consolidatedCount: 4, fingerprint: "snapshot" });
+    state.adaptAssignments = vi.fn().mockResolvedValue({});
+    render(<DistributionPanel collaboration={state} />);
+    fireEvent.click(screen.getByRole("button", { name: "Adaptar à equipe atual" }));
+    expect(await screen.findByText(/118 artigos serão adaptados/)).toBeInTheDocument();
+    expect(screen.getByText(/Revisão individual/)).toBeInTheDocument();
+    expect(state.adaptAssignments).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar adaptação" }));
+    await waitFor(() => expect(state.adaptAssignments).toHaveBeenCalledWith({ phase: "screening", fingerprint: "snapshot" }));
+    expect(await screen.findByText("Distribuição adaptada à equipe atual.")).toBeInTheDocument();
+  });
+  it("shows only reassignment vacancies from the selected phase and limits long lists", () => {
+    const state = collaboration({ assignments: [
+      { id: 1, articleId: 20, phase: "eligibility", slot: 2, status: "needs_reassignment", reviewerUserId: 99 },
+      ...Array.from({ length: 25 }, (_, i) => ({ id: i + 2, articleId: i + 100, phase: "screening", slot: 2, status: "needs_reassignment", reviewerUserId: 99 })),
+    ] });
+    render(<DistributionPanel collaboration={state} />);
+    expect(screen.queryByText(/Artigo 20 ·/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Reatribuir artigo/ })).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Próximas pendências" }));
+    expect(screen.getAllByRole("button", { name: /^Reatribuir artigo/ })).toHaveLength(5);
+  });
   it("previews counts and load before an explicit confirmation", async () => {
     const state = collaboration();
     state.previewAssignments.mockResolvedValue({

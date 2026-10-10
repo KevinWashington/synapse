@@ -129,6 +129,22 @@ class DistributionRequest(BaseModel):
     phase: Literal["screening", "eligibility"]
 
 
+class AdaptationRequest(DistributionRequest):
+    fingerprint: str = Field(min_length=64, max_length=64)
+
+
+class AdaptationPreviewResponse(BaseModel):
+    phase: Literal["screening", "eligibility"]
+    reviewerCount: int
+    reviewsPerArticle: int
+    articleCount: int
+    cancelledCount: int
+    assignedCount: int
+    consolidatedCount: int
+    loads: dict[int, int]
+    fingerprint: str
+
+
 class AssignmentPlanItemResponse(BaseModel):
     articleId: int
     reviewerUserId: int

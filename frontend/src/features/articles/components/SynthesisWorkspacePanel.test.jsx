@@ -17,6 +17,62 @@ const base = {
 
 describe("SynthesisWorkspacePanel", () => {
   beforeEach(() => useWorkspace.mockReset());
+  it("presents matrix metadata in Portuguese and extraction values as labeled fields instead of JSON", () => {
+    const study = { articleId: 1, title: "Original English title", year: 2026, sourceName: "Web of Science", qualityRating: "medium", qualityScore: 50, extractionValues: { finding: "Original English finding", confirmed: false, groups: ["Idosos", "Adultos"], empty: null } };
+    useWorkspace.mockReturnValue({ ...base, mode: "matrix", resources: { ...base.resources, matrix: { data: { items: [study], total: 1 } }, study: { data: study } } });
+    const { container } = render(<SynthesisWorkspacePanel project={{ id: 2, dataExtractionSchema: [{ key: "finding", label: "Achado" }, { key: "confirmed", label: "Confirmado" }, { key: "groups", label: "Grupos" }, { key: "empty", label: "Observações" }] }} />);
+    expect(screen.getByRole("columnheader", { name: "Fonte" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Avaliação" })).toBeInTheDocument();
+    expect(screen.queryByText("medium")).not.toBeInTheDocument();
+    expect(container.querySelector("pre")).toBeNull();
+    const details = container.querySelector("dl");
+    expect(details).toHaveTextContent("AchadoOriginal English finding");
+    expect(details).toHaveTextContent("ConfirmadoNão");
+    expect(details).toHaveTextContent("GruposIdosos, Adultos");
+    expect(details).toHaveTextContent("ObservaçõesNão preenchido");
+  });
+
+  it("presents quality answers using planning labels and Portuguese response names", () => {
+    useWorkspace.mockReturnValue({ ...base, mode: "quality", resources: { ...base.resources, study: { data: { articleId: 1, title: "Study", qualityRating: "unrated", qualityScore: null, qualityAnswers: { clear: "yes", bias: "partial", suitable: "no", other: "na" } } } } });
+    const { container } = render(<SynthesisWorkspacePanel project={{ id: 2, qualityAssessmentSchema: [{ key: "clear", label: "Objetivo claro" }, { key: "bias", label: "Risco de viés" }, { key: "suitable", label: "Método adequado" }, { key: "other", label: "Outro critério" }] }} />);
+    expect(container.querySelector("pre")).toBeNull();
+    expect(container.querySelector("dl")).toHaveTextContent("Objetivo claroSim");
+    expect(container.querySelector("dl")).toHaveTextContent("Risco de viésParcial");
+    expect(container.querySelector("dl")).toHaveTextContent("Método adequadoNão");
+    expect(container.querySelector("dl")).toHaveTextContent("Outro critérioNão se aplica");
+    expect(screen.queryByText(/unrated|—%/)).not.toBeInTheDocument();
+  });
+  it("selects a matrix study without navigating and opens extraction only through its explicit action", () => {
+    const selectArticle = vi.fn();
+    const onOpenArticle = vi.fn();
+    const study = { articleId: 42, title: "Estudo selecionável", year: 2026, extractionValues: { outcome: "Resultado extraído" }, qualityAnswers: {} };
+    const workspace = { ...base, mode: "matrix", actions: { ...base.actions, selectArticle }, resources: { ...base.resources, matrix: { data: { items: [study], total: 1, page: 1 } } } };
+    useWorkspace.mockReturnValue(workspace);
+    const view = render(<SynthesisWorkspacePanel project={{ id: 2 }} onOpenArticle={onOpenArticle} />);
+
+    fireEvent.click(screen.getByRole("button", { name: study.title }));
+    expect(selectArticle).toHaveBeenCalledWith(42);
+    expect(onOpenArticle).not.toHaveBeenCalled();
+
+    useWorkspace.mockReturnValue({ ...workspace, selection: { ...base.selection, articleId: 42 }, resources: { ...workspace.resources, study: { data: study } } });
+    view.rerender(<SynthesisWorkspacePanel project={{ id: 2 }} onOpenArticle={onOpenArticle} />);
+    expect(screen.getByRole("button", { name: study.title })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/Resultado extraído/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir na extração" }));
+    expect(onOpenArticle).toHaveBeenCalledWith(42);
+  });
+  it("reports a failed request instead of claiming the project has no questions", () => {
+    const refresh = vi.fn();
+    useWorkspace.mockReturnValue({
+      ...base, mode: "rqs", actions: { ...base.actions, refresh },
+      resources: { ...base.resources, rqs: { data: null, loading: false, error: new Error("API unavailable") } },
+    });
+    render(<SynthesisWorkspacePanel project={{ id: 2 }} canEdit />);
+    expect(screen.getByRole("alert")).toHaveTextContent("carregar os dados");
+    expect(screen.queryByText(/Cadastre perguntas/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(refresh).toHaveBeenCalledOnce();
+  });
   it("keeps the four synthesis modes and presents the selected mode", () => {
     useWorkspace.mockReturnValue({ ...base, mode: "rqs" });
     const view = render(<SynthesisWorkspacePanel project={{ id: 2, dataExtractionSchema: [] }} canEdit onOpenArticle={vi.fn()} />);

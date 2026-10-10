@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.project import Project
 from app.services.notification_service import create_notification
 from app.services.project_access_service import CAP_MANAGE_MEMBERS, ProjectAccess, require_capability
+from app.services.team_lock_service import lock_project_team
 
 
 def normalize_email(email: str) -> str:
@@ -61,6 +62,7 @@ async def _activate_member(
     invited_by_user_id: int | None,
     joined_at: datetime,
 ) -> tuple[ProjectMember, bool, bool]:
+    await lock_project_team(db, project_id)
     member_result = await db.execute(
         select(ProjectMember).where(
             ProjectMember.projectId == project_id,
@@ -267,7 +269,9 @@ async def claim_pending_invitations(
         ).with_for_update()
     )
     memberships = []
-    for invitation in pending_result.scalars().all():
+    # A signup may join several projects in one transaction; acquire their team
+    # locks in the same order across signups to avoid project-lock deadlocks.
+    for invitation in sorted(pending_result.scalars().all(), key=lambda item: (item.projectId, item.id)):
         member, _, _ = await _activate_member(
             db,
             project_id=invitation.projectId,

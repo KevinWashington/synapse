@@ -9,7 +9,6 @@ import {
   LoaderIcon,
   NetworkIcon,
   RotateCcwIcon,
-  SlidersHorizontalIcon,
   SparklesIcon,
 } from "lucide-react";
 import {
@@ -59,13 +58,13 @@ const EXCLUDED_OUTCOMES = new Set([
 ]);
 
 const STUDY_TYPE_LABELS = {
-  journal_article: "Artigo de periodico",
-  conference_paper: "Conferencia",
-  review: "Revisao",
+  journal_article: "Artigo de periódico",
+  conference_paper: "Conferência",
+  review: "Revisão",
   thesis: "Tese",
-  book_chapter: "Capitulo de livro",
+  book_chapter: "Capítulo de livro",
   other: "Outros",
-  unclassified: "Nao classificado",
+  unclassified: "Não classificado",
 };
 
 function formatNumber(value) {
@@ -81,9 +80,9 @@ function formatPercent(value) {
 
 function formatDistributionLabel(value) {
   if (value === "true") return "Sim";
-  if (value === "false") return "Nao";
+  if (value === "false") return "Não";
   if (value === "high") return "Alta";
-  if (value === "medium") return "Media";
+  if (value === "medium") return "Média";
   if (value === "low") return "Baixa";
   if (value === "unrated") return "Sem nota";
   return value;
@@ -93,15 +92,15 @@ function formatSuggestionStatus(value) {
   if (value === "ready") return "Pronto";
   if (value === "needs_data") return "Sem dados";
   if (value === "missing_field") return "Campo ausente";
-  return "Indisponivel";
+  return "Indisponível";
 }
 
 function formatVisualizationType(value) {
   if (value === "bar_chart") return "Barras por estudo";
   if (value === "category_bar_chart") return "Barras por categoria";
-  if (value === "multi_category_bar_chart") return "Frequencia por opcao";
+  if (value === "multi_category_bar_chart") return "Frequência por opção";
   if (value === "qualitative_table") return "Tabela qualitativa";
-  return "Nao disponivel";
+  return "Não disponivel";
 }
 
 function truncateChartLabel(value, maxLength = 18) {
@@ -164,7 +163,7 @@ function buildYearData(articles) {
 }
 
 function buildSourceData(articles) {
-  return groupByCount(articles, (article) => article.sourceName || "Origem nao informada").slice(0, 8);
+  return groupByCount(articles, (article) => article.sourceName || "Origem não informada").slice(0, 8);
 }
 
 function buildStudyTypeData(articles) {
@@ -191,11 +190,11 @@ function buildStatusData(articles) {
   );
 
   return [
-    { key: "included", name: "Incluidos", value: values.included, color: STATUS_COLORS.included },
-    { key: "eligible", name: "Elegiveis", value: values.eligible, color: STATUS_COLORS.eligible },
+    { key: "included", name: "Incluídos", value: values.included, color: STATUS_COLORS.included },
+    { key: "eligible", name: "Elegíveis", value: values.eligible, color: STATUS_COLORS.eligible },
     { key: "screening", name: "Em triagem", value: values.screening, color: STATUS_COLORS.screening },
-    { key: "excluded", name: "Excluidos", value: values.excluded, color: STATUS_COLORS.excluded },
-    { key: "identified", name: "Identificacao", value: values.identified, color: STATUS_COLORS.identified },
+    { key: "excluded", name: "Excluídos", value: values.excluded, color: STATUS_COLORS.excluded },
+    { key: "identified", name: "Identificação", value: values.identified, color: STATUS_COLORS.identified },
   ].filter((item) => item.value > 0);
 }
 
@@ -237,8 +236,8 @@ function buildTrendData(overview, articles) {
         month: "2-digit",
       }),
       Identificados: point.identification,
-      Incluidos: point.included,
-      Publicacoes: point.screening,
+      Incluídos: point.included,
+      Publicações: point.screening,
     }));
   }
 
@@ -246,8 +245,8 @@ function buildTrendData(overview, articles) {
   return yearData.map((point) => ({
     label: point.year,
     Identificados: point.value,
-    Incluidos: articles.filter((article) => article.reviewOutcome === "included" && String(article.year) === point.year).length,
-    Publicacoes: point.value,
+    Incluídos: articles.filter((article) => article.reviewOutcome === "included" && String(article.year) === point.year).length,
+    Publicações: point.value,
   }));
 }
 
@@ -264,7 +263,7 @@ function EmptyChart({ children, compact = false }) {
 
 function ChartCard({ action, children, className, title }) {
   return (
-    <section className={cn("rounded-lg border border-[#edf0f7] bg-white p-5", className)}>
+    <section className={cn("@container min-w-0 border-b border-[#edf0f7] bg-white p-4 sm:p-5", className)}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-[#111936]">{title}</h2>
         {action}
@@ -274,10 +273,11 @@ function ChartCard({ action, children, className, title }) {
   );
 }
 
-function FilterSelect({ icon: Icon, value, onValueChange, children, className }) {
+function FilterSelect({ icon: Icon, label, value, onValueChange, children, className }) {
   return (
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger
+        aria-label={label}
         className={cn(
           "h-10 rounded-lg border-[#dfe4ef] bg-white text-xs font-semibold text-[#253252] shadow-none",
           className
@@ -295,12 +295,13 @@ function FilterSelect({ icon: Icon, value, onValueChange, children, className })
 
 function ViewToggle({ value, onChange }) {
   const options = [
-    { key: "dashboard", label: "Painel", icon: BarChart3Icon },
-    { key: "graph", label: "Grafo", icon: NetworkIcon },
+    { key: "dashboard", label: "Panorama", icon: BarChart3Icon },
+    { key: "rqs", label: "Perguntas de pesquisa", icon: BookMarkedIcon },
+    { key: "graph", label: "Relações entre artigos", icon: NetworkIcon },
   ];
 
   return (
-    <div className="inline-flex rounded-lg border border-[#dfe4ef] bg-white p-1">
+    <nav aria-label="Seções de gráficos" className="grid min-w-0 grid-cols-1 border-y border-[#e7ebf4] bg-[#fbfcff] sm:grid-cols-3">
       {options.map((option) => {
         const Icon = option.icon;
         const isActive = value === option.key;
@@ -308,10 +309,11 @@ function ViewToggle({ value, onChange }) {
           <button
             key={option.key}
             type="button"
+            aria-current={isActive ? "page" : undefined}
             onClick={() => onChange(option.key)}
             className={cn(
-              "flex h-8 items-center gap-2 rounded-md px-3 text-xs font-semibold transition",
-              isActive ? "bg-[#6259ff] text-white" : "text-[#56627f] hover:bg-[#f7f8fc] hover:text-[#182344]"
+              "flex min-w-0 items-center justify-center gap-2 border-b-2 px-3 py-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#6259ff] sm:text-sm",
+              isActive ? "border-[#6259ff] bg-white text-[#554bea]" : "border-transparent text-[#667391] hover:text-[#111936]"
             )}
           >
             <Icon className="h-4 w-4" />
@@ -319,13 +321,13 @@ function ViewToggle({ value, onChange }) {
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }
 
 function PublicationYearChart({ data }) {
   if (!data.length) {
-    return <EmptyChart>Nenhum ano de publicacao informado.</EmptyChart>;
+    return <EmptyChart>Nenhum ano de publicação informado.</EmptyChart>;
   }
 
   return (
@@ -336,7 +338,7 @@ function PublicationYearChart({ data }) {
           <XAxis dataKey="year" tick={{ fill: "#56627f", fontSize: 11 }} tickLine={false} axisLine={false} />
           <YAxis tick={{ fill: "#56627f", fontSize: 11 }} tickLine={false} axisLine={false} />
           <Tooltip cursor={{ fill: "#f6f7ff" }} />
-          <Bar dataKey="value" fill="#8178ff" radius={[4, 4, 0, 0]} barSize={18} />
+          <Bar isAnimationActive={false} dataKey="value" fill="#8178ff" radius={[4, 4, 0, 0]} barSize={18} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -349,11 +351,11 @@ function StudyTypeChart({ data, total }) {
   }
 
   return (
-    <div className="grid min-h-[230px] items-center gap-4 md:grid-cols-[170px_1fr]">
-      <div className="relative h-[170px]">
+    <div className="grid min-h-[230px] items-center gap-4 @min-[360px]:grid-cols-[170px_minmax(0,1fr)]">
+      <div className="relative mx-auto h-[170px] w-[170px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={data} dataKey="value" innerRadius={52} outerRadius={80} paddingAngle={2}>
+            <Pie isAnimationActive={false} data={data} dataKey="value" innerRadius={52} outerRadius={80} paddingAngle={2}>
               {data.map((item, index) => (
                 <Cell key={item.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
               ))}
@@ -451,11 +453,11 @@ function StatusChart({ data, total }) {
   }
 
   return (
-    <div className="grid min-h-[190px] items-center gap-4 md:grid-cols-[155px_1fr]">
-      <div className="relative h-[155px]">
+    <div className="grid min-h-[190px] items-center gap-4 @min-[360px]:grid-cols-[155px_minmax(0,1fr)]">
+      <div className="relative mx-auto h-[155px] w-[155px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={data} dataKey="value" innerRadius={47} outerRadius={72} startAngle={90} endAngle={450}>
+            <Pie isAnimationActive={false} data={data} dataKey="value" innerRadius={47} outerRadius={72} startAngle={90} endAngle={450}>
               {data.map((item) => (
                 <Cell key={item.key} fill={item.color} />
               ))}
@@ -487,7 +489,7 @@ function StatusChart({ data, total }) {
 
 function TrendChart({ data }) {
   if (!data.length) {
-    return <EmptyChart>Sem eventos suficientes para montar tendencias.</EmptyChart>;
+    return <EmptyChart>Sem eventos suficientes para montar tendências.</EmptyChart>;
   }
 
   return (
@@ -498,9 +500,9 @@ function TrendChart({ data }) {
           <XAxis dataKey="label" tick={{ fill: "#56627f", fontSize: 11 }} tickLine={false} axisLine={false} />
           <YAxis tick={{ fill: "#56627f", fontSize: 11 }} tickLine={false} axisLine={false} />
           <Tooltip />
-          <Line type="monotone" dataKey="Identificados" stroke="#6259ff" strokeWidth={2} dot={{ r: 2 }} />
-          <Line type="monotone" dataKey="Incluidos" stroke="#49c987" strokeWidth={2} dot={{ r: 2 }} />
-          <Line type="monotone" dataKey="Publicacoes" stroke="#5a86ff" strokeWidth={2} dot={{ r: 2 }} />
+          <Line isAnimationActive={false} type="monotone" dataKey="Identificados" stroke="#6259ff" strokeWidth={2} dot={{ r: 2 }} />
+          <Line isAnimationActive={false} type="monotone" dataKey="Incluídos" stroke="#49c987" strokeWidth={2} dot={{ r: 2 }} />
+          <Line isAnimationActive={false} type="monotone" dataKey="Publicações" stroke="#5a86ff" strokeWidth={2} dot={{ r: 2 }} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -515,21 +517,19 @@ function InsightsPanel({ stats, sourceData, yearData, studyTypeData, onGoToScree
 
   const insights = [
     peakYear
-      ? `Maior volume de publicacoes em ${peakYear.year}, com ${formatNumber(peakYear.value)} registro(s).`
-      : "Cadastre anos de publicacao para gerar tendencias temporais.",
+      ? `Maior volume de publicações em ${peakYear.year}, com ${formatNumber(peakYear.value)} registro(s).`
+      : "Cadastre anos de publicação para gerar tendências temporais.",
     topSource
       ? `${topSource.name} concentra ${formatPercent((topSource.value / stats.identified) * 100)} dos registros filtrados.`
-      : "As fontes dos artigos ainda nao foram informadas.",
+      : "As fontes dos artigos ainda não foram informadas.",
     topType
       ? `${topType.name} e o tipo de estudo mais frequente neste recorte.`
       : "Classifique tipos de estudo para melhorar a analise metodologica.",
-    `A taxa de inclusao atual e ${formatPercent(includeRate)} dos registros identificados.`,
+    `A taxa de inclusão atual e ${formatPercent(includeRate)} dos registros identificados.`,
   ];
 
   const nextSteps = [
     { label: `Revisar artigos em triagem (${formatNumber(Math.max(stats.screening - stats.eligible, 0))})`, onClick: onGoToScreening },
-    { label: "Atualizar criterios de elegibilidade", onClick: null },
-    { label: "Exportar relatorio de graficos", onClick: null },
   ];
 
   return (
@@ -554,9 +554,9 @@ function InsightsPanel({ stats, sourceData, yearData, studyTypeData, onGoToScree
           ))}
         </div>
         <div className="rounded-lg bg-[#f5f7fc] p-4">
-          <p className="mb-3 text-xs font-semibold text-[#253252]">Proximos passos sugeridos</p>
+          <p className="mb-3 text-xs font-semibold text-[#253252]">Próximos passos sugeridos</p>
           <div className="space-y-1">
-            {nextSteps.map((step) => (
+            {nextSteps.filter((step) => step.onClick).map((step) => (
               <button
                 key={step.label}
                 type="button"
@@ -601,11 +601,11 @@ function SuggestedVisualizationChart({ suggestion }) {
               if (isCountChart) {
                 return [`${value} (${payload?.payload?.percentage ?? 0}%)`, "Contagem"];
               }
-              return [value, "Valor extraido"];
+              return [value, "Valor extraído"];
             }}
             labelFormatter={(value) => value}
           />
-          <Bar dataKey={isCountChart ? "count" : "value"} fill="#8178ff" radius={[4, 4, 0, 0]} barSize={22} />
+          <Bar isAnimationActive={false} dataKey={isCountChart ? "count" : "value"} fill="#8178ff" radius={[4, 4, 0, 0]} barSize={22} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -652,7 +652,7 @@ function SuggestedVisualizationCard({ onOpenArticle, suggestion }) {
     <ChartCard title={`RQ ${suggestion.rqNumber}`}>
       <div className="space-y-3">
         <div>
-          <p className="line-clamp-3 min-h-[60px] text-xs font-semibold leading-5 text-[#111936]" title={suggestion.question}>
+          <p className="line-clamp-3 text-sm font-semibold leading-5 text-[#111936]" title={suggestion.question}>
             {suggestion.question}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -663,8 +663,8 @@ function SuggestedVisualizationCard({ onOpenArticle, suggestion }) {
               {formatVisualizationType(suggestion.visualizationType)}
             </span>
           </div>
-          <p className="mt-2 truncate text-[11px] text-[#56627f]" title={suggestion.field?.label || "Nao configurado"}>
-            Campo: {suggestion.field?.label || "Nao configurado"}
+          <p className="mt-2 truncate text-[11px] text-[#56627f]" title={suggestion.field?.label || "Não configurado"}>
+            Campo: {suggestion.field?.label || "Não configurado"}
           </p>
           <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#667391]" title={suggestion.reason}>{suggestion.reason}</p>
         </div>
@@ -672,8 +672,8 @@ function SuggestedVisualizationCard({ onOpenArticle, suggestion }) {
         {!rows.length ? (
           <EmptyChart compact>
             {suggestion.status === "missing_field"
-              ? "Configure um campo de extracao para esta pergunta no planejamento."
-              : "Preencha a extracao dos artigos incluidos para gerar esta visualizacao."}
+              ? "Configure um campo de extração para esta pergunta no planejamento."
+              : "Preencha a extração dos artigos incluidos para gerar esta visualização."}
           </EmptyChart>
         ) : isChart ? (
           <SuggestedVisualizationChart suggestion={suggestion} />
@@ -687,12 +687,12 @@ function SuggestedVisualizationCard({ onOpenArticle, suggestion }) {
 
 function SuggestedVisualizationsSection({ onOpenArticle, suggestions }) {
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="min-w-0">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#edf0f7] px-4 py-4 sm:px-5">
         <div>
-          <h2 className="text-sm font-semibold text-[#111936]">Visualizacoes sugeridas por pergunta</h2>
+          <h2 className="text-sm font-semibold text-[#111936]">Visualizações por pergunta de pesquisa</h2>
           <p className="mt-1 text-xs text-[#667391]">
-            Geradas por regras locais com base no tipo de dado definido na extracao.
+            Dados dos estudos incluídos, conforme os campos definidos no planejamento. Os filtros do Panorama não se aplicam aqui.
           </p>
         </div>
         <span className="rounded-lg bg-[#f5f7fc] px-3 py-2 text-xs font-semibold text-[#56627f]">
@@ -701,7 +701,7 @@ function SuggestedVisualizationsSection({ onOpenArticle, suggestions }) {
       </div>
 
       {suggestions.length ? (
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className={cn("grid min-w-0 [&>section]:border-r [&>section]:border-[#edf0f7]", suggestions.length > 1 && "lg:grid-cols-2")}>
           {suggestions.map((suggestion) => (
             <SuggestedVisualizationCard
               key={`suggested-visualization-${suggestion.rqNumber}`}
@@ -712,7 +712,7 @@ function SuggestedVisualizationsSection({ onOpenArticle, suggestions }) {
         </div>
       ) : (
         <ChartCard title="Perguntas de pesquisa">
-          <EmptyChart>Cadastre perguntas e campos de extracao para receber sugestoes de visualizacao.</EmptyChart>
+          <EmptyChart>Cadastre perguntas e campos de extração para receber sugestões de visualização.</EmptyChart>
         </ChartCard>
       )}
     </section>
@@ -851,86 +851,43 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
     setSourceFilter("all");
   }
 
-  if (activeView === "graph") {
-    return (
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <ViewToggle value={activeView} onChange={setActiveView} />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-10 rounded-lg border-[#dfe4ef] bg-white text-[#182344] shadow-none"
-            onClick={() => setActiveView("dashboard")}
-          >
-            <BarChart3Icon className="h-4 w-4" />
-            Voltar aos graficos
-          </Button>
-        </div>
-        <ArticleGraph projectId={project.id} graphRefreshToken={graphRefreshToken} />
-      </div>
-    );
-  }
-
   if (loading) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-[#edf0f7] bg-white px-4 py-3 text-sm text-[#667391]">
-        <LoaderIcon className="h-4 w-4 animate-spin" />
-        Carregando graficos e analises...
-      </div>
-    );
+    return <div role="status" className="flex items-center gap-2 rounded-xl border border-[#e2e6ef] bg-white px-5 py-4 text-sm text-[#667391]"><LoaderIcon className="h-4 w-4 animate-spin" />Carregando gráficos e análises...</div>;
   }
-
   if (error) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-[#fee2e2] bg-[#fff1f2] px-4 py-3 text-sm text-[#be123c]">
-        <AlertCircleIcon className="h-4 w-4" />
-        {error}
-      </div>
-    );
+    return <div role="alert" className="flex items-center gap-2 rounded-xl border border-[#fee2e2] bg-[#fff1f2] px-5 py-4 text-sm text-[#be123c]"><AlertCircleIcon className="h-4 w-4" />{error}</div>;
   }
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <ViewToggle value={activeView} onChange={setActiveView} />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-10 rounded-lg border-[#dfe4ef] bg-white text-[#182344] shadow-none"
-            onClick={() => toast.info("Use os filtros para personalizar os graficos exibidos.")}
-          >
-            <SlidersHorizontalIcon className="h-4 w-4" />
-            Personalizar graficos
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => handleExport("csv")}
-            className="h-10 rounded-lg bg-[#6259ff] px-4 text-white shadow-[0_10px_20px_rgba(98,89,255,0.18)] hover:bg-[#5148ee]"
-          >
-            <DownloadIcon className="h-4 w-4" />
-            Exportar dados
-          </Button>
+    <section aria-label="Workspace de gráficos" className="min-w-0 overflow-hidden rounded-xl border border-[#e2e6ef] bg-white text-[#111936] shadow-[0_10px_30px_rgba(18,27,54,0.03)]">
+      <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 px-4 py-4 sm:px-5">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold tracking-[-0.02em]">Gráficos da revisão</h2>
+          <p className="mt-1 text-sm text-[#667391]">Explore o perfil dos estudos, as respostas às perguntas e as relações entre artigos.</p>
         </div>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.25fr_1fr_auto]">
-        <FilterSelect icon={BookMarkedIcon} value={yearFilter} onValueChange={setYearFilter}>
-          <SelectItem value="all">Todo o periodo</SelectItem>
+        <Button variant="outline" size="sm" title="Exportar relatório de seleção do projeto completo" onClick={() => handleExport("csv")}><DownloadIcon className="h-4 w-4" />Exportar relatório</Button>
+      </header>
+      <ViewToggle value={activeView} onChange={setActiveView} />
+      <div className="min-h-[420px] min-w-0 max-h-[min(72vh,900px)] overflow-y-auto">
+        {activeView === "graph" ? <div className="min-w-0 p-4 sm:p-5"><ArticleGraph projectId={project.id} graphRefreshToken={graphRefreshToken} /></div>
+        : activeView === "rqs" ? <SuggestedVisualizationsSection suggestions={visualizationSuggestions} onOpenArticle={onOpenArticle} />
+        : <>
+      <div className="grid gap-3 border-b border-[#edf0f7] bg-[#fbfcff] p-4 sm:px-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.25fr_1fr_auto]">
+        <FilterSelect label="Período" icon={BookMarkedIcon} value={yearFilter} onValueChange={setYearFilter}>
+          <SelectItem value="all">Todo o período</SelectItem>
           {filterOptions.years.map((year) => (
             <SelectItem key={year} value={String(year)}>
               {year}
             </SelectItem>
           ))}
         </FilterSelect>
-        <FilterSelect icon={FilterIcon} value={statusFilter} onValueChange={setStatusFilter}>
+        <FilterSelect label="Etapa ou resultado" icon={FilterIcon} value={statusFilter} onValueChange={setStatusFilter}>
           <SelectItem value="all">Todos os status</SelectItem>
           <SelectItem value="screening">Em triagem</SelectItem>
-          <SelectItem value="eligible">Elegiveis</SelectItem>
-          <SelectItem value="included">Incluidos</SelectItem>
-          <SelectItem value="excluded">Excluidos</SelectItem>
+          <SelectItem value="eligible">Elegíveis</SelectItem>
+          <SelectItem value="included">Incluídos</SelectItem>
+          <SelectItem value="excluded">Excluídos</SelectItem>
         </FilterSelect>
-        <FilterSelect value={studyTypeFilter} onValueChange={setStudyTypeFilter}>
+        <FilterSelect label="Tipo de estudo" value={studyTypeFilter} onValueChange={setStudyTypeFilter}>
           <SelectItem value="all">Todos os tipos de estudo</SelectItem>
           {filterOptions.studyTypes.map((type) => (
             <SelectItem key={type} value={type}>
@@ -938,7 +895,7 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
             </SelectItem>
           ))}
         </FilterSelect>
-        <FilterSelect value={sourceFilter} onValueChange={setSourceFilter}>
+        <FilterSelect label="Fonte" value={sourceFilter} onValueChange={setSourceFilter}>
           <SelectItem value="all">Todas as fontes</SelectItem>
           {filterOptions.sources.map((source) => (
             <SelectItem key={source} value={source}>
@@ -958,13 +915,16 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
         </Button>
       </div>
 
-      <SuggestedVisualizationsSection
-        suggestions={visualizationSuggestions}
-        onOpenArticle={onOpenArticle}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr_1.05fr]">
-        <ChartCard title="Publicacoes por ano">
+          <div className="grid grid-cols-2 gap-3 border-b border-[#edf0f7] px-4 py-3 sm:px-5 md:grid-cols-4">
+            {[
+              ["Registros no recorte", stats.identified],
+              ["Incluídos no recorte", stats.included],
+              ["Fontes no recorte", new Set(filteredArticles.map((article) => article.sourceName).filter(Boolean)).size],
+              ["Taxa de inclusão", formatPercent(stats.identified ? stats.included / stats.identified * 100 : 0)],
+            ].map(([label, value]) => <div key={label}><p className="text-xs text-[#667391]">{label}</p><p className="mt-1 text-base font-semibold">{typeof value === "number" ? formatNumber(value) : value}</p></div>)}
+          </div>
+      <div className="grid min-w-0 [&>section]:border-r [&>section]:border-[#edf0f7] xl:grid-cols-[1.15fr_1fr_1.05fr]">
+        <ChartCard title="Publicações por ano">
           <PublicationYearChart data={yearData} />
         </ChartCard>
         <ChartCard title="Artigos por tipo de estudo">
@@ -975,20 +935,20 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
         </ChartCard>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_1.2fr_1fr]">
-        <ChartCard title="Publicacoes por fonte">
+      <div className="grid min-w-0 [&>section]:border-r [&>section]:border-[#edf0f7] xl:grid-cols-[1fr_1.2fr_1fr]">
+        <ChartCard title="Publicações por fonte">
           <SourceChart data={sourceData.slice(0, 6)} total={Math.max(stats.identified, 1)} />
         </ChartCard>
         <ChartCard title="Palavras-chave mais frequentes">
           <KeywordCloud data={keywordData} />
         </ChartCard>
-        <ChartCard title="Distribuicao por status">
+        <ChartCard title="Distribuição por status">
           <StatusChart data={statusData} total={Math.max(stats.identified, 1)} />
         </ChartCard>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <ChartCard title="Tendencias ao longo do tempo">
+      <div className="grid min-w-0 [&>section]:border-r [&>section]:border-[#edf0f7] xl:grid-cols-[1.2fr_1fr]">
+        <ChartCard title="Tendências ao longo do tempo">
           <TrendChart data={trendData} />
         </ChartCard>
         <InsightsPanel
@@ -999,7 +959,9 @@ function ProjectAnalytics({ graphRefreshToken = 0, onGoToScreening, onOpenArticl
           onGoToScreening={onGoToScreening}
         />
       </div>
-    </div>
+        </>}
+      </div>
+    </section>
   );
 }
 

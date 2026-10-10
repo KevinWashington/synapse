@@ -3,7 +3,7 @@ import pytest
 from app.models.article import Article
 from app.models.project import Project
 from app.models.user import User
-from app.services.synthesis_query_service import get_overview, get_chart, get_quality_criteria, list_evidence, list_matrix
+from app.services.synthesis_query_service import get_overview, get_chart, get_quality_criteria, list_evidence, list_matrix, list_quality_studies
 from synthesis_test_support import synthesis_database, synthesis_session  # noqa: F401
 
 
@@ -24,6 +24,30 @@ async def _project(session):
     session.add(project)
     await session.flush()
     return project, owner
+
+
+@pytest.mark.asyncio
+async def test_overall_quality_lists_included_studies_and_aggregates_the_filtered_scope(synthesis_session):
+    project, owner = await _project(synthesis_session)
+    for title, year, answers in [("High", 2025, {"validity": "yes"}), ("Low", 2024, {"validity": "no"}), ("Unrated", 2025, {})]:
+        synthesis_session.add(Article(
+            projectId=project.id, ownerId=owner.id, title=title, year=year,
+            authors="Author", journal="Journal", reviewOutcome="included",
+            qualityAssessmentAnswers=answers,
+        ))
+    await synthesis_session.flush()
+
+    overall = await list_quality_studies(synthesis_session, project, "overall", {}, page=1, page_size=20)
+    assert overall["total"] == 3
+    assert len(overall["items"]) == 3
+    criterion = await list_quality_studies(synthesis_session, project, "validity", {}, page=1, page_size=20)
+    assert criterion["total"] == 2
+
+    filtered = await list_quality_studies(synthesis_session, project, "overall", {"yearFrom": 2025}, page=1, page_size=20)
+    criteria = await get_quality_criteria(synthesis_session, project, {"yearFrom": 2025})
+    assert filtered["total"] == criteria[0]["total"] == 2
+    assert criteria[0]["distribution"]["low"] == 0
+    assert sum(criteria[0]["distribution"].values()) == 2
 
 
 @pytest.mark.asyncio

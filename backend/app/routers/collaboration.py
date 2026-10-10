@@ -20,6 +20,8 @@ from app.schemas.collaboration import (
     AssignmentResponse,
     DistributionPreviewResponse,
     DistributionRequest,
+    AdaptationRequest,
+    AdaptationPreviewResponse,
     ReassignmentRequest,
     ConflictResolutionRequest,
     ConflictResponse,
@@ -45,6 +47,8 @@ from app.services.review_decision_service import (
     resolve_conflict,
     visible_decision_payloads,
 )
+from app.services.review_adaptation_service import preview_adaptation, adapt_reviews
+from app.services.team_lock_service import lock_project_team
 
 
 router = APIRouter()
@@ -236,6 +240,7 @@ async def cancel_invitation(projectId: int, invitationId: int, reason: str | Non
 async def update_member(projectId: int, memberId: int, data: MemberUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     require_capability(access, CAP_MANAGE_MEMBERS)
+    await lock_project_team(db, projectId)
     result = await db.execute(select(ProjectMember).where(ProjectMember.id == memberId, ProjectMember.projectId == projectId, ProjectMember.status == "active"))
     member = result.scalar_one_or_none()
     if member is None:
@@ -293,6 +298,7 @@ async def update_member(projectId: int, memberId: int, data: MemberUpdate, curre
 async def remove_member(projectId: int, memberId: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     require_capability(access, CAP_MANAGE_MEMBERS)
+    await lock_project_team(db, projectId)
     result = await db.execute(select(ProjectMember).where(ProjectMember.id == memberId, ProjectMember.projectId == projectId, ProjectMember.status == "active"))
     member = result.scalar_one_or_none()
     if member is None:
@@ -337,6 +343,7 @@ async def remove_member(projectId: int, memberId: int, current_user: User = Depe
 async def transfer_ownership(projectId: int, data: OwnershipTransferRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     require_capability(access, CAP_TRANSFER_OWNERSHIP)
+    await lock_project_team(db, projectId)
     result = await db.execute(select(ProjectMember).where(ProjectMember.projectId == projectId, ProjectMember.userId == data.userId, ProjectMember.status == "active"))
     target = result.scalar_one_or_none()
     if target is None:
@@ -372,6 +379,24 @@ async def distribute_assignments(projectId: int, data: DistributionRequest, curr
     result = await distribute_reviews(db, access=access, phase=data.phase, assigned_by_user_id=current_user.id)
     await db.commit()
     return _preview_response(result)
+
+
+@router.post("/{projectId}/assignments/adapt/preview", response_model=AdaptationPreviewResponse)
+async def preview_team_adaptation(projectId: int, data: DistributionRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    return await preview_adaptation(db, access=access, phase=data.phase)
+
+
+@router.post("/{projectId}/assignments/adapt", response_model=AdaptationPreviewResponse)
+async def adapt_team_assignments(projectId: int, data: AdaptationRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    response, changed_articles = await adapt_reviews(db, access=access, phase=data.phase, fingerprint=data.fingerprint, actor_user_id=current_user.id)
+    await db.commit()
+    # Reuse the same best-effort index synchronization as manual review decisions.
+    from app.routers.articles import _sync_article_indexes
+    for article in changed_articles:
+        await _sync_article_indexes(article, db)
+    return response
 
 
 @router.get("/{projectId}/assignments", response_model=list[AssignmentResponse])

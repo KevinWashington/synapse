@@ -14,6 +14,8 @@ describe("collaboration endpoint contracts", () => {
     ["transferOwnership", [{ userId: 4 }], "post", "/transfer-ownership"],
     ["previewAssignments", [{ phase: "screening" }], "post", "/assignments/preview"],
     ["distributeAssignments", [{ phase: "eligibility" }], "post", "/assignments/distribute"],
+    ["previewAdaptation", [{ phase: "screening" }], "post", "/assignments/adapt/preview"],
+    ["adaptAssignments", [{ phase: "screening", fingerprint: "snapshot" }], "post", "/assignments/adapt"],
     ["getMyAssignments", [], "get", "/assignments/me"],
     ["getAssignments", [], "get", "/assignments"],
     ["reassignAssignment", [6, { reviewerUserId: 9 }], "patch", "/assignments/6"],

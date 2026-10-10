@@ -433,8 +433,8 @@ async def get_chart(db: AsyncSession, project: Project, chart_key: str, filters:
     return {"key": chart_key, "field": field, "sampleSize": int(total), "missingCount": int(total - nonempty), "rows": rows}
 
 
-async def _quality_summary(db, project: Project, *, rq_number: int | None = None) -> dict:
-    clauses = _filters_clause(project, {}, rq_number=rq_number)
+async def _quality_summary(db, project: Project, *, rq_number: int | None = None, filters: dict | None = None) -> dict:
+    clauses = _filters_clause(project, filters or {}, rq_number=rq_number)
     counts = {rating: 0 for rating in QUALITY_RATING_ORDER}
     rating = _quality_rating_expression(project)
     result = await db.execute(
@@ -457,7 +457,7 @@ async def get_quality_criteria(db: AsyncSession, project: Project, filters: dict
     output = []
     for criterion in criteria:
         if criterion["kind"] == "overall":
-            distribution = await _quality_summary(db, project)
+            distribution = await _quality_summary(db, project, filters=filters)
             output.append({**criterion, "total": int(total), "distribution": distribution["counts"]})
             continue
         value = Article.qualityAssessmentAnswers[criterion["key"]].as_string()
@@ -475,7 +475,9 @@ async def get_quality_criteria(db: AsyncSession, project: Project, filters: dict
 
 
 async def list_quality_studies(db: AsyncSession, project: Project, criterion_key: str, filters: dict, *, page: int, page_size: int) -> dict:
-    scoped_filters = {**(filters or {}), "criterionKey": criterion_key}
+    scoped_filters = {**(filters or {})}
+    if criterion_key != "overall":
+        scoped_filters["criterionKey"] = criterion_key
     return await _list_article_page(db, project, scoped_filters, page=page, page_size=page_size, order="quality")
 
 

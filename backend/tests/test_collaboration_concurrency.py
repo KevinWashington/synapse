@@ -25,6 +25,9 @@ from app.services.project_access_service import (
 )
 from app.services.review_assignment_service import distribute_reviews
 from app.services.review_decision_service import submit_review_decision
+from app.services.review_adaptation_service import preview_adaptation, adapt_reviews
+from app.services.review_assignment_service import mark_reviewer_unavailable
+from app.services.team_lock_service import lock_project_team
 
 
 DATABASE = "synapse_assignment_concurrency_test"
@@ -56,6 +59,58 @@ def assignment_database():
     asyncio.run(reset(True))
     yield
     asyncio.run(reset(False))
+
+
+@pytest.mark.asyncio
+async def test_removal_waits_for_adaptation_then_invalidates_new_assignments(assignment_database):
+    engine = create_async_engine(URL)
+    first_session = AsyncSession(engine, expire_on_commit=False)
+    second_session = AsyncSession(engine, expire_on_commit=False)
+    try:
+        async with AsyncSession(engine, expire_on_commit=False) as setup:
+            owner = User(name="Adaptation owner", email="owner@adapt-lock.test")
+            reviewer = User(name="Leaving reviewer", email="reviewer@adapt-lock.test")
+            setup.add_all([owner, reviewer])
+            await setup.flush()
+            project = Project(title="Adaptation race", objetivo="Test", ownerId=owner.id)
+            setup.add(project)
+            await setup.flush()
+            member = ProjectMember(projectId=project.id, userId=reviewer.id, role="reviewer", status="active", participatesInReview=True)
+            article = Article(projectId=project.id, ownerId=owner.id, title="Race fixture", authors="QA", year=2026, journal="QA", currentPhase="screening", reviewOutcome="active")
+            setup.add_all([member, article])
+            await setup.flush()
+            setup.add(ReviewAssignment(projectId=project.id, articleId=article.id, phase="screening", reviewerUserId=owner.id, slot=1, status="pending"))
+            await setup.commit()
+        access = ProjectAccess(project=project, role="owner", capabilities=frozenset({CAP_MANAGE_DISTRIBUTION}), participates_in_review=True)
+        preview = await preview_adaptation(first_session, access=access, phase="screening")
+        assert preview["assignedCount"] == 1
+        await adapt_reviews(first_session, access=access, phase="screening", fingerprint=preview["fingerprint"], actor_user_id=owner.id)
+
+        async def remove_reviewer():
+            await lock_project_team(second_session, project.id)
+            row = (await second_session.execute(select(ProjectMember).where(ProjectMember.id == member.id))).scalar_one()
+            row.status = "inactive"
+            count = await mark_reviewer_unavailable(second_session, project_id=project.id, reviewer_user_id=reviewer.id)
+            await second_session.commit()
+            return count
+
+        removal = asyncio.create_task(remove_reviewer())
+        try:
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(asyncio.shield(removal), timeout=0.2)
+            await first_session.commit()
+            assert await asyncio.wait_for(removal, timeout=5) == 1
+            async with AsyncSession(engine) as check:
+                replacement = (await check.execute(select(ReviewAssignment).where(ReviewAssignment.articleId == article.id, ReviewAssignment.reviewerUserId == reviewer.id))).scalar_one()
+                assert replacement.status == "needs_reassignment"
+        finally:
+            if not removal.done():
+                removal.cancel()
+                await asyncio.gather(removal, return_exceptions=True)
+    finally:
+        await first_session.close()
+        await second_session.close()
+        await engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -121,8 +176,8 @@ async def test_concurrent_distribution_is_serialized_and_idempotent(assignment_d
         assert second.article_count == 0
         assert second.assignments == ()
         async with AsyncSession(engine) as verification:
-            assignment_count = await verification.scalar(select(func.count(ReviewAssignment.id)))
-            notification_count = await verification.scalar(select(func.count(ProjectNotification.id)))
+            assignment_count = await verification.scalar(select(func.count(ReviewAssignment.id)).where(ReviewAssignment.projectId == project_id))
+            notification_count = await verification.scalar(select(func.count(ProjectNotification.id)).where(ProjectNotification.projectId == project_id))
         assert assignment_count == 1
         assert notification_count == 1
     finally:

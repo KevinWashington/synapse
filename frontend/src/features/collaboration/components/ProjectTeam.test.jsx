@@ -10,6 +10,20 @@ import ProjectTeam from "./ProjectTeam";
 import { collaboration } from "./testFixtures";
 
 describe("project team permissions and mutations", () => {
+  it("switches connected team sections and falls back safely when access is revoked", () => {
+    const state = collaboration();
+    const view = render(<ProjectTeam collaboration={state} />);
+    const navigation = screen.getByRole("navigation", { name: "Seções da equipe" });
+    expect(screen.getByRole("table", { name: "Participantes do projeto" })).toBeVisible();
+    fireEvent.click(within(navigation).getByRole("button", { name: /Convites/ }));
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editar convite de bia@example.com" })).toBeVisible();
+    fireEvent.click(within(navigation).getByRole("button", { name: /Distribuição/ }));
+    expect(screen.getByRole("button", { name: "Pré-visualizar distribuição" })).toBeVisible();
+    view.rerender(<ProjectTeam collaboration={{ ...state, capabilities: ["read_project"] }} />);
+    expect(screen.getByRole("table", { name: "Participantes do projeto" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Pré-visualizar/ })).not.toBeInTheDocument();
+  });
   it("shows reviewers the team without administrative controls or peer decisions", () => {
     render(
       <ProjectTeam
@@ -20,7 +34,8 @@ describe("project team permissions and mutations", () => {
       />,
     );
     expect(screen.getByText("Ana")).toBeInTheDocument();
-    expect(screen.getByText("bia@example.com")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Convites/ }));
+    expect(screen.getByText("bia@example.com")).toBeVisible();
     expect(
       screen.queryByRole("button", {
         name: /Convidar|Editar|Remover|Transferir|Cancelar convite|distribuição|discordância/i,
@@ -69,7 +84,10 @@ describe("project team permissions and mutations", () => {
   it("confirms member removal and invitation cancellation", async () => {
     const state = collaboration();
     render(<ProjectTeam collaboration={state} />);
-    fireEvent.click(screen.getByRole("button", { name: "Remover Bruno" }));
+    const removeButton = screen.getByRole("button", { name: "Remover Bruno" });
+    expect(removeButton).toHaveClass("bg-destructive");
+    fireEvent.click(removeButton);
+    expect(state.removeMember).not.toHaveBeenCalled();
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", {
         name: "Remover pessoa",
@@ -79,6 +97,7 @@ describe("project team permissions and mutations", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
+    fireEvent.click(screen.getByRole("button", { name: /Convites/ }));
     fireEvent.click(
       screen.getByRole("button", {
         name: "Cancelar convite de bia@example.com",
@@ -121,6 +140,7 @@ describe("project team permissions and mutations", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
+    fireEvent.click(screen.getByRole("button", { name: /Convites/ }));
     fireEvent.click(
       screen.getByRole("button", { name: "Editar convite de bia@example.com" }),
     );
@@ -206,6 +226,7 @@ describe("project team permissions and mutations", () => {
         })}
       />,
     );
+    if (name.startsWith("Inspecionar")) fireEvent.click(screen.getByRole("button", { name: /Discordâncias/ }));
     const trigger = screen.getByRole("button", { name });
     trigger.focus();
     fireEvent.click(trigger);

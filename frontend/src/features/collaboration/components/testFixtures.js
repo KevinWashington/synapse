@@ -55,6 +55,8 @@ export function collaboration(overrides = {}) {
         "transferOwnership",
         "previewAssignments",
         "distributeAssignments",
+        "previewAdaptation",
+        "adaptAssignments",
         "reassignAssignment",
         "resolveConflict",
         "markNotificationRead",

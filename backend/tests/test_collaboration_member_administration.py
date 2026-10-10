@@ -137,6 +137,9 @@ async def test_removing_member_preserves_history_and_records_reassignment_count(
 
     await collaboration.remove_member(7, 4, current_user=SimpleNamespace(id=1), db=db)
 
+    from sqlalchemy.dialects import postgresql
+    first_query = str(db.execute.call_args_list[0].args[0].compile(dialect=postgresql.dialect()))
+    assert "FROM projects" in first_query and "FOR NO KEY UPDATE" in first_query
     assert member.status == "inactive"
     assert member.deactivatedAt is not None
     unavailable.assert_awaited_once_with(db, project_id=7, reviewer_user_id=22)

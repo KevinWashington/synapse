@@ -97,9 +97,27 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
     if (mode === "rqs" && !selection.rqNumber && first) selectRQ(first.rqNumber);
   }, [mode, resources.rqs.data, selectRQ, selection.rqNumber]);
   const refresh = useCallback(async () => {
-    await Promise.all([load("overview", () => synthesisService.getOverview(projectId)), load("rqs", () => synthesisService.getRQs(projectId, { ...filters, page: pages.rqs, pageSize: 20 }))]);
-    if (selection.rqNumber) await selectRQ(selection.rqNumber);
-  }, [filters, load, pages.rqs, projectId, selectRQ, selection.rqNumber]);
+    const requests = [load("overview", () => synthesisService.getOverview(projectId))];
+    if (mode === "rqs") {
+      requests.push(load("rqs", () => synthesisService.getRQs(projectId, { ...filters, page: pages.rqs, pageSize: 20 })));
+      if (selection.rqNumber) {
+        requests.push(load("evidence", () => synthesisService.getEvidence(projectId, selection.rqNumber, { ...filters, page: pages.evidence, pageSize: 20 })));
+        requests.push(load("detail", () => synthesisService.getRQDetail(projectId, selection.rqNumber)).then((detail) => {
+          if (detail) setDraftState((current) => current.dirty ? current : { content: detail.draft?.content || { narrative: "", keyFindings: [], divergences: [], limitations: [] }, baseVersion: detail.draft?.version || 0, dirty: false, conflict: null });
+        }));
+      }
+    } else if (mode === "matrix") {
+      requests.push(load("matrix", () => synthesisService.getMatrix(projectId, { ...filters, page: pages.matrix, pageSize: 20 })));
+    } else if (mode === "visualizations") {
+      requests.push(load("chartCatalog", () => synthesisService.getChartCatalog(projectId)));
+      if (selection.chartKey) requests.push(load("chart", () => synthesisService.getChart(projectId, selection.chartKey, { ...filters, page: pages.chart, pageSize: 20 })));
+    } else {
+      requests.push(load("criteria", () => synthesisService.getQualityCriteria(projectId, filters)));
+      requests.push(load("quality", () => synthesisService.getQualityStudies(projectId, { ...filters, criterionKey: selection.criterionKey, page: pages.quality, pageSize: 20 })));
+    }
+    if (selection.articleId && ["matrix", "quality"].includes(mode)) requests.push(load("study", () => synthesisService.getMatrixArticle(projectId, selection.articleId)));
+    await Promise.all(requests);
+  }, [filters, load, mode, pages, projectId, selection]);
   const save = useCallback(async () => {
     if (!canEdit || !selection.rqNumber || !draft.dirty) return null;
     const detail = resources.detail.data;

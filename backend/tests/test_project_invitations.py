@@ -35,6 +35,12 @@ class ScalarResult:
         return SimpleNamespace(all=lambda: self.values)
 
 
+@pytest.fixture(autouse=True)
+def isolate_team_lock(monkeypatch):
+    # PostgreSQL lock semantics are covered by the concurrency integration test.
+    monkeypatch.setattr("app.services.invitation_service.lock_project_team", AsyncMock())
+
+
 def owner_access():
     return SimpleNamespace(
         project=SimpleNamespace(id=7, ownerId=1),
@@ -45,6 +51,20 @@ def owner_access():
 
 def test_normalize_email_strips_and_lowercases():
     assert normalize_email("  Person@Example.COM ") == "person@example.com"
+
+
+@pytest.mark.asyncio
+async def test_signup_claims_projects_in_consistent_order_to_avoid_team_lock_deadlocks():
+    from app.services.invitation_service import claim_pending_invitations
+    invitations = [ProjectInvitation(id=id, projectId=project, emailNormalized="new@example.com", role="reviewer",
+                    participatesInReview=True, status="pending", invitedByUserId=None,
+                    expiresAt=datetime.now(timezone.utc) + timedelta(days=1)) for id, project in [(2, 20), (1, 10)]]
+    db = SimpleNamespace(execute=AsyncMock(side_effect=[ScalarResult(values=[]), ScalarResult(values=invitations),
+                         ScalarResult(None), ScalarResult(None)]), add=Mock(), flush=AsyncMock(),
+                         begin_nested=AsyncMock(return_value=SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())))
+    members = await claim_pending_invitations(db, user=SimpleNamespace(id=22, email="new@example.com", name="New"))
+    assert [member.projectId for member in members] == [10, 20]
+    assert all(invitation.status == "accepted" for invitation in invitations)
 
 
 @pytest.mark.asyncio

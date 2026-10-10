@@ -70,7 +70,7 @@ class AIService:
                 "evidence_json": json.dumps(packets, ensure_ascii=False, separators=(",", ":")),
             }
         )
-        parsed = self._parse_json_payload(response)
+        parsed = self._extract_json_payload(response)
         if not isinstance(parsed, dict):
             raise ValueError("Synthesis model did not return a JSON object")
         return parsed

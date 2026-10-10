@@ -27,6 +27,8 @@ const MUTATIONS = {
   transferOwnership: ["team", "access"],
   previewAssignments: [],
   distributeAssignments: ["assignments"],
+  previewAdaptation: [],
+  adaptAssignments: ["assignments", "conflicts"],
   reassignAssignment: ["assignments"],
   resolveConflict: ["assignments", "conflicts"],
   reopenReview: ["assignments", "conflicts"],
