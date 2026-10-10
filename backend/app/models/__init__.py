@@ -11,6 +11,7 @@ from app.models.collaboration import (
     ReviewDecision,
 )
 from app.models.project import Project
+from app.models.synthesis import RQSynthesis, SynthesisGenerationJob
 from app.models.user import User
 
 __all__ = [
@@ -20,8 +21,10 @@ __all__ = [
     "ProjectInvitation",
     "ProjectMember",
     "ProjectNotification",
+    "RQSynthesis",
     "ReviewAssignment",
     "ReviewConflict",
     "ReviewDecision",
+    "SynthesisGenerationJob",
     "User",
 ]

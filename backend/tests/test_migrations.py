@@ -23,6 +23,7 @@ from app.models.collaboration import (  # noqa: F401
     ReviewDecision,
 )
 from app.models.project import Project  # noqa: F401
+from app.models.synthesis import RQSynthesis, SynthesisGenerationJob  # noqa: F401
 from app.models.user import User  # noqa: F401
 
 
@@ -102,6 +103,8 @@ async def _schema_snapshot() -> tuple[set[str], dict[str, set[str]]]:
                             "review_conflicts",
                             "project_notifications",
                             "project_audit_events",
+                            "rq_syntheses",
+                            "synthesis_generation_jobs",
                         )
                     },
                 )
@@ -128,6 +131,8 @@ def test_empty_database_upgrades_to_baseline_schema():
         "review_conflicts",
         "project_notifications",
         "project_audit_events",
+        "rq_syntheses",
+        "synthesis_generation_jobs",
     } <= tables
     assert {"id", "email", "passwordHash", "isActive"} <= columns["users"]
     assert {
@@ -152,6 +157,26 @@ def test_empty_database_upgrades_to_baseline_schema():
     assert {"articleId", "phase", "status", "resolvedDecision"} <= columns["review_conflicts"]
     assert {"recipientUserId", "type", "readAt", "payload"} <= columns["project_notifications"]
     assert {"actorUserId", "action", "entityType", "reason", "payload"} <= columns["project_audit_events"]
+    assert {"projectId", "rqNumber", "questionSnapshot", "content", "version"} <= columns["rq_syntheses"]
+    assert {"projectId", "rqNumber", "requesterUserId", "idempotencyKey", "status"} <= columns["synthesis_generation_jobs"]
+
+
+def test_synthesis_revision_can_be_downgraded_and_reapplied():
+    command.upgrade(_config(), "head")
+    command.downgrade(_config(), "0004_inbox_invite_consent")
+
+    async def synthesis_tables_exist() -> bool:
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with engine.connect() as connection:
+                tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+                return {"rq_syntheses", "synthesis_generation_jobs"} <= tables
+        finally:
+            await engine.dispose()
+
+    assert asyncio.run(synthesis_tables_exist()) is False
+    command.upgrade(_config(), "head")
+    assert asyncio.run(synthesis_tables_exist()) is True
 
 
 def test_collaboration_constraints_and_partial_indexes():
@@ -291,7 +316,7 @@ def test_migration_runner_stamps_compatible_legacy_schema():
         finally:
             await engine.dispose()
 
-    assert asyncio.run(preserved_state()) == ("0004_inbox_invite_consent", 1)
+    assert asyncio.run(preserved_state()) == ("0005_evidence_synthesis", 1)
 
 
 def test_migration_runner_rejects_partial_legacy_schema():

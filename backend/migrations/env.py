@@ -18,6 +18,7 @@ from app.models.collaboration import (  # noqa: F401
     ReviewDecision,
 )
 from app.models.project import Project  # noqa: F401
+from app.models.synthesis import RQSynthesis, SynthesisGenerationJob  # noqa: F401
 from app.models.user import User  # noqa: F401
 
 

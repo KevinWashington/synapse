@@ -43,6 +43,8 @@ POST_BASELINE_TABLES = {
     "review_conflicts",
     "project_notifications",
     "project_audit_events",
+    "rq_syntheses",
+    "synthesis_generation_jobs",
 }
 
 
