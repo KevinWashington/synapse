@@ -1,0 +1,80 @@
+import { useState } from "react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Search } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { useSynthesisWorkspace } from "../hooks/useSynthesisWorkspace";
+import SynthesisHeader from "./SynthesisHeader";
+import SynthesisWorkspaceShell from "./SynthesisWorkspaceShell";
+import SynthesisDraftEditor from "./SynthesisDraftEditor";
+
+export default function SynthesisWorkspacePanel({ project, canEdit, onDirtyChange, onOpenArticle }) {
+  const workspace = useSynthesisWorkspace({ projectId: project?.id, canEdit, onDirtyChange });
+  const [search, setSearch] = useState("");
+  const [pending, setPending] = useState(null);
+  const { mode, setMode, resources, selection, actions, draft } = workspace;
+  const loading = resources.overview.loading || resources.rqs.loading;
+  const onExport = () => actions.export(mode === "matrix" ? "matrix.csv" : mode === "quality" ? "quality.csv" : mode === "visualizations" ? "distributions.csv" : "report.json", { scope: "filtered" });
+
+  const requestOpenArticle = (articleId) => {
+    if (draft.dirty) setPending({ type: "article", articleId });
+    else onOpenArticle?.(articleId);
+  };
+  const requestSelectRQ = (rqNumber) => {
+    if (draft.dirty) setPending({ type: "rq", rqNumber });
+    else actions.selectRQ(rqNumber);
+  };
+  const continuePending = async (saveFirst) => {
+    if (saveFirst) {
+      try { await actions.save(); } catch { return; }
+    }
+    const next = pending;
+    setPending(null);
+    if (next?.type === "rq") actions.selectRQ(next.rqNumber);
+    if (next?.type === "article") onOpenArticle?.(next.articleId);
+  };
+
+  let regions;
+  if (mode === "rqs") {
+    const items = (resources.rqs.data?.items || []).filter((item) => item.question.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+    regions = {
+      index: <Index title="Perguntas de pesquisa" search={search} onSearch={(value) => { setSearch(value); actions.setFilter("search", value); }} count={resources.rqs.data?.total}>
+        {items.map((item) => <button key={item.rqNumber} type="button" onClick={() => requestSelectRQ(item.rqNumber)} className={`w-full border-b border-[var(--syn-border)] p-3 text-left hover:bg-[var(--syn-bg-secondary)] ${selection.rqNumber === item.rqNumber ? "bg-[var(--syn-accent-soft)]" : ""}`}><span className="flex items-start justify-between gap-2"><span className="line-clamp-3 text-sm font-medium">RQ {item.rqNumber} · {item.question}</span><StatePill state={item.draftState} /></span><span className="mt-2 block text-xs text-[var(--syn-text-secondary)]">{item.evidenceCount} estudos com evidência</span></button>)}
+        {!items.length && <Empty>Cadastre perguntas no planejamento para iniciar a síntese.</Empty>}
+      </Index>,
+      content: <SynthesisDraftEditor detail={resources.detail.data} value={draft.content} dirty={draft.dirty} canEdit={canEdit} job={resources.detail.data?.activeGeneration} onChange={actions.setDraft} onSave={actions.save} onGenerate={(replace) => actions.generate(replace)} onOpenArticle={requestOpenArticle} />,
+      context: <EvidenceContext page={resources.evidence.data} rqNumber={selection.rqNumber} onOpenArticle={requestOpenArticle} />,
+    };
+  } else if (mode === "matrix") {
+    const fields = project?.dataExtractionSchema || [];
+    const columns = ["title", "year", "sourceName", "qualityRating", ...fields.map((field) => field.key)];
+    regions = {
+      index: <Index title="Matriz de extração"><FilterBox value={search} onChange={(value) => { setSearch(value); actions.setFilter("search", value); }} /><p className="p-3 text-xs text-[var(--syn-text-secondary)]">A matriz mostra estudos incluídos, com filtros aplicados no servidor.</p></Index>,
+      content: <div className="min-w-0 p-3"><h2 className="mb-3 text-base font-semibold">Matriz de extração</h2><div className="max-w-full overflow-auto rounded-lg border border-[var(--syn-border)]"><table className="w-full min-w-[760px] table-fixed border-collapse text-left text-sm"><colgroup>{columns.map((column, index) => <col key={column} style={{ width: index === 0 ? 280 : index === 1 ? 80 : 180 }} />)}</colgroup><thead className="sticky top-0 bg-[var(--syn-bg-secondary)]"><tr>{columns.map((column) => <th key={column} className="border-b border-[var(--syn-border)] p-2 font-semibold">{column === "title" ? "Artigo" : column === "year" ? "Ano" : fields.find((field) => field.key === column)?.label || column}</th>)}</tr></thead><tbody>{(resources.matrix.data?.items || []).map((row) => <tr key={row.articleId} className="border-b border-[var(--syn-border)]">{columns.map((column) => <td key={column} className="truncate p-2"><button className="max-w-full truncate text-left hover:underline" title={String(row[column] ?? row.extractionValues?.[column] ?? "")} onClick={() => column === "title" ? onOpenArticle?.(row.articleId) : actions.selectArticle(row.articleId)}>{String(row[column] ?? row.extractionValues?.[column] ?? "—")}</button></td>)}</tr>)}</tbody></table></div><Pagination page={resources.matrix.data?.page} total={resources.matrix.data?.total} onPage={(page) => actions.setPage("matrix", page)} /></div>,
+      context: <StudyContext study={resources.study.data} />,
+    };
+  } else if (mode === "visualizations") {
+    const catalog = resources.chartCatalog.data || [];
+    regions = {
+      index: <Index title="Visualizações"><p className="p-3 text-xs text-[var(--syn-text-secondary)]">Escolha um campo extraído para explorar sua distribuição.</p>{catalog.map((item) => <button key={item.key} onClick={() => actions.selectChart(item.key)} className={`w-full border-b border-[var(--syn-border)] p-3 text-left text-sm ${selection.chartKey === item.key ? "bg-[var(--syn-accent-soft)]" : ""}`}>{item.label}</button>)}</Index>,
+      content: <ChartContent chart={resources.chart.data} />,
+      context: <div className="p-4"><h3 className="font-semibold">Como ler</h3><p className="mt-2 text-sm leading-6 text-[var(--syn-text-secondary)]">Os valores são agregados sobre o conjunto filtrado, não apenas sobre a página visível. Estudos sem valor são contabilizados à parte.</p><p className="mt-4 text-sm">Amostra: {resources.chart.data?.sampleSize ?? 0}</p><p className="text-sm">Sem resposta: {resources.chart.data?.missingCount ?? 0}</p></div>,
+    };
+  } else {
+    const criteria = resources.criteria.data || [];
+    regions = {
+      index: <Index title="Avaliação da qualidade">{criteria.map((item) => <button key={item.key} onClick={() => actions.selectCriterion(item.key)} className={`w-full border-b border-[var(--syn-border)] p-3 text-left text-sm ${selection.criterionKey === item.key ? "bg-[var(--syn-accent-soft)]" : ""}`}><span className="block font-medium">{item.label}</span><span className="mt-1 block text-xs text-[var(--syn-text-secondary)]">{item.total ?? 0} estudos</span></button>)}</Index>,
+      content: <div className="p-4"><h2 className="mb-3 font-semibold">Estudos avaliados</h2>{(resources.quality.data?.items || []).map((item) => <button key={item.articleId} onClick={() => actions.selectArticle(item.articleId)} className={`block w-full border-b border-[var(--syn-border)] p-3 text-left text-sm ${selection.articleId === item.articleId ? "bg-[var(--syn-accent-soft)]" : ""}`}><span className="block font-medium">{item.title}</span><span className="text-xs text-[var(--syn-text-secondary)]">{item.year || "Ano indisponível"} · {item.qualityRating || "Sem nota"}</span></button>)}<Pagination page={resources.quality.data?.page} total={resources.quality.data?.total} onPage={(page) => actions.setPage("quality", page)} /></div>,
+      context: <StudyContext study={resources.study.data} />,
+    };
+  }
+  return <div className="min-w-0 space-y-4 p-4 sm:p-6"><SynthesisHeader mode={mode} onModeChange={setMode} overview={resources.overview.data} loading={loading} onRefresh={actions.refresh} onExport={onExport} /><SynthesisWorkspaceShell {...regions} />{pending && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="alertdialog" aria-modal="true" aria-labelledby="synthesis-unsaved-title"><div className="w-full max-w-md rounded-xl bg-[var(--syn-bg-primary)] p-5 shadow-xl"><h2 id="synthesis-unsaved-title" className="font-semibold">Alterações não salvas</h2><p className="mt-2 text-sm text-[var(--syn-text-secondary)]">Salve ou descarte o rascunho antes de continuar.</p><div className="mt-5 flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setPending(null)}>Continuar editando</Button><Button variant="outline" onClick={() => continuePending(false)}>Descartar</Button><Button onClick={() => continuePending(true)}>Salvar e continuar</Button></div></div></div>}</div>;
+}
+
+function Index({ title, count, search, onSearch, children }) { return <div><div className="sticky top-0 z-10 border-b border-[var(--syn-border)] bg-[var(--syn-bg-primary)] p-3"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">{title}</h2>{count != null && <span className="rounded-full bg-[var(--syn-accent-soft)] px-2 py-0.5 text-xs text-[var(--syn-accent)]">{count}</span>}</div>{search !== undefined && <FilterBox value={search} onChange={onSearch} />}</div>{children}</div>; }
+function FilterBox({ value, onChange }) { return <label className="mt-3 flex items-center gap-2 rounded-lg border border-[var(--syn-border)] px-3"><Search className="h-4 w-4 text-[var(--syn-text-secondary)]" /><input value={value} onChange={(event) => onChange(event.target.value)} placeholder="Buscar artigos ou perguntas" className="min-w-0 flex-1 py-2 text-sm outline-none" /></label>; }
+function Empty({ children }) { return <p className="p-4 text-sm text-[var(--syn-text-secondary)]">{children}</p>; }
+function StatePill({ state }) { const label = { not_started: "Não iniciado", draft: "Rascunho", stale: "Revisar" }[state] || state; return <span className="shrink-0 rounded-full bg-[var(--syn-bg-secondary)] px-2 py-1 text-[10px]">{label}</span>; }
+function EvidenceContext({ page, rqNumber, onOpenArticle }) { return <div className="p-3"><h3 className="text-sm font-semibold">Evidências · RQ {rqNumber || "—"}</h3><p className="mt-1 text-xs text-[var(--syn-text-secondary)]">{page?.total ?? 0} estudos encontrados</p>{(page?.items || []).map((item) => <button key={item.articleId} onClick={() => onOpenArticle?.(item.articleId)} className="block w-full border-b border-[var(--syn-border)] py-3 text-left"><span className="line-clamp-2 text-sm font-medium">{item.title}</span><span className="mt-1 block text-xs text-[var(--syn-text-secondary)]">{item.year || "Ano indisponível"} · {item.qualityRating || "Sem avaliação"}</span>{item.evidenceExcerpt && <span className="mt-2 line-clamp-3 block text-xs leading-5">{item.evidenceExcerpt}</span>}</button>)}</div>; }
+function StudyContext({ study }) { if (!study) return <Empty>Selecione um estudo para ver os detalhes completos.</Empty>; return <div className="space-y-4 p-4"><h3 className="font-semibold">{study.title}</h3><p className="text-sm text-[var(--syn-text-secondary)]">{study.year} · {study.qualityRating || "Sem avaliação"} · {study.qualityScore ?? "—"}%</p><div><h4 className="text-sm font-semibold">Respostas</h4><pre className="mt-2 whitespace-pre-wrap break-words text-xs">{JSON.stringify(study.qualityAnswers || study.extractionValues || {}, null, 2)}</pre></div></div>; }
+function ChartContent({ chart }) { return <div className="p-4"><h2 className="text-base font-semibold">{chart?.field?.label || "Distribuição"}</h2><p className="mt-1 text-xs text-[var(--syn-text-secondary)]">Dados subjacentes · n={chart?.sampleSize ?? 0}</p>{chart?.rows?.items ? <div className="mt-4 space-y-2">{chart.rows.items.map((row) => <p key={row.articleId} className="border-b border-[var(--syn-border)] py-2 text-sm">{row.title}: {row.value}</p>)}</div> : <div className="mt-4 h-[360px] min-w-0">{chart?.rows?.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={chart.rows}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="value" hide /><YAxis allowDecimals={false} /><Tooltip /><Bar dataKey="count" fill="var(--syn-accent)" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer> : <Empty>Não há dados para este campo.</Empty>}</div>}<div className="mt-4 max-h-64 overflow-auto">{(chart?.rows || []).map((row) => <div key={row.value} className="flex justify-between border-b border-[var(--syn-border)] py-2 text-sm"><span className="truncate">{row.value}</span><span>{row.count}</span></div>)}</div></div>; }
+function Pagination({ page = 1, total = 0, onPage }) { const pages = Math.max(1, Math.ceil(total / 20)); return <div className="flex items-center justify-between border-t border-[var(--syn-border)] p-3 text-xs"><span>{total} estudos · página {page || 1} de {pages}</span><div className="flex gap-2"><Button size="sm" variant="outline" disabled={(page || 1) <= 1} onClick={() => onPage((page || 1) - 1)}>Anterior</Button><Button size="sm" variant="outline" disabled={(page || 1) >= pages} onClick={() => onPage((page || 1) + 1)}>Próxima</Button></div></div>; }

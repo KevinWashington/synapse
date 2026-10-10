@@ -10,7 +10,6 @@ import {
   useProjectDetailsPage,
 } from "@/features/projects";
 import { usePageTitle } from "@hooks/usePageTitle";
-import { articleService } from "@features/articles/services/articleService";
 import { useSearchParams } from "react-router-dom";
 import { useProjectCollaboration } from "@features/collaboration/hooks/useProjectCollaboration";
 
@@ -31,7 +30,7 @@ const ProjectPlanning = lazy(
   () => import("@features/projects/components/ProjectPlanning"),
 );
 const SynthesisReportPanel = lazy(
-  () => import("@features/articles/components/SynthesisReportPanel"),
+  () => import("@features/articles/components/SynthesisWorkspacePanel"),
 );
 
 const PROJECT_TAB_LABELS = {
@@ -87,8 +86,7 @@ function ProjectDetails() {
     });
   }, [activeTab, project?.id, project?.title, updateTitle]);
 
-  const [synthesisData, setSynthesisData] = useState(null);
-  const [synthesisLoading, setSynthesisLoading] = useState(false);
+  const [synthesisDirty, setSynthesisDirty] = useState(false);
   const [planningDirty, setPlanningDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState(null);
   const [pendingNavigation, setPendingNavigation] = useState(null);
@@ -98,18 +96,18 @@ function ProjectDetails() {
         return;
       }
 
-      if (activeTab === "planejamento" && planningDirty) {
+      if ((activeTab === "planejamento" && planningDirty) || (activeTab === "sintese" && synthesisDirty)) {
         setPendingTab(nextTab);
         return;
       }
 
       setActiveTab(nextTab);
     },
-    [activeTab, planningDirty, setActiveTab],
+    [activeTab, planningDirty, synthesisDirty, setActiveTab],
   );
 
   useEffect(() => {
-    if (!planningDirty) {
+    if (!planningDirty && !synthesisDirty) {
       return undefined;
     }
 
@@ -120,28 +118,7 @@ function ProjectDetails() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [planningDirty]);
-
-  const loadSynthesis = useCallback(async () => {
-    if (!project?.id) {
-      return;
-    }
-    try {
-      setSynthesisLoading(true);
-      const report = await articleService.getProjectSynthesisReport(project.id);
-      setSynthesisData(report);
-    } catch (err) {
-      console.error("Erro ao carregar sintese:", err);
-    } finally {
-      setSynthesisLoading(false);
-    }
-  }, [project?.id]);
-
-  useEffect(() => {
-    if (activeTab === "sintese") {
-      loadSynthesis();
-    }
-  }, [activeTab, loadSynthesis]);
+  }, [planningDirty, synthesisDirty]);
 
   if (loading) {
     return <LoadingState message="Carregando projeto..." fullPage />;
@@ -253,9 +230,10 @@ function ProjectDetails() {
           )}
           {activeTab === "sintese" && (
             <SynthesisReportPanel
-              data={synthesisData}
-              isLoading={synthesisLoading}
-              onRefresh={loadSynthesis}
+              key={project.id}
+              project={project}
+              canEdit={collaboration.capabilities.includes("edit_project")}
+              onDirtyChange={setSynthesisDirty}
               onOpenArticle={(articleId) =>
                 navigate(
                   `/projetos/${project.id}/artigos/${articleId}?flow=included&workspace=extracao`,
@@ -306,6 +284,7 @@ function ProjectDetails() {
           const destination = pendingNavigation;
           setPendingNavigation(null);
           setPlanningDirty(false);
+          setSynthesisDirty(false);
           if (nextTab) {
             setActiveTab(nextTab);
           }
