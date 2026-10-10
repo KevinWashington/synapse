@@ -43,6 +43,37 @@ class AIService:
         self.base_url = settings.DEEPSEEK_BASE_URL
         self.model_name = model or settings.DEEPSEEK_MODEL
         self._llm = None
+
+    async def synthesize_evidence(self, *, question: str, packets: list[dict], stage: str) -> dict:
+        """Return a structured synthesis/map result while preserving supplied article IDs."""
+        system_message = (
+            "You are helping a human researcher synthesize review evidence. Return only valid JSON with keys "
+            "narrative, keyFindings, divergences, limitations. Each list item has text and articleIds. "
+            "Use only supplied article IDs. Never invent quotations or claim that a selection reason is an article quote. "
+            "Distinguish extracted values, reviewer notes, and selection reasons. State gaps and uncertainty explicitly. "
+            "Do not infer consensus from counts alone. Stage: {stage}."
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_message),
+                (
+                    "user",
+                    "Research question:\n{question}\n\nEvidence packets (JSON):\n{evidence_json}",
+                ),
+            ]
+        )
+        chain = prompt | self.llm | StrOutputParser()
+        response = await chain.ainvoke(
+            {
+                "stage": stage,
+                "question": question,
+                "evidence_json": json.dumps(packets, ensure_ascii=False, separators=(",", ":")),
+            }
+        )
+        parsed = self._parse_json_payload(response)
+        if not isinstance(parsed, dict):
+            raise ValueError("Synthesis model did not return a JSON object")
+        return parsed
     
     @property
     def llm(self) -> ChatOpenAI:

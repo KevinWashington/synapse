@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     # DeepSeek
     DEEPSEEK_MODEL: str = "deepseek-chat"
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    SYNTHESIS_MAX_INPUT_CHARS: int = 24000
+    SYNTHESIS_MAX_PACKET_CHARS: int = 6000
+    SYNTHESIS_MAX_CONCURRENCY: int = 2
+    SYNTHESIS_MODEL_TIMEOUT_SECONDS: int = 90
     HF_TOKEN: str = ""
     
     # Neo4j

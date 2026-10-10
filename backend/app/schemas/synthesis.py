@@ -1,7 +1,7 @@
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
 
 class StrictSchema(BaseModel):
@@ -10,7 +10,7 @@ class StrictSchema(BaseModel):
 
 class FindingItem(StrictSchema):
     text: str = Field(min_length=1, max_length=3_000)
-    articleIds: list[int] = Field(default_factory=list, max_length=500)
+    articleIds: list[PositiveInt] = Field(default_factory=list, max_length=500)
 
 
 class SynthesisContent(StrictSchema):
