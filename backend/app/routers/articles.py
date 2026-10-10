@@ -8,9 +8,10 @@ from io import BytesIO, StringIO
 import re
 from difflib import SequenceMatcher
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import case, func, or_, select
+from sqlalchemy.orm import load_only
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import (
@@ -2052,24 +2053,43 @@ async def update_article_evidence(
 @router.get("/{projectId}/artigos/synthesis-report")
 async def get_project_synthesis_report(
     projectId: int,
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
+    total = await db.scalar(select(func.count(Article.id)).where(Article.projectId == projectId)) or 0
     result = await db.execute(
-        select(Article).where(Article.projectId == projectId)
+        select(Article)
+        .options(load_only(
+            Article.id, Article.paperId, Article.title, Article.authors, Article.year, Article.journal,
+            Article.sourceName, Article.sourceCategory, Article.reviewOutcome, Article.manualDecision,
+            Article.answeringRQs, Article.extractionData, Article.extractionCompletedAt,
+            Article.qualityAssessmentAnswers, Article.qualityScore, Article.qualityRating,
+            Article.eligibilityReasonText, Article.screeningReasonText, Article.manualDecisionReason,
+            Article.aiEvaluation, Article.notas, Article.status,
+        ))
+        .where(Article.projectId == projectId)
+        .order_by(Article.title, Article.id)
+        .offset((page - 1) * pageSize)
+        .limit(pageSize)
     )
     articles = result.scalars().all()
-    return _build_synthesis_report(project, articles)
+    report = _build_synthesis_report(project, articles)
+    report["pagination"] = {"page": page, "pageSize": pageSize, "total": int(total), "isComplete": pageSize >= total and page == 1}
+    return report
 
 
 @router.get("/{projectId}/artigos/rq-synthesis")
 async def get_project_rq_synthesis(
     projectId: int,
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    report = await get_project_synthesis_report(projectId=projectId, current_user=current_user, db=db)
+    report = await get_project_synthesis_report(projectId=projectId, page=page, pageSize=pageSize, current_user=current_user, db=db)
     return {
         "projectId": report["projectId"],
         "projectTitle": report["projectTitle"],
@@ -2078,6 +2098,7 @@ async def get_project_rq_synthesis(
         "matrix": report["matrix"],
         "coverage": report["coverage"],
         "unlinkedIncludedArticles": report["unlinkedIncludedArticles"],
+        "pagination": report["pagination"],
     }
 
 
