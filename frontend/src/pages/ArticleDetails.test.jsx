@@ -5,6 +5,7 @@ import ArticleDetails from "./ArticleDetails";
 
 const navigate = vi.fn();
 const handleSaveNotes = vi.fn().mockResolvedValue(undefined);
+let workspaceTab = "extracao";
 
 const article = {
   id: 2,
@@ -45,6 +46,10 @@ vi.mock("@features/articles/components/PdfViewer", () => ({
   default: () => <div>Visualizador PDF</div>,
 }));
 
+vi.mock("@/features/inbox/services/inboxService", () => ({ inboxService: {
+  getInbox: async () => ({ notifications: [], invitations: [], unreadNotificationCount: 0, pendingInvitationCount: 0 }),
+} }));
+
 vi.mock("@/features/articles", () => ({
   useArticleDetailsPage: () => ({
     article,
@@ -67,7 +72,7 @@ vi.mock("@/features/articles", () => ({
     project,
     projectId: "7",
     refreshArticle: vi.fn(),
-    rightTab: "extracao",
+    rightTab: workspaceTab,
     setRightTab: vi.fn(),
   }),
 }));
@@ -87,6 +92,7 @@ function renderPage() {
 
 describe("ArticleDetails extraction workspace", () => {
   beforeEach(() => {
+    workspaceTab = "extracao";
     navigate.mockClear();
     handleSaveNotes.mockClear();
     delete article.hasActiveReviewAssignments;
@@ -96,6 +102,18 @@ describe("ArticleDetails extraction workspace", () => {
     article.currentPhase = "eligibility";
     article.reviewOutcome = "included";
     article.hasPdf = true;
+  });
+
+  it("collapses the review support panel without discarding unsaved notes", async () => {
+    workspaceTab = "notas";
+    article.reviewOutcome = "active";
+    renderPage();
+    const editor = await screen.findByRole("textbox", { name: "Notas do artigo" }, { timeout: 5000 });
+    fireEvent.change(editor, { target: { value: "Nota preservada ao recolher" } });
+    fireEvent.click(screen.getByRole("button", { name: "Recolher painel de apoio" }));
+    expect(editor).not.toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Expandir painel de apoio" }));
+    expect(screen.getByRole("textbox", { name: "Notas do artigo" })).toHaveValue("Nota preservada ao recolher");
   });
 
   it("switches between PDF and notes without losing extraction values", async () => {

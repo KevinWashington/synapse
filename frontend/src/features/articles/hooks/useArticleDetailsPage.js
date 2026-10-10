@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
 import { projectService } from "@features/projects/services/projectService";
@@ -12,6 +12,7 @@ function useArticleDetailsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [article, setArticle] = useState(null);
+  const articleRequestRef = useRef(0);
   const [project, setProject] = useState(null);
   const [articleList, setArticleList] = useState([]);
   const [articleListTotal, setArticleListTotal] = useState(0);
@@ -20,7 +21,10 @@ function useArticleDetailsPage() {
   const [articleListLoading, setArticleListLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [pdfData, setPdfData] = useState(null);
+  const [pdfResource, setPdfResource] = useState(null);
+  const pdfRequestRef = useRef(0);
+  const pdfKey = `${projectId}:${articleId}`;
+  const pdfData = pdfResource?.key === pdfKey ? pdfResource.data : null;
   const [rightTab, setRightTab] = useState(() => {
     const requestedTab = searchParams.get("workspace");
     const requestedFlow = searchParams.get("flow");
@@ -39,16 +43,18 @@ function useArticleDetailsPage() {
   const listFlow = returnFlow || (requestedWorkspace === "extracao" ? "included" : null);
 
   const fetchArticle = useCallback(async (showLoading = true) => {
+    const request = ++articleRequestRef.current;
     try {
       if (showLoading) setLoading(true);
       setError(null);
       const articleData = await articleService.getArticleById(projectId, articleId);
+      if (request !== articleRequestRef.current) return;
       setArticle(articleData);
       return articleData;
     } catch (currentError) {
-      setError(currentError.message || "Erro ao carregar artigo");
+      if (request === articleRequestRef.current) setError(currentError.message || "Erro ao carregar artigo");
     } finally {
-      setLoading(false);
+      if (request === articleRequestRef.current) setLoading(false);
     }
   }, [articleId, projectId]);
 
@@ -105,13 +111,14 @@ function useArticleDetailsPage() {
   }, [listFlow, projectId]);
 
   const fetchPdfData = useCallback(async () => {
-    if (!article || article.hasPdf === false) {
-      setPdfData(null);
+    const request = ++pdfRequestRef.current;
+    if (!article || String(article.id) !== String(articleId) || article.hasPdf === false) {
+      setPdfResource(null);
       return;
     }
     try {
       const buffer = await articleService.getPdfData(projectId, articleId);
-      setPdfData(buffer);
+      if (request === pdfRequestRef.current) setPdfResource({ key: `${projectId}:${articleId}`, data: buffer });
     } catch (currentError) {
       console.error("Erro ao obter PDF:", currentError);
     }
@@ -120,6 +127,7 @@ function useArticleDetailsPage() {
   useEffect(() => {
     fetchArticle();
     fetchProject();
+    return () => { articleRequestRef.current += 1; };
   }, [fetchArticle, fetchProject]);
 
   useEffect(() => {
@@ -221,10 +229,11 @@ function useArticleDetailsPage() {
     async (notes) => {
       try {
         const updated = await articleService.updateArticleNotes(projectId, articleId, notes);
-        setArticle(updated);
-        toast.success("Notas salvas com sucesso!");
+        setArticle((current) => String(current?.id) === String(updated.id) ? updated : current);
+        return updated;
       } catch (currentError) {
         toast.error("Erro ao salvar notas: " + currentError.message);
+        throw currentError;
       }
     },
     [articleId, projectId]
@@ -270,13 +279,6 @@ function useArticleDetailsPage() {
     }
   }, [article, articleId, backUrl, navigate, projectId]);
 
-  const handleAddNote = useCallback((note) => {
-    setArticle((current) => ({
-      ...current,
-      notas: current?.notas ? `${current.notas}\n${note}` : note,
-    }));
-  }, []);
-
   return {
     article,
     articleList,
@@ -285,14 +287,13 @@ function useArticleDetailsPage() {
     articleId,
     backUrl,
     error,
-    handleAddNote,
     handleDeleteArticle,
     handleEligibilityDecision,
     handleSaveEvidence,
     handleSaveNotes,
     handleScreeningDecision,
     isSavingEvidence,
-    loading,
+    loading: loading || Boolean(!error && article && String(article.id) !== String(articleId)),
     myAssignments,
     navigate,
     pdfData,

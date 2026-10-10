@@ -191,9 +191,12 @@ async def chat(
     try:
         # Get last user message
         last_message = ""
-        for msg in reversed(data.messages):
+        last_user_index = -1
+        for index in range(len(data.messages) - 1, -1, -1):
+            msg = data.messages[index]
             if msg.get("role") == "user":
                 last_message = msg.get("content", "")
+                last_user_index = index
                 break
         
         if not last_message:
@@ -206,7 +209,7 @@ async def chat(
             )
         
         article_context = data.artigo.model_dump() if data.artigo else None
-        response = await ai_service.chat(last_message, article_context)
+        response = await ai_service.chat(last_message, article_context, history=data.messages[:last_user_index])
         
         return ChatResponse(content=response)
     

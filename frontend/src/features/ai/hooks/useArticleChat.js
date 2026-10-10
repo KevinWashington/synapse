@@ -1,188 +1,109 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { chatService } from "@services/chatService";
+import { extractArticlePdfContent } from "./articlePdfContent";
 
-function buildWelcomeMessage({ article, articleContent, loadingContent, pdfData }) {
-  let statusMessage = "";
-
-  if (article?.hasPdf === false) {
-    statusMessage = article?.abstract
-      ? "Este artigo nao possui PDF. Posso ajudar com base no resumo e nos metadados disponiveis."
-      : "Este artigo nao possui PDF. Posso ajudar com os metadados cadastrados.";
-  } else if (!pdfData) {
-    statusMessage = "Aguardando carregamento do PDF...";
-  } else if (loadingContent) {
-    statusMessage = "Extraindo conteudo do PDF...";
-  } else if (articleContent) {
-    statusMessage = "Conteudo do PDF carregado com sucesso.";
-  } else {
-    statusMessage = "PDF carregado, mas o conteudo ainda nao esta disponivel.";
+function availableSource(article, pdfData, pdfState) {
+  const hasAbstract = Boolean(article?.abstract?.trim());
+  const fallback = hasAbstract ? "Resumo e metadados" : "Somente metadados";
+  const fallbackDetail = hasAbstract
+    ? "As respostas se limitam ao resumo disponível, não ao texto completo."
+    : "Sem resumo ou texto extraído: não é possível verificar métodos e resultados do estudo.";
+  if (pdfState.status === "ready" && pdfState.value?.text) {
+    const value = pdfState.value;
+    return { label: value.partial ? "PDF parcial" : "PDF extraído", loading: false,
+      detail: `${value.pagesRead} de ${value.totalPages} páginas processadas, com limite de 8.000 caracteres.${hasAbstract ? " Resumo também disponível." : ""}` };
   }
-
-  return {
-    id: "welcome",
-    role: "assistant",
-    content: `Ola! Estou analisando o artigo "${article.title}". ${statusMessage}\n\n${
-      articleContent ? "Posso ajudar com:" : "Assim que o conteudo estiver pronto, posso ajudar com:"
-    }\n\n- Analise do conteudo\n- Explicacao de conceitos\n- Identificacao de pontos-chave\n- Sugestoes para suas notas`,
-  };
+  if (article?.hasPdf && pdfData && pdfState.status === "loading") {
+    return { label: "Preparando texto do PDF", detail: "Aguarde a leitura para perguntar sobre o PDF.", loading: true };
+  }
+  return { label: fallback, loading: false,
+    detail: pdfState.status === "error" ? `Não foi possível extrair o PDF. ${fallbackDetail}`
+      : article?.hasPdf ? `Texto do PDF ainda indisponível. ${fallbackDetail}` : fallbackDetail };
 }
 
-async function extractPdfContent(pdfData) {
-  if (!(pdfData instanceof ArrayBuffer)) {
-    console.error("pdfData invalido:", typeof pdfData, pdfData);
-    throw new Error("Dados do PDF invalidos");
-  }
-
-  const pdfjsLib = await import("pdfjs-dist");
-
-  const loadingTask = pdfjsLib.getDocument({ data: pdfData });
-  const pdf = await loadingTask.promise;
-  let extractedText = "";
-
-  for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 10); pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items.map((item) => item.str).join(" ");
-
-    extractedText += `${pageText}\n\n`;
-  }
-
-  return extractedText.length > 8000
-    ? `${extractedText.substring(0, 8000)}...`
-    : extractedText.trim();
-}
-
-function useArticleChat({ article, onAddNote, pdfData }) {
-  const [articleContent, setArticleContent] = useState(null);
+function useArticleChat({ article, onAddNote, pdfData, enabled = true }) {
+  const [pdfState, setPdfState] = useState({ status: "idle", value: null });
+  const [pdfAttempt, setPdfAttempt] = useState(0);
   const [error, setError] = useState(null);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingContent, setLoadingContent] = useState(false);
-  const [messages, setMessages] = useState([]);
+  const [conversation, setConversation] = useState([]);
+  const scopeRef = useRef(0);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
-    setArticleContent(null);
-    setError(null);
+    scopeRef.current += 1;
+    sendingRef.current = false;
+    setConversation([]);
     setInput("");
+    setError(null);
     setIsLoading(false);
-    setLoadingContent(false);
-    setMessages([]);
+    setPdfState({ status: "idle", value: null });
+    return () => { scopeRef.current += 1; };
   }, [article?.id]);
 
   useEffect(() => {
-    let shouldIgnore = false;
-
-    async function loadArticleContent() {
-      if (!article || articleContent || !pdfData) {
-        return;
-      }
-
-      setLoadingContent(true);
-
-      try {
-        const extractedText = await extractPdfContent(pdfData);
-        if (!shouldIgnore) {
-          setArticleContent(extractedText);
-        }
-      } catch (loadError) {
-        console.error("Erro ao extrair conteudo do PDF:", loadError);
-      } finally {
-        if (!shouldIgnore) {
-          setLoadingContent(false);
-        }
-      }
+    if (!enabled) return;
+    let ignore = false;
+    setPdfState({ status: "idle", value: null });
+    if (article?.hasPdf && pdfData) {
+      setPdfState({ status: "loading", value: null });
+      extractArticlePdfContent(pdfData).then((value) => {
+        if (!ignore) setPdfState({ status: value.text ? "ready" : "error", value });
+      }).catch(() => {
+        if (!ignore) setPdfState({ status: "error", value: null });
+      });
     }
+    return () => { ignore = true; };
+  }, [article?.id, article?.hasPdf, pdfData, pdfAttempt, enabled]);
 
-    loadArticleContent();
+  const source = availableSource(article, pdfData, pdfState);
+  const messages = [
+    { id: "welcome", role: "assistant", content: "Posso resumir este estudo, explicar conceitos e localizar evidências no material disponível. Vou distinguir interpretação de citação literal e sinalizar quando faltar informação. A decisão da revisão continua sendo sua." },
+    ...conversation,
+  ];
 
-    return () => {
-      shouldIgnore = true;
-    };
-  }, [article, articleContent, pdfData]);
-
-  useEffect(() => {
-    if (!article || messages.length > 0) {
-      return;
-    }
-
-    setMessages([
-      buildWelcomeMessage({
-        article,
-        articleContent,
-        loadingContent,
-        pdfData,
-      }),
-    ]);
-  }, [article, articleContent, loadingContent, messages.length, pdfData]);
-
-  async function handleSend(event) {
+  async function handleSend(event, question = input) {
     event?.preventDefault();
-
-    if (!input.trim() || isLoading) {
-      return;
-    }
-
-    const userMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: input,
-    };
-    const nextMessages = [...messages, userMessage];
-
-    setMessages(nextMessages);
+    if (!question.trim() || sendingRef.current || source.loading || !article) return;
+    const scope = scopeRef.current;
+    const userMessage = { id: crypto.randomUUID(), role: "user", content: question.trim() };
+    const nextMessages = [...conversation, userMessage];
+    sendingRef.current = true;
+    setConversation(nextMessages);
     setInput("");
     setIsLoading(true);
     setError(null);
-
     try {
       const data = await chatService.sendChatMessage({
-        messages: nextMessages,
-        article: article
-          ? {
-              title: article.title,
-              abstract: article.abstract,
-              authors: article.authors,
-              year: article.year,
-              journal: article.journal,
-              doi: article.doi,
-              status: article.status,
-              notas: article.notas,
-              content: articleContent,
-            }
-          : null,
-      });
-
-      setMessages((currentMessages) => [
-        ...currentMessages,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: data.content,
+        messages: nextMessages.map(({ role, content }) => ({ role, content })),
+        article: { title: article.title, abstract: article.abstract, authors: article.authors,
+          year: article.year, journal: article.journal, doi: article.doi, notas: article.notas,
+          content: pdfState.status === "ready" ? pdfState.value.text : null,
+          contentSource: source.label + (pdfState.status === "ready" ? `: ${source.detail}` : ""),
         },
-      ]);
+      });
+      if (!data?.content?.trim()) throw new Error("A IA retornou uma resposta vazia. Tente novamente.");
+      if (scope !== scopeRef.current) return;
+      setConversation((current) => [...current, { id: crypto.randomUUID(), role: "assistant",
+        content: data.content, sourceLabel: source.label }]);
     } catch (sendError) {
-      console.error("Erro:", sendError);
-      setError(sendError.message);
-      setMessages((currentMessages) => currentMessages.slice(0, -1));
+      if (scope !== scopeRef.current) return;
+      setError(sendError.message || "Não foi possível obter uma resposta.");
+      setConversation((current) => current.filter((message) => message.id !== userMessage.id));
+      setInput(userMessage.content);
     } finally {
-      setIsLoading(false);
+      if (scope === scopeRef.current) {
+        sendingRef.current = false;
+        setIsLoading(false);
+      }
     }
   }
 
-  function handleAddToNotes(content) {
-    if (onAddNote) {
-      onAddNote(content);
-    }
-  }
-
-  return {
-    error,
-    handleAddToNotes,
-    handleSend,
-    input,
-    isLoading,
-    messages,
-    setInput,
+  return { error, input, isLoading, messages, setInput, source,
+    handleSend, retrySend: () => handleSend(),
+    retryPdf: pdfState.status === "error" ? () => setPdfAttempt((value) => value + 1) : null,
+    handleAddToNotes: (content) => onAddNote?.(content),
   };
 }
 

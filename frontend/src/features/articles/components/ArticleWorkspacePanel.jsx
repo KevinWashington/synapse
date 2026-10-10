@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DatabaseIcon, MessageSquareIcon, PenLineIcon } from "lucide-react";
 import { ArticleChatPanel } from "@features/ai";
 import ArticleEvidenceEditor from "@features/articles/components/ArticleEvidenceEditor";
@@ -32,14 +32,16 @@ function ArticleWorkspacePanel({
   activeFlow,
   article,
   project,
-  onAddNote,
   onSaveEvidence,
   onSaveNotes,
   pdfData,
   rightTab,
   setRightTab,
   isSavingEvidence,
+  chatSession,
 }) {
+  const notesRef = useRef(null);
+  const [chatOpenedFor, setChatOpenedFor] = useState(null);
   const workspaceTabs = activeFlow === "included" ? INCLUDED_TABS : REVIEW_TABS;
   const review = collaborativeReview(article);
   const effectiveRightTab = workspaceTabs.some((tab) => tab.key === rightTab)
@@ -52,8 +54,12 @@ function ArticleWorkspacePanel({
     }
   }, [effectiveRightTab, rightTab, setRightTab]);
 
+  useEffect(() => {
+    if (effectiveRightTab === "chat") setChatOpenedFor(article.id);
+  }, [effectiveRightTab, article.id]);
+
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-[var(--syn-bg-primary)]">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--syn-bg-primary)]">
       <div className="flex shrink-0 flex-wrap gap-1 border-b border-[var(--syn-border)] p-2">
         {workspaceTabs.map((tab) => {
           const Icon = tab.icon;
@@ -64,9 +70,10 @@ function ArticleWorkspacePanel({
               key={tab.key}
               type="button"
               onClick={() => setRightTab(tab.key)}
-              className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              aria-pressed={isActive}
+              className={`relative flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-[var(--syn-bg-secondary)] text-[var(--syn-text-primary)]"
+                  ? "text-[var(--syn-sidebar-accent)]"
                   : "text-[var(--syn-text-secondary)] hover:bg-[var(--syn-bg-secondary)] hover:text-[var(--syn-text-primary)]"
               }`}
             >
@@ -82,9 +89,10 @@ function ArticleWorkspacePanel({
 
       {review.writeExplanation ? <p className="border-b border-[var(--syn-border)] p-3 text-xs text-[var(--syn-text-secondary)]">{review.writeExplanation}</p> : null}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {effectiveRightTab === "notas" ? (
-          <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} readOnly={!review.canWrite} />
-        ) : effectiveRightTab === "extracao" ? (
+        <div hidden={effectiveRightTab !== "notas"} className="h-full">
+          <NotesEditor key={article.id} ref={notesRef} valorInicial={article?.notas} onSalvar={onSaveNotes} readOnly={!review.canWrite} />
+        </div>
+        {effectiveRightTab === "extracao" ? (
           <ArticleEvidenceEditor
             article={article}
             project={project}
@@ -92,13 +100,20 @@ function ArticleWorkspacePanel({
             onSave={onSaveEvidence}
             readOnly={!review.canWrite}
           />
-        ) : (
-          <ArticleChatPanel
+        ) : null}
+        <div hidden={effectiveRightTab !== "chat"} className="h-full">
+          {effectiveRightTab === "chat" || chatOpenedFor === article.id ? <ArticleChatPanel
+            key={article.id}
+            session={chatSession}
             article={article}
-            onAddNote={review.canWrite ? onAddNote : undefined}
+            onAddNote={review.canWrite ? (content) => {
+              const saving = notesRef.current?.append(content);
+              setRightTab("notas");
+              return saving;
+            } : undefined}
             pdfData={pdfData}
-          />
-        )}
+          /> : null}
+        </div>
       </div>
     </div>
   );

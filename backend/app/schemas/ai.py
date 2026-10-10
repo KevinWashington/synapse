@@ -49,6 +49,7 @@ class ArticleContext(BaseModel):
     doi: str | None = None
     abstract: str | None = None
     content: str | None = None
+    contentSource: str | None = None
     notas: str | None = None
 
 

@@ -3,10 +3,13 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangleIcon,
   ArrowLeftIcon,
+  ArrowRightIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
   FileIcon,
   LoaderIcon,
+  PanelRightCloseIcon,
+  PanelRightOpenIcon,
   SaveIcon,
   SearchIcon,
   SparklesIcon,
@@ -16,9 +19,9 @@ import {
 import { Button } from "@/components/ui/Button";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { Input } from "@/components/ui/Input";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { AppHeader, LoadingState } from "@/components/layout";
 import { useArticleDetailsPage } from "@/features/articles";
+import useArticleChat from "@features/ai/hooks/useArticleChat";
 import ArticleAIBanner from "@/features/articles/components/ArticleAIBanner";
 import EligibilityDecisionDialog from "@/features/articles/components/EligibilityDecisionDialog";
 import ScreeningDecisionDialog from "@/features/articles/components/ScreeningDecisionDialog";
@@ -36,8 +39,27 @@ const ArticleEvidenceEditor = lazy(() =>
 const PdfViewer = lazy(() => import("@features/articles/components/PdfViewer"));
 const NotesEditor = lazy(() => import("@features/articles/components/NotesEditor"));
 
+const FOCUS_WORKSPACE_THEME = {
+  "--syn-sidebar-accent": "#6259ff",
+  "--syn-border": "#edf0f7",
+  "--syn-text-primary": "#111936",
+  "--syn-text-secondary": "#667391",
+  "--syn-bg-secondary": "#fbfcff",
+};
+
 function ArticlePanelLoader() {
   return <LoadingState message="Carregando conteúdo..." />;
+}
+
+function ArticleTransitionState({ state }) {
+  return <div className="col-span-full flex min-h-[320px] flex-1 items-center justify-center p-5">
+    {state.error ? <div role="alert" className="space-y-3 text-center">
+      <p className="text-sm text-[var(--syn-text-secondary)]">{state.error}</p>
+      <Button variant="outline" onClick={state.retry}>Tentar novamente</Button>
+    </div> : <div role="status" className="flex items-center gap-2 text-sm text-[var(--syn-text-secondary)]">
+      <LoaderIcon className="h-5 w-5 animate-spin" />Carregando artigo...
+    </div>}
+  </div>;
 }
 
 
@@ -93,6 +115,7 @@ function getExtractionStatus(article, currentArticleId, schema) {
 
 
 function PrismaExtractionWorkspace({
+  articleState,
   article,
   articleId,
   articleList,
@@ -141,7 +164,7 @@ function PrismaExtractionWorkspace({
   }
 
   return (
-    <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
+    <div style={FOCUS_WORKSPACE_THEME} className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="hidden min-h-0 flex-col border-r border-[#edf0f7] bg-[#fbfcff] px-5 pb-4 xl:flex">
         <Link
           to="/"
@@ -231,7 +254,7 @@ function PrismaExtractionWorkspace({
           ]}
         />
 
-        <main className="flex min-h-0 flex-1 flex-col px-5 pb-0 md:px-10">
+        <main className="flex min-h-0 flex-1 flex-col px-5 pb-0 pt-5 md:px-10">
           <div className="mb-5 flex shrink-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
@@ -245,7 +268,7 @@ function PrismaExtractionWorkspace({
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div inert={articleState.pending || undefined} className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="min-w-[300px]">
                 <div className="mb-2 flex items-center justify-between gap-4 text-xs font-semibold text-[#182344]">
                   <span>Progresso geral</span>
@@ -280,9 +303,10 @@ function PrismaExtractionWorkspace({
             </div>
           </div>
 
-          <ReviewAssignmentStatus article={article} />
-          <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(500px,570px)]">
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white p-5">
+          {!articleState.pending ? <ReviewAssignmentStatus article={article} /> : null}
+          <div className="grid min-h-0 flex-1 overflow-y-auto rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-white xl:grid-cols-[minmax(0,1fr)_minmax(400px,500px)] xl:overflow-hidden">
+            {articleState.pending ? <ArticleTransitionState state={articleState} /> : <>
+            <section className="flex min-h-[420px] flex-col overflow-hidden p-5 xl:min-h-0">
               <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <h2 className="line-clamp-2 text-lg font-semibold leading-7 text-[#111936]">{article.title}</h2>
@@ -313,18 +337,18 @@ function PrismaExtractionWorkspace({
                 })}
               </div>
 
-              <div className="min-h-[420px] flex-1 overflow-hidden">
+              <div className="min-h-[320px] flex-1 overflow-hidden xl:min-h-0">
                 <Suspense fallback={<ArticlePanelLoader />}>
                   {leftTab === "pdf" ? (
                     <PdfViewer article={article} articleId={articleId} pdfData={pdfData} projectId={projectId} />
                   ) : (
-                    <NotesEditor valorInicial={article?.notas} onSalvar={onSaveNotes} readOnly={!review.canWrite} />
+                    <NotesEditor key={article.id} valorInicial={article?.notas} onSalvar={onSaveNotes} readOnly={!review.canWrite} />
                   )}
                 </Suspense>
               </div>
             </section>
 
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white">
+            <section className="flex min-h-[480px] flex-col overflow-hidden border-t border-[var(--syn-border)] xl:min-h-0 xl:border-l xl:border-t-0">
               <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[#edf0f7] px-4 py-4">
                 <div>
                   <h2 className="text-base font-semibold text-[#111936]">Formulário de extração</h2>
@@ -337,6 +361,7 @@ function PrismaExtractionWorkspace({
               <div className="min-h-0 flex-1 overflow-hidden">
                 <Suspense fallback={<ArticlePanelLoader />}>
                   <ArticleEvidenceEditor
+                    key={article.id}
                     article={article}
                     className="h-full"
                     formId="article-extraction-form"
@@ -350,23 +375,25 @@ function PrismaExtractionWorkspace({
                 </Suspense>
               </div>
             </section>
+            </>}
           </div>
 
-          <div className="mt-4 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-t border-[#edf0f7] bg-white px-1 text-xs text-[#56627f]">
-            <Button variant="ghost" className="h-10 justify-start gap-3 text-[#56627f]" onClick={() => openArticle(previousArticle)} disabled={!previousArticle}>
+          <nav aria-label="Navegação entre estudos" className="mt-3 grid min-h-16 shrink-0 grid-cols-2 items-center gap-4 border-t border-[#edf0f7] py-2 text-xs text-[#56627f]">
+            <Button variant="ghost" className="h-12 min-w-0 justify-start gap-3 text-[#56627f]" onClick={() => openArticle(previousArticle)} disabled={!previousArticle}>
               <ArrowLeftIcon className="h-4 w-4" />
               <span className="min-w-0 text-left">
                 <span className="block font-semibold">Anterior</span>
                 {previousArticle ? <span className="block max-w-[260px] truncate">{previousArticle.title}</span> : null}
               </span>
             </Button>
-            <Button variant="ghost" className="h-10 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
+            <Button variant="ghost" className="h-12 min-w-0 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
               <span className="min-w-0 text-right">
                 <span className="block font-semibold">Próximo</span>
                 {nextArticle ? <span className="block max-w-[260px] truncate">{nextArticle.title}</span> : null}
               </span>
+              <ArrowRightIcon className="h-4 w-4" />
             </Button>
-          </div>
+          </nav>
         </main>
       </div>
     </div>
@@ -425,6 +452,8 @@ function getReviewStatus(article, activeFlow, currentArticleId, extractionSchema
 }
 
 function PrismaArticleReviewWorkspace({
+  articleState,
+  chatSession,
   activeFlow,
   article,
   articleId,
@@ -435,7 +464,6 @@ function PrismaArticleReviewWorkspace({
   onRequestDelete,
   isSavingEvidence,
   navigate,
-  onAddNote,
   onOpenEligibility,
   onOpenScreening,
   onOpenUpload,
@@ -449,6 +477,7 @@ function PrismaArticleReviewWorkspace({
   suggestedDecision,
 }) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [supportCollapsed, setSupportCollapsed] = useState(false);
   const extractionSchema = project?.dataExtractionSchema || [];
   const review = collaborativeReview(article);
   const stage = REVIEW_STAGE_CONFIG[activeFlow] || REVIEW_STAGE_CONFIG.screening;
@@ -485,7 +514,7 @@ function PrismaArticleReviewWorkspace({
   }
 
   return (
-    <div className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
+    <div style={FOCUS_WORKSPACE_THEME} className="grid h-screen overflow-hidden bg-[#fbfcff] text-[#101936] xl:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="hidden min-h-0 flex-col border-r border-[#edf0f7] bg-[#fbfcff] px-5 pb-4 xl:flex">
         <Link
           to="/"
@@ -575,18 +604,16 @@ function PrismaArticleReviewWorkspace({
           ]}
         />
 
-        <main className="flex min-h-0 flex-1 flex-col px-5 pb-0 md:px-10">
+        <main className="flex min-h-0 flex-1 flex-col px-5 pb-0 pt-5 md:px-10">
           <div className="mb-5 flex shrink-0 flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
                 <h1 className="text-3xl font-semibold leading-tight tracking-normal text-[#0f1734]">{stage.title}</h1>
-                <StatusBadge status={article.currentPhase} />
-                <StatusBadge status={article.reviewOutcome} />
               </div>
               <p className="mt-2 text-sm text-[#56627f]">{stage.description}</p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div inert={articleState.pending || undefined} className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="min-w-[260px]">
                 <div className="mb-2 flex items-center justify-between gap-4 text-xs font-semibold text-[#182344]">
                   <span>Posição na etapa</span>
@@ -645,9 +672,13 @@ function PrismaArticleReviewWorkspace({
             </div>
           </div>
 
-          <ReviewAssignmentStatus article={article} />
-          <div className="grid min-h-0 flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(460px,540px)]">
-            <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#edf0f7] bg-white p-5">
+          {!articleState.pending ? <ReviewAssignmentStatus article={article} /> : null}
+          <div className={cn(
+            "grid min-h-0 flex-1 overflow-y-auto rounded-[var(--syn-radius-card)] border border-[var(--syn-border)] bg-white xl:overflow-hidden",
+            supportCollapsed ? "xl:grid-cols-[minmax(0,1fr)_48px]" : "xl:grid-cols-[minmax(0,1fr)_minmax(340px,400px)]"
+          )}>
+            {articleState.pending ? <ArticleTransitionState state={articleState} /> : <>
+            <section className="flex min-h-[420px] min-w-0 flex-col overflow-hidden p-5 xl:min-h-0">
               <div className="mb-4 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <h2 className="line-clamp-2 text-lg font-semibold leading-7 text-[#111936]">{article.title}</h2>
@@ -657,19 +688,31 @@ function PrismaArticleReviewWorkspace({
                 </div>
               </div>
 
-              <div className="min-h-[420px] flex-1 overflow-hidden">
+              <div className="min-h-[320px] flex-1 overflow-hidden xl:min-h-0">
                 <Suspense fallback={<ArticlePanelLoader />}>
                   <PdfViewer article={article} articleId={articleId} pdfData={pdfData} projectId={projectId} />
                 </Suspense>
               </div>
             </section>
 
-            <section className="min-h-0 overflow-hidden rounded-lg border border-[#edf0f7] bg-white">
-              <Suspense fallback={<ArticlePanelLoader />}>
+            <section className={cn("flex min-w-0 flex-col overflow-hidden border-t border-[var(--syn-border)] xl:min-h-0 xl:border-l xl:border-t-0", supportCollapsed ? "min-h-0" : "min-h-[480px]")}>
+              <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--syn-border)] p-2">
+                {!supportCollapsed ? <h2 className="pl-2 text-xs font-medium text-[var(--syn-text-secondary)]">Ferramentas do estudo</h2> : null}
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"
+                  aria-label={supportCollapsed ? "Expandir painel de apoio" : "Recolher painel de apoio"}
+                  title={supportCollapsed ? "Expandir painel de apoio" : "Recolher painel de apoio"}
+                  aria-expanded={!supportCollapsed} aria-controls="article-support-panel"
+                  onClick={() => setSupportCollapsed((value) => !value)}>
+                  {supportCollapsed ? <PanelRightOpenIcon className="h-4 w-4" /> : <PanelRightCloseIcon className="h-4 w-4" />}
+                </Button>
+              </div>
+              <div id="article-support-panel" hidden={supportCollapsed} className="min-h-0 flex-1">
+                <Suspense fallback={<ArticlePanelLoader />}>
                 <ArticleWorkspacePanel
+                  key={article.id}
+                  chatSession={chatSession}
                   activeFlow={activeFlow}
                   article={article}
-                  onAddNote={onAddNote}
                   onSaveEvidence={onSaveEvidence}
                   onSaveNotes={onSaveNotes}
                   pdfData={pdfData}
@@ -678,25 +721,28 @@ function PrismaArticleReviewWorkspace({
                   setRightTab={setRightTab}
                   isSavingEvidence={isSavingEvidence}
                 />
-              </Suspense>
+                </Suspense>
+              </div>
             </section>
+            </>}
           </div>
 
-          <div className="mt-4 grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-t border-[#edf0f7] bg-white px-1 text-xs text-[#56627f]">
-            <Button variant="ghost" className="h-10 justify-start gap-3 text-[#56627f]" onClick={() => openArticle(previousArticle)} disabled={!previousArticle}>
+          <nav aria-label="Navegação entre estudos" className="mt-3 grid min-h-16 shrink-0 grid-cols-2 items-center gap-4 border-t border-[#edf0f7] py-2 text-xs text-[#56627f]">
+            <Button variant="ghost" className="h-12 min-w-0 justify-start gap-3 text-[#56627f]" onClick={() => openArticle(previousArticle)} disabled={!previousArticle}>
               <ArrowLeftIcon className="h-4 w-4" />
               <span className="min-w-0 text-left">
                 <span className="block font-semibold">Anterior</span>
                 {previousArticle ? <span className="block max-w-[260px] truncate">{previousArticle.title}</span> : null}
               </span>
             </Button>
-            <Button variant="ghost" className="h-10 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
+            <Button variant="ghost" className="h-12 min-w-0 justify-end gap-3 text-[#6259ff]" onClick={() => openArticle(nextArticle)} disabled={!nextArticle}>
               <span className="min-w-0 text-right">
                 <span className="block font-semibold">Próximo</span>
                 {nextArticle ? <span className="block max-w-[260px] truncate">{nextArticle.title}</span> : null}
               </span>
+              <ArrowRightIcon className="h-4 w-4" />
             </Button>
-          </div>
+          </nav>
         </main>
       </div>
     </div>
@@ -712,7 +758,6 @@ function ArticleDetails() {
     articleId,
     backUrl,
     error,
-    handleAddNote,
     handleDeleteArticle,
     handleEligibilityDecision,
     handleSaveEvidence,
@@ -729,6 +774,7 @@ function ArticleDetails() {
     selectionSummary,
     setRightTab,
   } = useArticleDetailsPage();
+  const chatSession = useArticleChat({ article, pdfData, enabled: rightTab === "chat" });
   const [screeningDialogOpen, setScreeningDialogOpen] = useState(false);
   const [screeningInitialDecision, setScreeningInitialDecision] = useState("included");
   const [eligibilityDialogOpen, setEligibilityDialogOpen] = useState(false);
@@ -736,6 +782,13 @@ function ArticleDetails() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
+
+  useEffect(() => {
+    setScreeningDialogOpen(false);
+    setEligibilityDialogOpen(false);
+    setUploadDialogOpen(false);
+    setDeleteConfirmOpen(false);
+  }, [projectId, articleId]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -756,7 +809,7 @@ function ArticleDetails() {
     navigate(`/projetos/${projectId}/artigos/${articleId}?${params.toString()}`, { replace: true });
   }, [article?.reviewOutcome, articleId, navigate, projectId, rightTab]);
 
-  if (loading) {
+  if (loading && !article) {
     return (
       <div className="flex min-h-[400px] items-center justify-center gap-2 text-[var(--syn-text-secondary)]">
         <LoaderIcon className="h-6 w-6 animate-spin" />
@@ -765,7 +818,7 @@ function ArticleDetails() {
     );
   }
 
-  if (error) {
+  if (error && !article) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center text-center">
         <AlertTriangleIcon className="mb-3 h-12 w-12 text-[var(--syn-badge-high-text)]" />
@@ -793,6 +846,7 @@ function ArticleDetails() {
   }
 
   async function handleScreeningSubmit(payload) {
+    if (loading || error || String(article.id) !== String(articleId)) return;
     try {
       setIsSavingDecision(true);
       await handleScreeningDecision(payload);
@@ -803,6 +857,7 @@ function ArticleDetails() {
   }
 
   async function handleEligibilitySubmit(payload) {
+    if (loading || error || String(article.id) !== String(articleId)) return;
     try {
       setIsSavingDecision(true);
       await handleEligibilityDecision(payload);
@@ -813,12 +868,14 @@ function ArticleDetails() {
   }
 
   function openScreeningDialog(initialDecision = "included") {
+    if (loading || error || String(article.id) !== String(articleId)) return;
     if (!collaborativeReview(article).canDecide) return;
     setScreeningInitialDecision(initialDecision);
     setScreeningDialogOpen(true);
   }
 
   function openEligibilityDialog(initialDecision = "included") {
+    if (loading || error || String(article.id) !== String(articleId)) return;
     if (!collaborativeReview(article).canDecide) return;
     setEligibilityInitialDecision(initialDecision);
     setEligibilityDialogOpen(true);
@@ -831,9 +888,12 @@ function ArticleDetails() {
   const isIncludedFlow = routeFlow === "included";
   const showExtractionWorkspace = isIncluded && isIncludedFlow && rightTab === "extracao";
   const suggestedDecision = mapSuggestedDecision(article.aiSuggestedStatus);
+  const articleState = { pending: loading || Boolean(error), error, retry: refreshArticle };
 
   const content = showExtractionWorkspace ? (
     <PrismaExtractionWorkspace
+      key={projectId}
+      articleState={articleState}
       article={article}
       articleId={articleId}
       articleList={articleList}
@@ -851,6 +911,9 @@ function ArticleDetails() {
     />
   ) : (
     <PrismaArticleReviewWorkspace
+      articleState={articleState}
+      chatSession={chatSession}
+      key={projectId}
       activeFlow={activeFlow}
       article={article}
       articleId={articleId}
@@ -861,7 +924,6 @@ function ArticleDetails() {
       onRequestDelete={() => setDeleteConfirmOpen(true)}
       isSavingEvidence={isSavingEvidence}
       navigate={navigate}
-      onAddNote={handleAddNote}
       onOpenEligibility={openEligibilityDialog}
       onOpenScreening={openScreeningDialog}
       onOpenUpload={() => setUploadDialogOpen(true)}
@@ -879,7 +941,7 @@ function ArticleDetails() {
   return (
     <>
       {content}
-
+      {!articleState.pending ? <>
       <ScreeningDecisionDialog
         article={article}
         initialDecision={screeningInitialDecision}
@@ -920,11 +982,13 @@ function ArticleDetails() {
         confirmLabel="Remover artigo"
         tone="destructive"
         onConfirm={async () => {
+          if (loading || error || String(article.id) !== String(articleId)) return;
           setDeleteConfirmOpen(false);
           await handleDeleteArticle();
         }}
         onOpenChange={setDeleteConfirmOpen}
       />
+      </> : null}
     </>
   );
 }

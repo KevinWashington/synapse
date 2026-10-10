@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { PlusCircle } from "lucide-react";
+import { Loader2, PlusCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import ReactMarkdown from "react-markdown";
 
 function ArticleChatMessages({
@@ -7,6 +8,7 @@ function ArticleChatMessages({
   isLoading,
   messages,
   onAddToNotes,
+  onRetry,
 }) {
   const chatContainerRef = useRef(null);
 
@@ -27,13 +29,13 @@ function ArticleChatMessages({
           className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
         >
           <div
-            className={`relative max-w-[80%] ${message.role === "assistant" ? "group/message" : ""}`}
+            className={message.role === "assistant" ? "min-w-0 w-full" : "min-w-0 max-w-[90%]"}
           >
             <div
               className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 message.role === "user"
-                  ? "rounded-br-md bg-[var(--syn-sidebar-bg)] text-white"
-                  : "rounded-bl-md border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] text-[var(--syn-text-primary)]"
+                  ? "rounded-br-md bg-[var(--syn-sidebar-accent)] text-white"
+                  : "px-0 py-1 text-[var(--syn-text-primary)]"
               }`}
             >
               {message.role === "assistant" ? (
@@ -44,38 +46,38 @@ function ArticleChatMessages({
                 <p className="whitespace-pre-wrap">{message.content}</p>
               )}
             </div>
+            {message.sourceLabel ? <p className="mt-2 text-xs text-[var(--syn-text-secondary)]">Base da resposta: {message.sourceLabel}</p> : null}
 
-            {message.role === "assistant" && message.id !== "welcome" ? (
-              <button
+            {message.role === "assistant" && message.id !== "welcome" && onAddToNotes ? (
+              <Button
                 type="button"
-                className="absolute -right-9 top-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-[var(--syn-text-secondary)] opacity-0 transition-all hover:bg-[var(--syn-badge-neutral-bg)] hover:text-[var(--syn-text-primary)] group-hover/message:opacity-100"
+                variant="ghost"
+                size="sm"
+                className="mt-2 gap-2 text-[var(--syn-sidebar-accent)]"
                 onClick={() => onAddToNotes(message.content)}
                 title="Adicionar às notas"
               >
                 <PlusCircle className="h-4 w-4" />
-              </button>
+                Adicionar às notas
+              </Button>
             ) : null}
           </div>
         </div>
       ))}
 
       {isLoading ? (
-        <div className="flex justify-start">
-          <div className="rounded-2xl rounded-bl-md border border-[var(--syn-border)] bg-[var(--syn-bg-secondary)] px-4 py-3">
-            <div className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--syn-text-secondary)] [animation-delay:0ms]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--syn-text-secondary)] [animation-delay:150ms]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--syn-text-secondary)] [animation-delay:300ms]" />
-            </div>
-          </div>
+        <div role="status" className="flex items-center gap-2 rounded-lg bg-[var(--syn-bg-secondary)] p-3 text-sm text-[var(--syn-text-secondary)]">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Preparando resposta com as fontes disponíveis...
         </div>
       ) : null}
 
       {error ? (
-        <div className="rounded-lg border border-pink-200 bg-[var(--syn-badge-high-bg)] p-3">
+        <div role="alert" className="space-y-2 rounded-lg border border-pink-200 bg-[var(--syn-badge-high-bg)] p-3">
           <span className="text-sm text-[var(--syn-badge-high-text)]">
             Erro: {error}
           </span>
+          {onRetry ? <Button variant="outline" size="sm" onClick={onRetry}>Tentar novamente</Button> : null}
         </div>
       ) : null}
     </div>

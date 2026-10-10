@@ -1,6 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import ArticleWorkspacePanel from "./ArticleWorkspacePanel";
+
+vi.mock("@services/chatService", () => ({
+  chatService: { sendChatMessage: async () => ({ content: "Trecho de evidência" }) },
+}));
+
+function InteractivePanel(props) {
+  const [rightTab, setRightTab] = useState("notas");
+  return <ArticleWorkspacePanel {...defaultProps} {...props} rightTab={rightTab} setRightTab={setRightTab} />;
+}
 
 const defaultProps = {
   article: { id: 1, title: "Estudo", notas: "" },
@@ -15,6 +25,49 @@ const defaultProps = {
 };
 
 describe("ArticleWorkspacePanel stage tools", () => {
+  it("only initializes the assistant when its tab is opened", () => {
+    render(<InteractivePanel activeFlow="screening" />);
+    expect(screen.queryByPlaceholderText("Pergunte sobre o artigo...")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Assistente IA" }));
+    expect(screen.getByPlaceholderText("Pergunte sobre o artigo...")).toBeVisible();
+  });
+
+  it("does not offer to modify notes to a read-only reviewer", async () => {
+    render(<InteractivePanel activeFlow="screening" article={{ ...defaultProps.article, canWriteReview: false }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Assistente IA" }));
+    fireEvent.change(screen.getByPlaceholderText("Pergunte sobre o artigo..."), { target: { value: "Qual é a evidência?" } });
+    fireEvent.keyDown(screen.getByPlaceholderText("Pergunte sobre o artigo..."), { key: "Enter" });
+    await screen.findByText("Trecho de evidência");
+    expect(screen.queryByTitle("Adicionar às notas")).not.toBeInTheDocument();
+  });
+
+  it("preserves conversation and input when switching support tabs", async () => {
+    render(<InteractivePanel activeFlow="screening" />);
+    fireEvent.click(screen.getByRole("button", { name: "Assistente IA" }));
+    fireEvent.change(screen.getByPlaceholderText("Pergunte sobre o artigo..."), { target: { value: "Qual é a evidência?" } });
+    fireEvent.keyDown(screen.getByPlaceholderText("Pergunte sobre o artigo..."), { key: "Enter" });
+    await screen.findByText("Trecho de evidência");
+    fireEvent.change(screen.getByPlaceholderText("Pergunte sobre o artigo..."), { target: { value: "Pergunta pendente" } });
+    fireEvent.click(screen.getByRole("button", { name: "Notas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Assistente IA" }));
+    expect(screen.getByText("Trecho de evidência")).toBeVisible();
+    expect(screen.getByPlaceholderText("Pergunte sobre o artigo...")).toHaveValue("Pergunta pendente");
+  });
+
+  it("appends AI evidence to the current unsaved note and persists both", async () => {
+    const saved = [];
+    render(<InteractivePanel activeFlow="screening" onSaveNotes={async (value) => saved.push(value)} />);
+    fireEvent.change(screen.getByPlaceholderText("Digite suas notas aqui..."), { target: { value: "Minha observação" } });
+    fireEvent.click(screen.getByRole("button", { name: "Assistente IA" }));
+    fireEvent.change(screen.getByPlaceholderText("Pergunte sobre o artigo..."), { target: { value: "Qual é a evidência?" } });
+    fireEvent.keyDown(screen.getByPlaceholderText("Pergunte sobre o artigo..."), { key: "Enter" });
+    await screen.findByText("Trecho de evidência");
+    fireEvent.click(screen.getByTitle("Adicionar às notas"));
+    await act(async () => {});
+    expect(screen.getByPlaceholderText("Digite suas notas aqui...")).toHaveValue("Minha observação\n\nTrecho de evidência");
+    expect(saved.at(-1)).toBe("Minha observação\n\nTrecho de evidência");
+  });
+
   it("lets unassigned reviewers read notes without editing them", () => {
     render(<ArticleWorkspacePanel {...defaultProps} activeFlow="screening"
       article={{ ...defaultProps.article, notas: "Existing notes", hasActiveReviewAssignments: true, myReviewAssignment: null, canWriteReview: false }} />);

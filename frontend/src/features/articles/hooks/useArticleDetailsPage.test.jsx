@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import useArticleDetailsPage from "./useArticleDetailsPage";
 
@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   submitScreeningDecision: vi.fn(),
   updateArticleEvidence: vi.fn(),
   getMyAssignments: vi.fn(),
+  updateArticleNotes: vi.fn(),
+  getPdfData: vi.fn(),
 }));
 
 vi.mock("@features/articles/services/articleService", () => ({
@@ -18,9 +20,10 @@ vi.mock("@features/articles/services/articleService", () => ({
     getArticleById: mocks.getArticleById,
     getArticlesByProject: mocks.getArticlesByProject,
     getSelectionSummary: mocks.getSelectionSummary,
-    getPdfData: vi.fn(),
+    getPdfData: mocks.getPdfData,
     submitScreeningDecision: mocks.submitScreeningDecision,
     updateArticleEvidence: mocks.updateArticleEvidence,
+    updateArticleNotes: mocks.updateArticleNotes,
   },
 }));
 
@@ -55,6 +58,60 @@ describe("useArticleDetailsPage stage queue", () => {
     mocks.getArticlesByProject.mockResolvedValue({ articles: [], total: 0 });
     mocks.getSelectionSummary.mockResolvedValue({ included: 0, pendingExtraction: 0 });
     mocks.getProjectById.mockResolvedValue({ id: 7, title: "Projeto" });
+  });
+
+  it("ignores an older article response after navigation", async () => {
+    let finishFirst;
+    mocks.getArticleById.mockImplementation((_project, id) => id === "11"
+      ? new Promise((resolve) => { finishFirst = resolve; })
+      : Promise.resolve({ id: 12, title: "Novo estudo", hasPdf: false }));
+    const { result } = renderHook(() => ({ ...useArticleDetailsPage(), go: useNavigate() }), {
+      wrapper: wrapperAt("/projetos/7/artigos/11?flow=identification"),
+    });
+    act(() => result.current.go("/projetos/7/artigos/12?flow=identification"));
+    await waitFor(() => expect(result.current.article?.id).toBe(12));
+    await act(async () => finishFirst({ id: 11, title: "Resposta atrasada", hasPdf: false }));
+    expect(result.current.article.id).toBe(12);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("exposes a navigation failure instead of remaining stuck loading the previous article", async () => {
+    mocks.getArticleById.mockResolvedValueOnce({ id: 11, hasPdf: false })
+      .mockRejectedValueOnce(new Error("Falha ao carregar novo estudo"));
+    const { result } = renderHook(() => ({ ...useArticleDetailsPage(), go: useNavigate() }), {
+      wrapper: wrapperAt("/projetos/7/artigos/11?flow=identification"),
+    });
+    await waitFor(() => expect(result.current.article?.id).toBe(11));
+    act(() => result.current.go("/projetos/7/artigos/12?flow=identification"));
+    await waitFor(() => expect(result.current.error).toBe("Falha ao carregar novo estudo"));
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("never exposes the previous article's PDF while the new PDF is loading", async () => {
+    const firstPdf = new ArrayBuffer(8);
+    const secondPdf = new ArrayBuffer(16);
+    let finishSecond;
+    mocks.getArticleById.mockImplementation(async (_project, id) => ({ id: Number(id), title: `Estudo ${id}`, hasPdf: true }));
+    mocks.getPdfData.mockResolvedValueOnce(firstPdf).mockImplementation(() => new Promise((resolve) => { finishSecond = resolve; }));
+    const { result } = renderHook(() => ({ ...useArticleDetailsPage(), go: useNavigate() }), {
+      wrapper: wrapperAt("/projetos/7/artigos/11?flow=eligibility"),
+    });
+    await waitFor(() => expect(result.current.pdfData).toBe(firstPdf));
+    act(() => result.current.go("/projetos/7/artigos/12?flow=eligibility"));
+    await waitFor(() => expect(result.current.article?.id).toBe(12));
+    expect(result.current.pdfData).toBeNull();
+    await act(async () => finishSecond(secondPdf));
+    expect(result.current.pdfData).toBe(secondPdf);
+  });
+
+  it("propagates a failed note save so the editor cannot report success", async () => {
+    mocks.updateArticleNotes.mockRejectedValue(new Error("offline"));
+    const { result } = renderHook(() => useArticleDetailsPage(), {
+      wrapper: wrapperAt("/projetos/7/artigos/11?flow=screening"),
+    });
+    await waitFor(() => expect(result.current.article?.id).toBe(11));
+    await expect(result.current.handleSaveNotes("Rascunho")).rejects.toThrow("offline");
+    expect(result.current.article.notas).toBeUndefined();
   });
 
   it.each(["screening", "eligibility"])(
