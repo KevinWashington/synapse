@@ -37,6 +37,7 @@ from app.services.evidence_service import (
     sanitize_data_extraction_schema,
     sanitize_quality_assessment_schema,
 )
+from app.services.synthesis_identity_service import reconcile_research_questions
 
 
 router = APIRouter()
@@ -445,6 +446,13 @@ async def update_project(
     
     # Update only provided fields
     updateData = data.model_dump(exclude_unset=True)
+    if "researchQuestions" in updateData:
+        await reconcile_research_questions(
+            db,
+            project=project,
+            previous=list(project.researchQuestions or []),
+            current=list(updateData["researchQuestions"] or []),
+        )
     quality_schema_changed = False
     for field, value in updateData.items():
         if field == "picoc" and value:
