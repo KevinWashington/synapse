@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectPlanning from "./ProjectPlanning";
 import PlanningArrayField from "./PlanningArrayField";
@@ -114,6 +114,67 @@ describe("ProjectPlanning", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
     await waitFor(() => expect(handleSave).toHaveBeenCalledOnce());
     expect(screen.getByRole("button", { name: "Salvar alterações" })).toBeInTheDocument();
+  });
+
+  it("organizes every planning section into compact tabs and independent accordions", () => {
+    render(<ProjectPlanning project={project} />);
+
+    expect(screen.getByRole("tab", { name: /Fundação/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: /Perguntas de pesquisa/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /PICOC/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Resumo do planejamento")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exportar planejamento" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Seleção/ }));
+    expect(screen.getByRole("tab", { name: /Seleção/ })).toHaveAttribute("aria-selected", "true");
+    const criteria = screen.getByRole("button", { name: /Critérios de elegibilidade/ });
+    const guidance = screen.getByRole("button", { name: /Guia para triagem/ });
+    fireEvent.click(criteria);
+    fireEvent.click(guidance);
+    expect(criteria).toHaveAttribute("aria-expanded", "true");
+    expect(guidance).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Buscar seção" }));
+    const dialog = screen.getByRole("dialog", { name: "Buscar seção" });
+    [
+      "PICOC",
+      "Perguntas de pesquisa",
+      "Estratégia de busca",
+      "Critérios de elegibilidade",
+      "Guia para triagem",
+      "Extração de dados",
+      "Critérios de qualidade",
+    ].forEach((label) => expect(within(dialog).getByRole("button", { name: new RegExp(label) })).toBeInTheDocument());
+  });
+
+  it("preserves a framework draft while moving between thematic tabs", () => {
+    const state = buildHookState();
+    state.updateComponent = vi.fn((key, value) => {
+      state.data = { ...state.data, picoc: { ...state.data.picoc, [key]: value } };
+      mocks.hookState = state;
+    });
+    mocks.hookState = state;
+    const { rerender } = render(<ProjectPlanning project={project} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /PICOC/ }));
+    fireEvent.change(screen.getByRole("textbox", { name: "População" }), { target: { value: "Pessoas idosas" } });
+    rerender(<ProjectPlanning project={project} />);
+    fireEvent.click(screen.getByRole("tab", { name: /Seleção/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Fundação/ }));
+
+    expect(screen.getByRole("textbox", { name: "População" })).toHaveValue("Pessoas idosas");
+  });
+
+  it("edits inclusion, exclusion, and checklist criteria inline", () => {
+    render(<ProjectPlanning project={project} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: /Seleção/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Critérios de elegibilidade/ }));
+
+    expect(screen.getByPlaceholderText("Novo critério de inclusão...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Novo critério de exclusão...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Novo item do checklist...")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Critérios de elegibilidade" })).not.toBeInTheDocument();
   });
 
   it("keeps edit actions visible for list fields", () => {
