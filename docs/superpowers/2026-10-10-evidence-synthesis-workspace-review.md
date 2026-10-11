@@ -36,3 +36,15 @@ O código deixa o módulo do worker em `backend/app/synthesis_worker.py`, pois o
 ## Segurança e integridade
 
 Leitura e escrita são autorizadas separadamente por capacidade de projeto. Jobs e rascunhos são persistidos antes da resposta, conflitos são HTTP 409 e não sobrescrevem conteúdo. Exportações percorrem páginas, aplicam escopo `filtered` ou `full`, escapam células de fórmula e mantêm Unicode/quebras de linha.
+
+## Correção após uso local — 2026-10-10
+
+O reinício simples deixou o backend com a imagem antiga de migrations. Logs anteriores mostravam 404 nas novas rotas; após o reinício as rotas estavam registradas, mas o container ainda identificava `0004_inbox_invite_consent` como head e não continha a migration de Síntese. `docker compose up -d --build --no-deps backend` atualizou a imagem e aplicou `0005_evidence_synthesis`. Consultas reais do projeto 7 retornaram 5 RQs, 3 estudos incluídos e 2 avaliados.
+
+O smoke de dados também revelou que `overall` estava sendo aplicado como chave de resposta na listagem de Qualidade. A consulta geral agora lista os estudos incluídos; a distribuição respeita os mesmos filtros da lista. Esse caso tem regressão backend.
+
+A composição passou a usar um único painel com divisórias, abas integradas, cabeçalho compacto e as mesmas cores/espaçamentos de Planejamento e Artigos. Os tokens de destaque antes indefinidos foram definidos no escopo da Síntese. Erros HTTP agora aparecem com tentativa novamente; atualizar dados conserva o rascunho local e recarrega o modo ativo.
+
+Verificação desta correção: 12 testes backend de consultas/geração, 54 arquivos / 296 testes frontend, lint, build e os 2 E2E desktop/mobile aprovados. Houve um timeout inicial no teste de Artigos durante execução paralela com build; ele passou isoladamente e a suíte completa passou com `--maxWorkers=2`. As capturas foram atualizadas e inspecionadas. A validação visual usa o cenário E2E com dados simulados; a validação dos dados reais foi feita por consultas de leitura no backend. O worker real ainda não foi exercitado.
+
+Este registro descreve a validação de Síntese de 2026-10-10. As verificações posteriores da refatoração e da correção no Neo4j estão no [relatório de arquitetura](../audits/architecture-maintainability-2026-10-10/verification.md).

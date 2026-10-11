@@ -32,7 +32,7 @@ test("team table fills its card and keeps removal visibly destructive and confir
     const actions = await page.getByRole("button", { name: "Transferir propriedade para Bruno" }).boundingBox();
     expect(card.x + card.width - actions.x - actions.width).toBeLessThan(30);
   }
-  await page.screenshot({ path: `../docs/audits/team-layout-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/evidence/team-layout-${testInfo.project.name}.png`, fullPage: true });
   await remove.click();
   const dialog = page.getByRole("dialog", { name: "Remover pessoa?" });
   await expect(dialog).toBeVisible();
@@ -55,6 +55,6 @@ test("team table fills its card and keeps removal visibly destructive and confir
   await expect(page.getByText("Nenhuma discordância neste projeto.")).toBeVisible();
   await navigation.getByRole("button", { name: /Distribuição/ }).click();
   await expect(page.getByText("12 artigos · 2 revisores")).toBeVisible();
-  await page.screenshot({ path: `../docs/audits/team-distribution-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/evidence/team-distribution-${testInfo.project.name}.png`, fullPage: true });
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 });
