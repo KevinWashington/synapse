@@ -3,7 +3,7 @@ import path from "node:path";
 
 const apiBaseUrl = "http://localhost:5000";
 const csrfToken = "playwright-csrf";
-const evidenceDir = path.resolve("../docs/audits/playwright-article-flow-stability-2026-10-07");
+const evidenceDir = path.resolve("test-results/evidence/article-flow-stability");
 
 async function authenticate(context) {
   const token = process.env.E2E_SESSION_TOKEN;
@@ -59,6 +59,7 @@ async function openArticleFromRow(page, title) {
 test.describe("stable article workflow", () => {
   test("keeps totals, decisions, extraction, navigation and account context coherent", async ({ context, page }, testInfo) => {
     test.setTimeout(240_000);
+    page.setDefaultTimeout(30_000);
     test.skip(testInfo.project.name !== "desktop-chromium", "The complete flow captures desktop and narrow states once.");
     await authenticate(context);
 
@@ -163,14 +164,16 @@ test.describe("stable article workflow", () => {
       await expect(page.getByText("Página 2 de 2", { exact: true })).toBeVisible();
       await openArticleFromRow(page, primaryTitle);
       await page.getByRole("button", { name: "Incluir", exact: true }).click();
-      const screeningDialog = page.getByRole("dialog", { name: "Decisão de triagem" });
-      await expect(screeningDialog).toBeVisible();
-      await screeningDialog.getByRole("button", { name: "Copiar justificativa da IA" }).click();
-      const screeningReason = screeningDialog.getByRole("textbox", { name: "Justificativa" });
+      const screeningPanel = page.getByRole("complementary", { name: "Decisão de triagem" });
+      await expect(screeningPanel).toBeVisible();
+      await screeningPanel.getByRole("button", { name: "Usar como rascunho" }).click();
+      const screeningReason = screeningPanel.getByRole("textbox", { name: "Justificativa" });
       await expect(screeningReason).toHaveValue(/justificativa sugerida/);
       await screeningReason.fill("Justificativa da IA copiada e revisada pelo pesquisador.");
-      await screeningDialog.getByRole("button", { name: "Salvar decisão" }).click();
-      await expect(screeningDialog).not.toBeVisible();
+      await screeningPanel.getByRole("button", { name: "Salvar e próximo" }).click();
+      await expect(page.getByText("Decisão de triagem salva. Próximo artigo aberto.", { exact: true })).toBeAttached();
+      await expect(articleRow(page, primaryTitle)).not.toBeVisible();
+      await expect(page.getByText("22 na fila", { exact: true })).toBeVisible();
 
       await post(
         page.request,
@@ -197,24 +200,24 @@ test.describe("stable article workflow", () => {
       await expect(page.getByRole("dialog")).not.toBeVisible();
 
       await openArticleFromRow(page, primaryTitle);
-      await page.getByRole("button", { name: "Incluir", exact: true }).click();
-      const eligibilityDialog = page.getByRole("dialog", { name: "Decisão de elegibilidade" });
-      await expect(eligibilityDialog.getByText("Checklist assistido", { exact: true })).toBeVisible();
-      await expect(eligibilityDialog.getByText("RQs respondidas", { exact: true })).toBeVisible();
-      await eligibilityDialog.getByRole("button", { name: "Texto completo indisponível" }).click();
-      await expect(eligibilityDialog.getByText("Checklist assistido", { exact: true })).toHaveCount(0);
-      await expect(eligibilityDialog.getByText("RQs respondidas", { exact: true })).toHaveCount(0);
-      await expect(eligibilityDialog.getByRole("textbox", { name: "Motivo da indisponibilidade" })).toBeVisible();
-      await eligibilityDialog.getByRole("button", { name: "Incluir no corpus" }).click();
-      await eligibilityDialog.getByRole("button", { name: "Sim" }).click();
-      await eligibilityDialog.getByRole("button", { name: "RQ 1" }).click();
-      await eligibilityDialog.getByRole("button", { name: "Salvar decisão" }).click();
-      await expect(eligibilityDialog).not.toBeVisible();
+      const eligibilityPanel = page.getByRole("complementary", { name: "Decisão de elegibilidade" });
+      await expect(eligibilityPanel.getByText("Checklist assistido", { exact: true })).toBeVisible();
+      await expect(eligibilityPanel.getByText("RQs respondidas", { exact: true })).toBeVisible();
+      await eligibilityPanel.getByRole("button", { name: "Texto completo indisponível" }).click();
+      await expect(eligibilityPanel.getByText("Checklist assistido", { exact: true })).toHaveCount(0);
+      await expect(eligibilityPanel.getByText("RQs respondidas", { exact: true })).toHaveCount(0);
+      await expect(eligibilityPanel.getByRole("textbox", { name: "Motivo da indisponibilidade" })).toBeVisible();
+      await eligibilityPanel.getByRole("button", { name: "Incluir no corpus" }).click();
+      await eligibilityPanel.getByRole("button", { name: "Sim" }).click();
+      await eligibilityPanel.getByRole("button", { name: "RQ 1" }).click();
+      await eligibilityPanel.getByRole("button", { name: "Salvar e próximo" }).click();
+      await expect(page.getByText("Decisão de elegibilidade salva. Próximo artigo aberto.", { exact: true })).toBeAttached();
+      await expect(articleRow(page, primaryTitle)).not.toBeVisible();
 
       await page.getByRole("button", { name: /Inclusão/ }).first().click();
       await expect(page.getByText("2 na fila", { exact: true })).toBeVisible();
       await openArticleFromRow(page, primaryTitle);
-      await page.getByRole("button", { name: "Abrir workspace de extração" }).click();
+      await page.getByRole("button", { name: "Abrir em modo de foco" }).click();
       await expect(page).toHaveURL(new RegExp(`/projetos/${project.id}/artigos/${primaryId}\\?flow=included&workspace=extracao`));
       await expect(page.getByRole("button", { name: "Abrir menu da conta" })).toBeVisible();
       await expect(page.getByRole("navigation", { name: "Navegação estrutural" })).toContainText("Extração de dados");
@@ -273,6 +276,7 @@ test.describe("stable article workflow", () => {
       await page.goForward();
       await expect(page).toHaveURL(/tab=artigos&flow=identification/);
       await expect(page.getByText("Carregando artigos...")).not.toBeVisible({ timeout: 30_000 });
+      await page.getByRole("tab", { name: "Fila", exact: true }).click();
       await expect(page.getByText("2 na fila", { exact: true })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByRole("button", { name: "Abrir menu da conta" })).toBeVisible();
       await capture(page, testInfo, "05", "project-navigation-narrow");

@@ -17,10 +17,8 @@ import {
 } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EmptyState, LoadingState } from "@/components/layout";
-import {
-  ArticleLibraryDetailPanel,
-  useArticlesLibraryPage,
-} from "@/features/articles";
+import { ArticleLibraryDetailPanel } from "@features/articles/public/components";
+import { useArticlesLibraryPage } from "@features/articles/public/hooks";
 import { usePageTitle } from "@hooks/usePageTitle";
 
 function formatNumber(value) {

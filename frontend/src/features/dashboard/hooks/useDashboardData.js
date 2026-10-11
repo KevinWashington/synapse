@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { projectService } from "@features/projects/services/projectService";
+import { projectService } from "@features/projects/public/services";
 import { statsService } from "@services/statsService";
 
 function useDashboardData() {

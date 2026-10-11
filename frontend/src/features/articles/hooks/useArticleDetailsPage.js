@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
-import { projectService } from "@features/projects/services/projectService";
-import { collaborationService } from "@features/collaboration/services/collaborationService";
+import { projectService } from "@features/projects/public/services";
+import { collaborationService } from "@features/collaboration/public/services";
+import { useRemoteResource } from "@/hooks/useRemoteResource";
 import { toast } from "@/lib/toast";
 
 const WORKSPACE_TABS = new Set(["notas", "extracao", "chat"]);
@@ -11,16 +12,9 @@ function useArticleDetailsPage() {
   const { projectId, articleId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [article, setArticle] = useState(null);
-  const articleRequestRef = useRef(0);
-  const [project, setProject] = useState(null);
-  const [articleList, setArticleList] = useState([]);
-  const [articleListTotal, setArticleListTotal] = useState(0);
-  const [selectionSummary, setSelectionSummary] = useState(null);
-  const [myAssignments, setMyAssignments] = useState([]);
-  const [articleListLoading, setArticleListLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [assignmentResource, setAssignmentResource] = useState(null);
+  const myAssignments = assignmentResource?.projectId === projectId ? assignmentResource.data : [];
+  const [isSavingEvidence, setIsSavingEvidence] = useState(false);
   const [pdfResource, setPdfResource] = useState(null);
   const pdfRequestRef = useRef(0);
   const pdfKey = `${projectId}:${articleId}`;
@@ -33,7 +27,6 @@ function useArticleDetailsPage() {
     }
     return WORKSPACE_TABS.has(requestedTab) ? requestedTab : "notas";
   });
-  const [isSavingEvidence, setIsSavingEvidence] = useState(false);
   const returnFlow = searchParams.get("flow");
   const requestedWorkspace = searchParams.get("workspace");
   const backUrl = returnFlow
@@ -42,73 +35,32 @@ function useArticleDetailsPage() {
 
   const listFlow = returnFlow || (requestedWorkspace === "extracao" ? "included" : null);
 
-  const fetchArticle = useCallback(async (showLoading = true) => {
-    const request = ++articleRequestRef.current;
-    try {
-      if (showLoading) setLoading(true);
-      setError(null);
-      const articleData = await articleService.getArticleById(projectId, articleId);
-      if (request !== articleRequestRef.current) return;
-      setArticle(articleData);
-      return articleData;
-    } catch (currentError) {
-      if (request === articleRequestRef.current) setError(currentError.message || "Erro ao carregar artigo");
-    } finally {
-      if (request === articleRequestRef.current) setLoading(false);
-    }
-  }, [articleId, projectId]);
-
-  const fetchProject = useCallback(async () => {
-    try {
-      const projectData = await projectService.getProjectById(projectId);
-      setProject(projectData);
-    } catch (currentError) {
-      console.error("Erro ao carregar contexto do projeto:", currentError);
-    }
-  }, [projectId]);
-
-  const fetchArticleList = useCallback(async () => {
-    if (!projectId || !listFlow) {
-      setArticleList([]);
-      setArticleListTotal(0);
-      setSelectionSummary(null);
-      return;
-    }
-
-    const filters = {
-      limit: 1000,
-    };
-
-    if (listFlow === "included") {
-      filters.outcome = "included";
-    } else if (["identification", "screening", "eligibility"].includes(listFlow)) {
-      filters.phase = listFlow;
-      if (listFlow === "screening" || listFlow === "eligibility") {
-        filters.outcome = "active";
-      }
-    } else {
-      setArticleList([]);
-      return;
-    }
-
-    try {
-      setArticleListLoading(true);
-      const [response, summary] = await Promise.all([
-        articleService.getArticlesByProject(projectId, filters),
-        articleService.getSelectionSummary(projectId),
-      ]);
-      setArticleList(response.articles || []);
-      setArticleListTotal(response.total || 0);
-      setSelectionSummary(summary || null);
-    } catch (currentError) {
-      console.error("Erro ao carregar lista do workspace:", currentError);
-      setArticleList([]);
-      setArticleListTotal(0);
-      setSelectionSummary(null);
-    } finally {
-      setArticleListLoading(false);
-    }
+  const loadArticle = useCallback(() => articleService.getArticleById(projectId, articleId), [projectId, articleId]);
+  const articleResource = useRemoteResource({ key: `${projectId}:${articleId}`, enabled: Boolean(projectId && articleId), load: loadArticle });
+  const { data: remoteArticle, setData: setArticle, reload: fetchArticle, loading, error: articleError } = articleResource;
+  const error = articleError?.message || null;
+  const loadProject = useCallback(() => projectService.getProjectById(projectId), [projectId]);
+  const projectResource = useRemoteResource({ key: projectId, enabled: Boolean(projectId), load: loadProject });
+  const project = projectResource.data;
+  const loadList = useCallback(async () => {
+    const filters = { limit: 1000 };
+    if (listFlow === "included") filters.outcome = "included";
+    else { filters.phase = listFlow; if (["screening", "eligibility"].includes(listFlow)) filters.outcome = "active"; }
+    const [response, summary] = await Promise.all([
+      articleService.getArticlesByProject(projectId, filters), articleService.getSelectionSummary(projectId),
+    ]);
+    return { articles: response.articles || [], total: response.total || 0, summary };
   }, [listFlow, projectId]);
+  const queueResource = useRemoteResource({ key: `${projectId}:${listFlow}`, enabled: Boolean(projectId && ["included", "identification", "screening", "eligibility"].includes(listFlow)), load: loadList });
+  const articleList = queueResource.data?.articles || [];
+  const article = remoteArticle || articleList.find((item) => String(item.id) === String(articleId)) || null;
+  const articleListTotal = queueResource.data?.total || 0;
+  const selectionSummary = queueResource.data?.summary || null;
+  const articleListLoading = queueResource.loading;
+  const fetchArticleList = queueResource.reload;
+  const setQueueData = queueResource.setData;
+  const setArticleList = useCallback((update) => setQueueData((current) => ({ ...current, articles: update(current?.articles || []) })), [setQueueData]);
+  const setSelectionSummary = useCallback((summary) => setQueueData((current) => ({ ...current, summary })), [setQueueData]);
 
   const fetchPdfData = useCallback(async () => {
     const request = ++pdfRequestRef.current;
@@ -125,17 +77,8 @@ function useArticleDetailsPage() {
   }, [article, articleId, projectId]);
 
   useEffect(() => {
-    fetchArticle();
-    fetchProject();
-    return () => { articleRequestRef.current += 1; };
-  }, [fetchArticle, fetchProject]);
-
-  useEffect(() => {
-    fetchArticleList();
-  }, [fetchArticleList]);
-
-  useEffect(() => {
     fetchPdfData();
+    return () => { pdfRequestRef.current += 1; };
   }, [fetchPdfData]);
 
   useEffect(() => {
@@ -185,15 +128,15 @@ function useArticleDetailsPage() {
 
   const refreshAfterDecision = useCallback(async (updated) => {
     setArticle(updated);
-    if (!article?.hasActiveReviewAssignments && !updated.hasActiveReviewAssignments) return updated;
+    if (!article?.hasActiveReviewAssignments && !updated.hasActiveReviewAssignments) { await fetchArticleList(); return updated; }
     const [reloaded, assignments] = await Promise.all([
       fetchArticle(false),
       collaborationService.getMyAssignments(projectId),
       fetchArticleList(),
     ]);
-    setMyAssignments(assignments || []);
+    setAssignmentResource({ projectId, data: assignments || [] });
     return reloaded || updated;
-  }, [article?.hasActiveReviewAssignments, fetchArticle, fetchArticleList, projectId]);
+  }, [article?.hasActiveReviewAssignments, fetchArticle, fetchArticleList, projectId, setArticle]);
 
   const handleScreeningDecision = useCallback(
     async (payload) => {
@@ -236,7 +179,7 @@ function useArticleDetailsPage() {
         throw currentError;
       }
     },
-    [articleId, projectId]
+    [articleId, projectId, setArticle]
   );
 
   const handleSaveEvidence = useCallback(
@@ -263,7 +206,7 @@ function useArticleDetailsPage() {
         setIsSavingEvidence(false);
       }
     },
-    [articleId, projectId]
+    [articleId, projectId, setArticle, setArticleList, setSelectionSummary]
   );
 
   const handleDeleteArticle = useCallback(async () => {
@@ -285,8 +228,11 @@ function useArticleDetailsPage() {
     articleListTotal,
     articleListLoading,
     articleId,
+    articlePending: !remoteArticle && (loading || Boolean(error)),
     backUrl,
     error,
+    projectError: projectResource.error,
+    articleListError: queueResource.error,
     handleDeleteArticle,
     handleEligibilityDecision,
     handleSaveEvidence,

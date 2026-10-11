@@ -24,7 +24,11 @@ const libraryState = {
   setSelectedProjectId: vi.fn(),
 };
 
-vi.mock("@/features/articles", () => ({
+vi.mock("@features/articles/public/components", () => ({
+  ArticleLibraryDetailPanel: () => null,
+  useArticlesLibraryPage: () => libraryState,
+}));
+vi.mock("@features/articles/public/hooks", () => ({
   ArticleLibraryDetailPanel: () => null,
   useArticlesLibraryPage: () => libraryState,
 }));

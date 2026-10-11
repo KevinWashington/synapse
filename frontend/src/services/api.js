@@ -1,6 +1,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const SESSION_COOKIE_NAME = import.meta.env.VITE_SESSION_COOKIE_NAME || "synapse_session";
 
+/** @param {any} errorData @param {number} status @returns {import("../types/api").ApiErrorData} */
 function normalizeErrorData(errorData, status) {
   const raw = errorData?.detail ?? errorData;
   const fallbackCode = `HTTP_${status}`;
@@ -45,9 +46,11 @@ class ApiService {
     this.baseURL = API_BASE_URL;
   }
 
+  /** @param {import("../types/api").ApiRequestOptions} options */
   buildRequestConfig(options = {}) {
     const { ...fetchOptions } = options;
 
+    /** @type {any} */
     const config = {
       credentials: "include",
       headers: {
@@ -81,6 +84,7 @@ class ApiService {
     return config;
   }
 
+  /** @param {string} endpoint @param {import("../types/api").ApiRequestOptions} options */
   async requestRaw(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const {
@@ -130,6 +134,7 @@ class ApiService {
     }
   }
 
+  /** @param {string} endpoint @param {import("../types/api").ApiRequestOptions} options */
   async request(endpoint, options = {}) {
     const response = await this.requestRaw(endpoint, options);
 
@@ -210,6 +215,7 @@ class ApiService {
 }
 
 class ApiError extends Error {
+  /** @param {string} message @param {number} status @param {Partial<import("../types/api").ApiErrorData>} data */
   constructor(message, status, data = {}) {
     super(message);
     this.name = "ApiError";

@@ -395,6 +395,9 @@ function exportPlanning(project, data) {
 
 function ProjectPlanning({ project = {}, onDirtyChange, onProjectUpdated }) {
   const {
+    catalogReady,
+    catalogError,
+    reloadCatalog,
     addExtractionField,
     addArrayItem,
     addQualityCriterion,
@@ -469,24 +472,25 @@ function ProjectPlanning({ project = {}, onDirtyChange, onProjectUpdated }) {
   );
 
   const generateButton = (loading, onClick) => (
-    <Button type="button" variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onClick} disabled={loading}>
+    <Button type="button" variant="outline" size="sm" className="h-9 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onClick} disabled={loading || !catalogReady}>
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
       Gerar
     </Button>
   );
 
+  const visibleFrameworkComponents = frameworkComponents.length ? frameworkComponents : Object.keys(data.picoc || {}).map((key) => ({ key, labelPt: key }));
   const panels = {
     foundation: (
       <div className="space-y-3">
         {accordion("framework", (
           <div className="divide-y divide-[#edf0f7]">
-            {frameworkComponents.map((component, index) => (
+            {visibleFrameworkComponents.map((component, index) => (
               <div key={component.key} className="grid gap-3 py-3 md:grid-cols-[190px_1fr] md:items-center">
                 <div className="flex items-center gap-3 text-sm font-semibold text-[#253252]">
                   <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg text-xs", COMPONENT_COLORS[index % COMPONENT_COLORS.length])}>{component.labelPt.slice(0, 1)}</span>
                   {component.labelPt}
                 </div>
-                <Input value={data.picoc?.[component.key] || ""} onChange={(event) => updateComponent(component.key, event.target.value)} placeholder={component.placeholder} aria-label={component.labelPt} className="h-10 border-[#dfe4ef] bg-white text-sm text-[#253252] shadow-none" />
+                <Input readOnly={!catalogReady} value={data.picoc?.[component.key] ?? ""} onChange={(event) => updateComponent(component.key, event.target.value)} placeholder={component.placeholder} aria-label={component.labelPt} className="h-10 border-[#dfe4ef] bg-white text-sm text-[#253252] shadow-none" />
               </div>
             ))}
           </div>
@@ -578,6 +582,7 @@ function ProjectPlanning({ project = {}, onDirtyChange, onProjectUpdated }) {
 
   return (
     <div className={cn("min-w-0 space-y-5", isDirty && "pb-24")}>
+      {catalogError ? <div role="alert">{catalogError.message}<Button variant="outline" onClick={reloadCatalog}>Tentar novamente</Button></div> : null}
       <PlanningEditorHeader completed={planningState.completed} total={planningState.total} percent={planningState.percent} onExport={() => exportPlanning(project, data)} onOpenSearch={() => setSearchOpen(true)} />
       <PlanningTabs activeTab={activeTab} onTabChange={setActiveTab} panels={panels} tabs={planningState.tabs} />
 
@@ -589,7 +594,7 @@ function ProjectPlanning({ project = {}, onDirtyChange, onProjectUpdated }) {
           </div>
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
             <Button type="button" variant="outline" onClick={discardChanges} disabled={loadingMap.save} className="h-10 min-w-0 border-[#dfe4ef] bg-white">Descartar</Button>
-            <Button type="button" onClick={handleSave} disabled={loadingMap.save} className="h-10 min-w-0 gap-2 bg-[#6259ff] px-5 text-white hover:bg-[#5148ee]">
+            <Button type="button" onClick={handleSave} disabled={loadingMap.save || !catalogReady} className="h-10 min-w-0 gap-2 bg-[#6259ff] px-5 text-white hover:bg-[#5148ee]">
               {loadingMap.save ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Salvar alterações
             </Button>

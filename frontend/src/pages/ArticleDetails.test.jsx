@@ -50,7 +50,7 @@ vi.mock("@/features/inbox/services/inboxService", () => ({ inboxService: {
   getInbox: async () => ({ notifications: [], invitations: [], unreadNotificationCount: 0, pendingInvitationCount: 0 }),
 } }));
 
-vi.mock("@/features/articles", () => ({
+vi.mock("@features/articles/public/hooks", () => ({
   useArticleDetailsPage: () => ({
     article,
     articleList,

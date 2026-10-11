@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { projectService } from "@features/projects/services/projectService";
+import { projectService } from "@features/projects/public/services";
 import { articleService } from "@features/articles/services/articleService";
 
 const ARTICLE_PAGE_SIZE = 20;

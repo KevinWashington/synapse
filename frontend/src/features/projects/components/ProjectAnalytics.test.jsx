@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectAnalytics from "./ProjectAnalytics";
-import { articleService } from "@/features/articles/services/articleService";
-import { synthesisService } from "@/features/articles/services/synthesisService";
+import { articleService } from "@features/articles/public/services";
+import { synthesisService } from "@features/articles/public/services";
 import { projectService } from "@/features/projects/services/projectService";
 
 vi.mock("@/features/articles/services/articleService", () => ({ articleService: { getArticlesByProject: vi.fn(), getProjectGraph: vi.fn(), exportSelectionReport: vi.fn() } }));

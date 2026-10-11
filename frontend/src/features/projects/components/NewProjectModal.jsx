@@ -20,10 +20,12 @@ import {
 } from "@/components/ui/Dialog";
 import { LoaderIcon, PlusIcon, CheckIcon } from "lucide-react";
 import { toast } from "@/lib/toast";
-import { FRAMEWORKS } from "@/lib/frameworkConfig";
+import { getFrameworkInfo } from "@/lib/frameworkConfig";
+import { useFrameworkCatalog } from "../hooks/useFrameworkCatalog";
 import { projectService } from "@features/projects/services/projectService";
 
 function NewProjectModal({ isOpen, onClose, onSuccess }) {
+  const catalog = useFrameworkCatalog();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -31,6 +33,7 @@ function NewProjectModal({ isOpen, onClose, onSuccess }) {
     status: "ideia",
     framework: "PICOC",
   });
+  const catalogReady = !catalog.loading && !catalog.error && catalog.frameworks.some((item) => item.name === formData.framework);
   const [errors, setErrors] = useState({});
 
   const handleInputChange = (field, value) => {
@@ -58,7 +61,7 @@ function NewProjectModal({ isOpen, onClose, onSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!catalogReady || !validateForm()) return;
 
     try {
       setLoading(true);
@@ -89,7 +92,7 @@ function NewProjectModal({ isOpen, onClose, onSuccess }) {
     onClose();
   };
 
-  const frameworkKeys = Object.keys(FRAMEWORKS);
+  const frameworkKeys = catalog.frameworks.map((item) => item.name);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -105,6 +108,7 @@ function NewProjectModal({ isOpen, onClose, onSuccess }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5 py-2">
+          {catalog.error ? <div role="alert">{catalog.error.message}<Button type="button" variant="outline" onClick={catalog.reload}>Tentar novamente</Button></div> : null}
           {/* Título */}
           <div className="space-y-2">
             <Label htmlFor="title">
@@ -156,7 +160,7 @@ function NewProjectModal({ isOpen, onClose, onSuccess }) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {frameworkKeys.map((fw) => {
-                const info = FRAMEWORKS[fw];
+                const info = getFrameworkInfo(fw, catalog.frameworks);
                 const isSelected = formData.framework === fw;
                 return (
                   <button
@@ -238,7 +242,7 @@ function NewProjectModal({ isOpen, onClose, onSuccess }) {
             <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="gap-2">
+            <Button type="submit" disabled={loading || !catalogReady} className="gap-2">
               {loading ? (
                 <>
                   <LoaderIcon className="w-4 h-4 animate-spin" />

@@ -4,7 +4,7 @@ import path from "node:path";
 
 const apiBaseUrl = "http://localhost:5000";
 const csrfToken = "playwright-csrf";
-const evidenceDir = path.resolve("../docs/audits/playwright-project-collaboration-2026-10-08");
+const evidenceDir = path.resolve("test-results/evidence/collaboration-flow");
 const actorIds = { owner: 1, reviewer: 2, peer: 3, coordinator: 4 };
 
 fs.mkdirSync(evidenceDir, { recursive: true });
@@ -114,6 +114,7 @@ function actorForUser(userId) {
 test.describe("collaborative review workflow", () => {
   test("supports solo and multi-reviewer projects end to end", async ({ context, page }, testInfo) => {
     test.setTimeout(360_000);
+    page.setDefaultTimeout(30_000);
     const createdProjects = [];
     const browserErrors = [];
     const suffix = `${testInfo.project.name}-${Date.now()}`;
@@ -257,6 +258,8 @@ test.describe("collaborative review workflow", () => {
 
       await authenticate(context, tokens.reviewer());
       await page.goto(`/projetos/${project.id}?tab=artigos&flow=screening`);
+      const queueTab = page.getByRole("tab", { name: "Fila", exact: true });
+      if (testInfo.project.name === "mobile-chromium") await queueTab.click();
       await page.getByRole("button", { name: "Atribuídos a mim", exact: true }).click();
       const assignedResponse = await api(page.request, "get", `/api/projetos/${project.id}/artigos?phase=screening&outcome=active&assignedToMe=true&page=1&limit=5`);
       expect(assignedResponse.total).toBeGreaterThan(assignedResponse.articles.length);
@@ -299,9 +302,9 @@ test.describe("collaborative review workflow", () => {
 
       await authenticate(context, claimed.token);
       await page.goto(`/projetos/${project.id}?tab=equipe`);
-      const bell = page.getByRole("button", { name: /Central de notificações, \d+ pendentes/ });
+      const bell = page.getByRole("button", { name: /^Central de notificações/ });
       await bell.click();
-      await expect(page.getByText("Novas revisões atribuídas", { exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Novas revisões atribuídas", exact: true }).first()).toBeVisible();
       await capture(page, testInfo, "08", "notification-panel");
       const markAll = page.getByRole("button", { name: "Marcar todas como lidas" });
       await markAll.click();

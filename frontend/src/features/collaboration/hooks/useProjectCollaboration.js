@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collaborationService } from "../services/collaborationService";
-import { projectService } from "@features/projects/services/projectService";
+import { projectService } from "@features/projects/public/services";
 
 const emptyState = () => ({
   members: [],

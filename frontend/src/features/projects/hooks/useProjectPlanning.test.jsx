@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@features/projects/services/projectService", () => ({
   projectService: {
+    getFrameworks: vi.fn().mockResolvedValue([{ name: "PICOC", components: [{ key: "population", required: true }, { key: "intervention", required: true }, { key: "comparison", required: false }, { key: "outcome", required: true }, { key: "context", required: true }] }]),
     updateProject: mocks.updateProject,
   },
 }));
@@ -69,6 +70,7 @@ describe("useProjectPlanning dirty state", () => {
     mocks.updateProject.mockResolvedValue(updatedProject);
 
     act(() => result.current.updateField("objetivo", "Novo objetivo"));
+    await waitFor(() => expect(result.current.catalogReady).toBe(true));
     await act(async () => result.current.handleSave());
 
     expect(result.current.data.objetivo).toBe("Novo objetivo");
@@ -80,6 +82,7 @@ describe("useProjectPlanning dirty state", () => {
     mocks.updateProject.mockRejectedValue(new Error("Falha de rede"));
 
     act(() => result.current.updateField("objetivo", "Objetivo não salvo"));
+    await waitFor(() => expect(result.current.catalogReady).toBe(true));
     await act(async () => result.current.handleSave());
 
     expect(result.current.data.objetivo).toBe("Objetivo não salvo");
@@ -113,4 +116,15 @@ describe("useProjectPlanning dirty state", () => {
       label: "Risco de viés",
     });
   });
+});
+
+it("preserves an unknown project's framework and component values while disabling catalog actions", async () => {
+  const value = { ...project, framework: "LEGACY", picoc: { custom: "Texto local" } };
+  const { result } = renderHook(() => useProjectPlanning(value));
+  await waitFor(() => expect(result.current.catalogError?.message).toContain("LEGACY"));
+  expect(result.current.framework).toBe("LEGACY");
+  expect(result.current.data.picoc).toEqual({ custom: "Texto local" });
+  expect(result.current.catalogReady).toBe(false);
+  await act(async () => result.current.handleSave());
+  expect(mocks.updateProject).not.toHaveBeenCalled();
 });

@@ -20,7 +20,7 @@ test("analytics uses a connected workspace with scoped filters and accessible se
   await expect.poll(() => page.locator(".recharts-bar-rectangle path").first().evaluate((element) => element.getBBox().height)).toBeGreaterThan(150);
   await expect.poll(() => page.locator(".recharts-sector").first().evaluate((element) => element.getBBox().width)).toBeGreaterThan(159);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await page.screenshot({ path: `../docs/audits/analytics-panorama-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/evidence/analytics-panorama-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("combobox", { name: "Período" }).click();
   await page.getByRole("option", { name: "2025", exact: true }).click();
   await expect(page.getByText("Registros no recorte").locator("..")).toHaveText("Registros no recorte12");
@@ -28,7 +28,7 @@ test("analytics uses a connected workspace with scoped filters and accessible se
   await expect(page.getByText("Acesso limitado a equipamentos e conectividade.")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Período" })).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await page.screenshot({ path: `../docs/audits/analytics-rqs-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/evidence/analytics-rqs-${testInfo.project.name}.png`, fullPage: true });
   await navigation.getByRole("button", { name: "Relações entre artigos" }).click();
   await expect(page.getByText(/Adicione artigos ao projeto/)).toBeVisible();
   await navigation.getByRole("button", { name: "Panorama" }).click();

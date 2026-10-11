@@ -12,7 +12,7 @@ const ArticlesPage = lazy(() => import("@/pages/Articles"));
 const AIChatPage = lazy(() => import("@/pages/AIChat"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 const DashboardPage = lazy(() => import("@/pages/Dashboard"));
-const LayoutPage = lazy(() => import("@/pages/Layout"));
+const LayoutPage = lazy(() => import("@/app/AppShell"));
 const LoginPage = lazy(() => import("@/pages/Login"));
 const ProjectDetailsPage = lazy(() => import("@/pages/ProjectDetails"));
 const ProjectsPage = lazy(() => import("@/pages/Projects"));

@@ -23,7 +23,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/Button";
-import { articleService } from "@/features/articles/services/articleService";
+import { articleService } from "@features/articles/public/services";
 import { projectService } from "@/features/projects/services/projectService";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";

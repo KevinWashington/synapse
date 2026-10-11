@@ -4,6 +4,7 @@ import {
   getFrameworkInfo,
   getRequiredKeys,
 } from "@/lib/frameworkConfig";
+import { useFrameworkCatalog } from "./useFrameworkCatalog";
 import { toast } from "@/lib/toast";
 import { projectService } from "@features/projects/services/projectService";
 import {
@@ -37,15 +38,7 @@ const INITIAL_DATA = {
   selectionReportNotes: "",
 };
 
-function buildFrameworkData(rawPicoc, framework) {
-  const source = rawPicoc || {};
-  const components = getComponentsForFramework(framework);
-
-  return components.reduce((result, component) => {
-    result[component.key] = source[component.key] || "";
-    return result;
-  }, {});
-}
+function buildFrameworkData(rawPicoc) { return { ...(rawPicoc || {}) }; }
 
 function buildInitialData(project, framework) {
   if (!project || Object.keys(project).length === 0) {
@@ -90,13 +83,15 @@ function stableSerialize(value) {
 
 export default function useProjectPlanning(project = {}, onProjectUpdated) {
   const framework = project.framework || "PICOC";
+  const catalog = useFrameworkCatalog();
+  const catalogReady = !catalog.loading && !catalog.error && catalog.frameworks.some((item) => item.name === framework);
 
-  const frameworkInfo = useMemo(() => getFrameworkInfo(framework), [framework]);
+  const frameworkInfo = useMemo(() => getFrameworkInfo(framework, catalog.frameworks), [framework, catalog.frameworks]);
   const frameworkComponents = useMemo(
-    () => getComponentsForFramework(framework),
-    [framework]
+    () => getComponentsForFramework(framework, catalog.frameworks),
+    [framework, catalog.frameworks]
   );
-  const requiredKeys = useMemo(() => getRequiredKeys(framework), [framework]);
+  const requiredKeys = useMemo(() => getRequiredKeys(framework, catalog.frameworks), [framework, catalog.frameworks]);
 
   const [data, setData] = useState(() => buildInitialData(project, framework));
   const [targetDatabase, setTargetDatabase] = useState("scopus");
@@ -263,8 +258,8 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
   );
 
   const hasRequiredComponentsFilled = useMemo(
-    () => requiredKeys.every((key) => data.picoc[key]?.trim()),
-    [data.picoc, requiredKeys]
+    () => catalogReady && requiredKeys.every((key) => data.picoc[key]?.trim()),
+    [catalogReady, data.picoc, requiredKeys]
   );
 
   const projectMetadata = useMemo(
@@ -300,6 +295,7 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
   );
 
   const handleSave = useCallback(async () => {
+    if (!catalogReady) return;
     if (!data.title.trim()) {
       toast.warning("Título é obrigatório");
       return;
@@ -324,7 +320,7 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
     } finally {
       setActionLoading("save", false);
     }
-  }, [data, framework, onProjectUpdated, project.id, setActionLoading]);
+  }, [catalogReady, data, framework, onProjectUpdated, project.id, setActionLoading]);
 
   const generateResearchQuestions = useCallback(async () => {
     if (!ensureRequiredComponents("antes de gerar perguntas")) {
@@ -548,6 +544,9 @@ export default function useProjectPlanning(project = {}, onProjectUpdated) {
   ]);
 
   return {
+    catalogReady,
+    catalogError: catalog.error || (!catalog.loading && !catalogReady ? new Error(`Framework indispon?vel: ${framework}`) : null),
+    reloadCatalog: catalog.reload,
     addExtractionField,
     addArrayItem,
     addQualityCriterion,

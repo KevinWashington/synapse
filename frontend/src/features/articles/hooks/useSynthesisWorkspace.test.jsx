@@ -10,6 +10,7 @@ vi.mock("../services/synthesisService", () => ({ synthesisService: {
   getRQDetail: vi.fn().mockResolvedValue({ rqNumber: 1, question: "Question", questionFingerprint: "abc", draft: null }),
   getEvidence: vi.fn().mockResolvedValue({ items: [], total: 0 }),
   save: vi.fn(),
+  getGeneration: vi.fn(),
 } }));
 
 describe("useSynthesisWorkspace", () => {
@@ -53,4 +54,27 @@ describe("useSynthesisWorkspace", () => {
     expect(result.current.draft.content.narrative).toBe("Texto local ainda não salvo");
     expect(result.current.draft.conflict).toMatchObject({ code: "SYNTHESIS_VERSION_CONFLICT", message: "A síntese foi atualizada por outra pessoa." });
   });
+});
+
+it("hydrates the completed generation after its deferred detail request", async () => {
+  let poll;
+  const realInterval = window.setInterval.bind(window);
+  const interval = vi.spyOn(window, "setInterval").mockImplementation((callback, delay) => { if (delay === 2000) { poll = callback; return 42; } return realInterval(callback, delay); });
+  try {
+    synthesisService.getRQs.mockResolvedValue({ items: [{ rqNumber: 1 }], total: 1 });
+    synthesisService.getRQDetail.mockResolvedValue({ rqNumber: 1, questionFingerprint: "abc", activeGeneration: { id: 5, status: "queued" }, draft: null });
+    synthesisService.getGeneration.mockResolvedValue({ id: 5, status: "completed" });
+    const { result, unmount } = renderHook(() => useSynthesisWorkspace({ projectId: 8, canEdit: true }));
+    await waitFor(() => expect(result.current.resources.detail.data?.activeGeneration?.id).toBe(5));
+    let finishDetail;
+    synthesisService.getRQDetail.mockImplementation(() => new Promise((resolve) => { finishDetail = resolve; }));
+    const overviewCalls = synthesisService.getOverview.mock.calls.length;
+    let pending;
+    await act(async () => { pending = poll(); await Promise.resolve(); });
+    await act(async () => { finishDetail({ rqNumber: 1, draft: { version: 2, content: { narrative: "Generated" } }, activeGeneration: null }); await pending; });
+    expect(result.current.draft.content?.narrative).toBe("Generated");
+    expect(result.current.draft.baseVersion).toBe(2);
+    expect(synthesisService.getOverview.mock.calls.length).toBeGreaterThan(overviewCalls);
+    unmount();
+  } finally { interval.mockRestore(); }
 });

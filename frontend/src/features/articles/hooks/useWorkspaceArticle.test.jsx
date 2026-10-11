@@ -79,3 +79,13 @@ describe("useWorkspaceArticle", () => {
     expect(mocks.getPdfData).not.toHaveBeenCalled();
   });
 });
+
+it("exposes detail load errors and supports a retry", async () => {
+  mocks.getArticleById.mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce({ id: 4, abstract: "Ready", hasPdf: false });
+  const { result } = renderHook(() => useWorkspaceArticle({ projectId: 2, article: { id: 4 }, activeStage: "included" }));
+  await waitFor(() => expect(result.current.error?.message).toBe("offline"));
+  expect(result.current.isReady).toBe(false);
+  await act(async () => result.current.refreshArticle());
+  expect(result.current.error).toBeNull();
+  expect(result.current.isReady).toBe(true);
+});

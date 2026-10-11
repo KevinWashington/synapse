@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 
-const evidenceDir = path.resolve("../docs/audits/synthesis-workspace-2026-10-10");
+const evidenceDir = path.resolve("test-results/evidence/synthesis-workspace");
 
 test("synthesis workspace remains contained and traceable across its four modes", async ({ page }, testInfo) => {
   test.setTimeout(90_000);

@@ -467,3 +467,17 @@ describe("identification stage summary", () => {
     ).toEqual(["Únicos na fila", "Possíveis duplicatas"]);
   });
 });
+
+it("shows a failed workspace detail request and disables evidence writes until retry succeeds", async () => {
+  const included = { ...article, currentPhase: "included", reviewOutcome: "included", extractionData: { result: "Local" } };
+  vi.spyOn(articleService, "getArticlesByProject").mockResolvedValue({ articles: [included], total: 1 });
+  vi.spyOn(articleService, "getArticleById").mockRejectedValueOnce(new Error("offline detail")).mockResolvedValue(included);
+  vi.spyOn(articleService, "getSelectionSummary").mockResolvedValue({ included: 1 });
+  vi.spyOn(articleService, "getSelectionReport").mockResolvedValue({});
+  vi.spyOn(articleService, "getDuplicateCandidates").mockResolvedValue([]);
+  render(<MemoryRouter initialEntries={["/projetos/7?flow=included"]}><ProjectArticles onNavigate={vi.fn()} project={{ id: 7, capabilities: ["edit_project"], dataExtractionSchema: [{ key: "result", label: "Resultado", type: "text" }] }} /></MemoryRouter>);
+  expect(await screen.findByRole("alert")).toHaveTextContent("offline detail");
+  expect(screen.getByRole("button", { name: "Salvar rascunho" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Salvar rascunho" })).toBeEnabled());
+});

@@ -43,7 +43,12 @@ const projectPageState = {
   showNewProjectModal: false,
 };
 
-vi.mock("@/features/projects", () => ({
+vi.mock("@features/projects/public/components", () => ({
+  EditProjectPanel: () => null,
+  NewProjectModal: () => null,
+  useProjectsPage: () => projectPageState,
+}));
+vi.mock("@features/projects/public/hooks", () => ({
   EditProjectPanel: () => null,
   NewProjectModal: () => null,
   useProjectsPage: () => projectPageState,

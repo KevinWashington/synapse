@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { articleService } from "@features/articles/services/articleService";
 import { toggleVisibleSelection } from "@features/articles/utils/reviewFlow";
+import { useRemoteResource } from "@/hooks/useRemoteResource";
 import { toast } from "@/lib/toast";
 
 const PHASE_FILTERS = {
@@ -19,24 +20,20 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     const requestedFlow = searchParams.get("flow");
     return FLOW_TABS.has(requestedFlow) ? requestedFlow : "identification";
   });
-  const [articles, setArticles] = useState([]);
   const [articlePage, setArticlePage] = useState(1);
-  const [articleTotal, setArticleTotal] = useState(0);
   const [assignedToMe, setAssignedToMeState] = useState(false);
-  const articleRequest = useRef(0);
   const [searchTermsByFlow, setSearchTermsByFlow] = useState({});
-  const [summary, setSummary] = useState(null);
-  const [report, setReport] = useState(null);
-  const [duplicateCandidates, setDuplicateCandidates] = useState([]);
-  const [isLoadingArticles, setIsLoadingArticles] = useState(false);
-  const [isLoadingSummary, setIsLoadingSummary] = useState(false);
-  const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isLoadingDuplicates, setIsLoadingDuplicates] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
   const [isPromotingUnique, setIsPromotingUnique] = useState(false);
   const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
   const [selectedDuplicateMap, setSelectedDuplicateMap] = useState({});
+  useEffect(() => {
+    setSelectedIdentificationIds([]);
+    setSelectedDuplicateMap({});
+    setArticlePage(1);
+  }, [project?.id]);
   const searchTerm = searchTermsByFlow[activeFlowTab] || "";
   const articleContext = useRef(null);
   articleContext.current = {
@@ -92,119 +89,43 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     setArticlePage(1);
   }, []);
 
-  const loadSummary = useCallback(async () => {
-    if (!project?.id) {
-      return;
-    }
-    try {
-      setIsLoadingSummary(true);
-      const response = await articleService.getSelectionSummary(project.id);
-      setSummary(response);
-    } catch (error) {
-      console.error("Erro ao carregar resumo do funil:", error);
-    } finally {
-      setIsLoadingSummary(false);
-    }
-  }, [project?.id]);
-
-  const loadReport = useCallback(async () => {
-    if (!project?.id) {
-      return;
-    }
-    try {
-      setIsLoadingReport(true);
-      const response = await articleService.getSelectionReport(project.id);
-      setReport(response);
-    } catch (error) {
-      console.error("Erro ao carregar relatorio:", error);
-    } finally {
-      setIsLoadingReport(false);
-    }
-  }, [project?.id]);
-
-  const loadDuplicateCandidates = useCallback(async () => {
-    if (!project?.id) {
-      return;
-    }
-    try {
-      setIsLoadingDuplicates(true);
-      const response = await articleService.getDuplicateCandidates(project.id);
-      setDuplicateCandidates(response || []);
-      setSelectedDuplicateMap((current) => {
-        const next = {};
-        (response || []).forEach((group) => {
-          next[group.groupKey] = current[group.groupKey] || group.candidateIds?.[0] || null;
-        });
-        return next;
-      });
-    } catch (error) {
-      console.error("Erro ao carregar duplicatas:", error);
-      setDuplicateCandidates([]);
-    } finally {
-      setIsLoadingDuplicates(false);
-    }
-  }, [project?.id]);
-
-  const loadArticles = useCallback(async (flowOverride, pageOverride) => {
-    if (!project?.id) {
-      return;
-    }
+  const fetchSummary = useCallback(() => articleService.getSelectionSummary(project.id), [project?.id]);
+  const summaryResource = useRemoteResource({ key: project?.id, enabled: Boolean(project?.id), load: fetchSummary });
+  const { data: summary, loading: isLoadingSummary, reload: loadSummary } = summaryResource;
+  const fetchReport = useCallback(() => articleService.getSelectionReport(project.id), [project?.id]);
+  const reportResource = useRemoteResource({ key: project?.id, enabled: Boolean(project?.id), load: fetchReport });
+  const { data: report, loading: isLoadingReport, reload: loadReport } = reportResource;
+  const fetchDuplicates = useCallback(() => articleService.getDuplicateCandidates(project.id), [project?.id]);
+  const duplicatesResource = useRemoteResource({ key: project?.id, enabled: Boolean(project?.id), load: fetchDuplicates });
+  const duplicateCandidates = useMemo(() => duplicatesResource.data || [], [duplicatesResource.data]);
+  const loadDuplicateCandidates = duplicatesResource.reload;
+  const setDuplicateCandidates = duplicatesResource.setData;
+  useEffect(() => {
+    setSelectedDuplicateMap((current) => Object.fromEntries((duplicatesResource.data || []).map((group) => [group.groupKey, current[group.groupKey] || group.candidateIds?.[0] || null])));
+  }, [duplicatesResource.data]);
+  const fetchArticles = useCallback(async (flowOverride, pageOverride) => {
     const context = articleContext.current;
-    const resolvedFlowTab = FLOW_TABS.has(flowOverride) ? flowOverride : context.activeFlowTab;
-    const resolvedPage = pageOverride ?? context.articlePage;
-    const request = ++articleRequest.current;
-    const currentSearchTerm = context.searchTermsByFlow[resolvedFlowTab] || "";
-
-    if (!PHASE_FILTERS[resolvedFlowTab]) {
-      setArticles([]);
-      setArticleTotal(0);
-      return;
-    }
-
-    try {
-      setIsLoadingArticles(true);
-      const response = await articleService.getArticlesByProject(project.id, {
-        ...PHASE_FILTERS[resolvedFlowTab],
-        search: currentSearchTerm || undefined,
-        page: resolvedPage,
-        limit: ARTICLE_PAGE_SIZE,
-        ...(context.assignedToMe && ["screening", "eligibility"].includes(resolvedFlowTab) ? { assignedToMe: true } : {}),
-      });
-      if (request !== articleRequest.current) return;
-      const nextArticles = response.articles || [];
-      const nextTotal = response.total || 0;
-      const lastPage = Math.max(1, Math.ceil(nextTotal / ARTICLE_PAGE_SIZE));
-
-      setArticleTotal(nextTotal);
-      if (nextTotal > 0 && nextArticles.length === 0 && resolvedPage > lastPage) {
-        setArticlePage(lastPage);
-        return;
-      }
-
-      setArticles(nextArticles);
-      if (resolvedFlowTab !== "identification") {
-        setSelectedIdentificationIds([]);
-      }
-    } catch (error) {
-      if (request !== articleRequest.current) return;
-      console.error("Erro ao carregar artigos:", error);
-      setArticles([]);
-      setArticleTotal(0);
-    } finally {
-      if (request === articleRequest.current) setIsLoadingArticles(false);
-    }
+    const flow = FLOW_TABS.has(flowOverride) ? flowOverride : context.activeFlowTab;
+    const page = pageOverride ?? context.articlePage;
+    const response = await articleService.getArticlesByProject(project.id, {
+      ...PHASE_FILTERS[flow], search: context.searchTermsByFlow[flow] || undefined,
+      page, limit: ARTICLE_PAGE_SIZE,
+      ...(context.assignedToMe && ["screening", "eligibility"].includes(flow) ? { assignedToMe: true } : {}),
+    });
+    return response;
   }, [project?.id]);
-
+  const articlesResource = useRemoteResource({ key: JSON.stringify([project?.id, activeFlowTab, articlePage, assignedToMe, searchTerm]), enabled: Boolean(project?.id), load: fetchArticles });
+  const articles = useMemo(() => articlesResource.data?.articles || [], [articlesResource.data]);
+  const articleTotal = articlesResource.data?.total || 0;
+  const isLoadingArticles = articlesResource.loading;
+  const loadArticles = articlesResource.reload;
   useEffect(() => {
-    loadSummary();
-    loadReport();
-    loadDuplicateCandidates();
-  }, [loadDuplicateCandidates, loadReport, loadSummary]);
-
-  useEffect(() => {
-    loadArticles(activeFlowTab, articlePage);
-    return () => { articleRequest.current += 1; };
-  }, [activeFlowTab, articlePage, assignedToMe, loadArticles, searchTermsByFlow]);
+    const response = articlesResource.data;
+    if (!response) return;
+    const lastPage = Math.max(1, Math.ceil((response.total || 0) / ARTICLE_PAGE_SIZE));
+    if (response.total > 0 && !response.articles?.length && articlePage > lastPage) setArticlePage(lastPage);
+    if (activeFlowTab !== "identification") setSelectedIdentificationIds([]);
+  }, [activeFlowTab, articlePage, articlesResource.data]);
 
   const refreshAll = useCallback(
     async ({ targetFlowTab } = {}) => {
@@ -269,7 +190,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     } finally {
       setIsLoadingDuplicates(false);
     }
-  }, [project?.id, refreshAll]);
+  }, [project?.id, refreshAll, setDuplicateCandidates]);
 
   const applyDuplicateReview = useCallback(async () => {
     if (!project?.id || duplicateCandidates.length === 0) {
@@ -456,7 +377,8 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     identificationArticles,
     isBatchEvaluating,
     isLoadingArticles,
-    isLoadingDuplicates,
+    isLoadingDuplicates: isLoadingDuplicates || duplicatesResource.loading,
+    remoteErrors: [articlesResource.error, summaryResource.error, reportResource.error, duplicatesResource.error].filter(Boolean),
     isLoadingReport,
     isLoadingSummary,
     isPromotingUnique,

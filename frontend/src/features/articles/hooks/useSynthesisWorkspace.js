@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRemoteResource } from "@/hooks/useRemoteResource";
 import { synthesisService } from "../services/synthesisService";
 
 const emptyResource = { data: null, loading: false, error: null };
@@ -9,29 +10,39 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
   const [filters, setFilters] = useState({});
   const [pages, setPages] = useState({ rqs: 1, evidence: 1, matrix: 1, chart: 1, quality: 1 });
   const [resources, setResources] = useState({ overview: emptyResource, rqs: emptyResource, detail: emptyResource, evidence: emptyResource, matrix: emptyResource, chartCatalog: emptyResource, chart: emptyResource, criteria: emptyResource, quality: emptyResource, study: emptyResource });
+  const resourcesProject = useRef(projectId);
   const [draft, setDraftState] = useState({ content: null, baseVersion: 0, dirty: false, conflict: null });
+  const overviewLoader = useCallback(() => synthesisService.getOverview(projectId), [projectId]);
+  const overviewResource = useRemoteResource({ key: projectId, enabled: Boolean(projectId), load: overviewLoader });
+  const reloadOverview = overviewResource.reload;
   const requestSequence = useRef({});
+  const currentProject = useRef(projectId);
+  currentProject.current = projectId;
+  const mounted = useRef(true);
+  useEffect(() => { const requests = requestSequence.current; mounted.current = true; return () => { mounted.current = false; Object.keys(requests).forEach((key) => { requests[key] += 1; }); }; }, []);
   const updateResource = useCallback((key, patch) => setResources((current) => ({ ...current, [key]: { ...current[key], ...(typeof patch === "function" ? patch(current[key]) : patch) } })), []);
   const load = useCallback(async (key, fn) => {
     if (!projectId) return null;
+    if (key === "overview") return reloadOverview();
     const id = (requestSequence.current[key] || 0) + 1;
     requestSequence.current[key] = id;
     updateResource(key, { loading: true, error: null });
     try {
       const data = await fn();
-      if (requestSequence.current[key] === id) {
+      if (mounted.current && currentProject.current === projectId && requestSequence.current[key] === id) {
         updateResource(key, { data, loading: false });
         return data;
       }
       return null;
     } catch (error) {
-      if (requestSequence.current[key] === id) updateResource(key, { loading: false, error });
+      if (mounted.current && currentProject.current === projectId && requestSequence.current[key] === id) updateResource(key, { loading: false, error });
       return null;
     }
-  }, [projectId, updateResource]);
+  }, [reloadOverview, projectId, updateResource]);
 
   useEffect(() => {
     if (!projectId) return;
+    resourcesProject.current = projectId;
     setMode("rqs");
     setSelection({ rqNumber: null, articleId: null, chartKey: null, criterionKey: "overall" });
     setFilters({});
@@ -39,7 +50,6 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
     setDraftState({ content: null, baseVersion: 0, dirty: false, conflict: null });
     setResources({ overview: emptyResource, rqs: emptyResource, detail: emptyResource, evidence: emptyResource, matrix: emptyResource, chartCatalog: emptyResource, chart: emptyResource, criteria: emptyResource, quality: emptyResource, study: emptyResource });
     Object.keys(requestSequence.current).forEach((key) => { requestSequence.current[key] += 1; });
-    load("overview", () => synthesisService.getOverview(projectId));
     load("rqs", () => synthesisService.getRQs(projectId, { page: 1, pageSize: 20 }));
   }, [projectId, load]);
 
@@ -143,19 +153,27 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
     const active = resources.detail.data?.activeGeneration;
     if (!active || !["queued", "running"].includes(active.status) || !selection.rqNumber) return undefined;
     let disposed = false;
+    let inFlight = false;
     const timer = window.setInterval(async () => {
+      if (disposed || inFlight) return;
+      inFlight = true;
+      try {
       const job = await synthesisService.getGeneration(projectId, active.id);
       if (disposed) return;
-      updateResource("detail", (current) => ({ data: { ...current.data, activeGeneration: job } }));
+      if (["queued", "running"].includes(job.status)) updateResource("detail", (current) => ({ data: { ...current.data, activeGeneration: job } }));
       if (!["queued", "running"].includes(job.status)) {
         window.clearInterval(timer);
         const detail = await synthesisService.getRQDetail(projectId, selection.rqNumber);
+        if (disposed) return;
         updateResource("detail", { data: { ...detail, lastGeneration: job }, loading: false });
         if (detail) setDraftState((old) => old.dirty
           ? { ...old, conflict: { code: "SYNTHESIS_VERSION_CONFLICT", message: "A síntese foi atualizada enquanto você editava. Seu texto local foi preservado." } }
           : { content: detail.draft?.content || { narrative: "", keyFindings: [], divergences: [], limitations: [] }, baseVersion: detail.draft?.version || 0, dirty: false, conflict: null });
         await Promise.all([load("overview", () => synthesisService.getOverview(projectId)), load("rqs", () => synthesisService.getRQs(projectId, { ...filters, page: pages.rqs, pageSize: 20 }))]);
       }
+      } catch (error) {
+        if (!disposed) updateResource("detail", { error, loading: false });
+      } finally { inFlight = false; }
     }, 2000);
     return () => { disposed = true; window.clearInterval(timer); };
   }, [filters, load, pages.rqs, projectId, resources.detail.data?.activeGeneration, selection.rqNumber, updateResource]);
@@ -170,5 +188,5 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
     cancel: (id) => synthesisService.cancel(projectId, id),
     export: (kind, params = {}) => synthesisService.export(projectId, kind, { ...filters, ...params }),
   }), [discardDraft, filters, generate, load, projectId, refresh, save, selectRQ, setDraft]);
-  return { mode, setMode, selection, selections: selection, filters, setFilters, pages, resources, draft, actions };
+  return { mode, setMode, selection, selections: selection, filters, setFilters, pages, resources: { ...(resourcesProject.current === projectId ? resources : Object.fromEntries(Object.keys(resources).map((key) => [key, emptyResource]))), overview: overviewResource }, draft, actions };
 }

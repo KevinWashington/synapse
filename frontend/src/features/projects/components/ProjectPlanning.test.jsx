@@ -21,6 +21,7 @@ const project = {
 function buildHookState(overrides = {}) {
   const noop = vi.fn();
   return {
+    catalogReady: true,
     addExtractionField: noop,
     addArrayItem: noop,
     addQualityCriterion: noop,
@@ -201,4 +202,12 @@ describe("ProjectPlanning", () => {
     const editButton = screen.getByRole("button", { name: "Editar Critério 1" });
     expect(editButton.parentElement).not.toHaveClass("opacity-0");
   });
+});
+
+it("keeps stored component values visible when the catalog is unavailable", () => {
+  mocks.hookState = buildHookState({ catalogReady: false, catalogError: new Error("offline"), frameworkComponents: [], isDirty: true });
+  render(<ProjectPlanning project={project} />);
+  expect(screen.getByDisplayValue("Adultos")).toHaveAttribute("readonly");
+  expect(screen.getByRole("button", { name: /Salvar altera/ })).toBeDisabled();
+  expect(screen.getByRole("alert")).toHaveTextContent("offline");
 });

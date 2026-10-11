@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { chatService } from "@services/chatService";
-import { projectService } from "@features/projects/services/projectService";
+import { projectService } from "@features/projects/public/services";
 
 const DEFAULT_WELCOME_MESSAGE = {
   id: "welcome",

@@ -5,6 +5,7 @@ const TONES = {
   danger: { className: "bg-[#ffecef] text-[#d94343]", dot: "bg-[#f04444]" },
 };
 
+/** @param {unknown} value */
 export function hasExtractionValue(value) {
   if (value === null || value === undefined) return false;
   if (typeof value === "string") return value.trim().length > 0;
@@ -13,6 +14,7 @@ export function hasExtractionValue(value) {
   return true;
 }
 
+/** @param {import("../../../types/api").ExtractionArticle} article @param {import("../../../types/api").ExtractionField[]} schema */
 export function getExtractionProgress(article, schema = []) {
   const extractionData = article?.extractionData || {};
   const fields = Array.isArray(schema) ? schema : [];

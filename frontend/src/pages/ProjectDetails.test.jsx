@@ -13,7 +13,45 @@ const mocks = vi.hoisted(() => ({
   capabilities: [],
 }));
 
-vi.mock("@/features/projects", () => ({
+vi.mock("@features/projects/public/components", () => ({
+  EditProjectPanel: () => null,
+  ProjectDetailsHeader: ({ onTabChange, notifications }) => (
+    <nav>
+      <button type="button" onClick={() => onTabChange("artigos")}>
+        Artigos
+      </button>
+      <button type="button" onClick={() => onTabChange("equipe")}>
+        Equipe
+      </button>
+      {notifications}
+    </nav>
+  ),
+  ProjectOverview: () => <div>Visão geral</div>,
+  useProjectDetailsPage: () => ({
+    activeTab: mocks.activeTab,
+    editData: {},
+    editLoading: false,
+    editOpen: false,
+    error: null,
+    graphRefreshToken: 0,
+    handleEditProject: vi.fn(),
+    handleGraphNeedsRefresh: vi.fn(),
+    handleProjectUpdated: vi.fn(),
+    handleSaveEdit: vi.fn(),
+    loading: false,
+    navigate: mocks.navigate,
+    project: {
+      id: mocks.projectId,
+      title: "Revisão de saúde",
+      objetivo: "Objetivo",
+      capabilities: mocks.capabilities,
+    },
+    setActiveTab: mocks.setActiveTab,
+    setEditData: vi.fn(),
+    setEditOpen: vi.fn(),
+  }),
+}));
+vi.mock("@features/projects/public/hooks", () => ({
   EditProjectPanel: () => null,
   ProjectDetailsHeader: ({ onTabChange, notifications }) => (
     <nav>

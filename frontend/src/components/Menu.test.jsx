@@ -103,3 +103,11 @@ describe("Menu", () => {
     expect(screen.getByRole("combobox", { name: "Ordenar projetos" })).toHaveClass("cursor-pointer");
   });
 });
+
+it("renders supplied projects and invokes the shell create action", () => {
+  const onNewProject = vi.fn();
+  render(<MemoryRouter><Menu projects={[{ id: 42, title: "Projeto fornecido" }]} onNewProject={onNewProject} /></MemoryRouter>);
+  expect(screen.getByRole("link", { name: /Projeto fornecido/ })).toHaveAttribute("href", "/projetos/42");
+  fireEvent.click(screen.getByRole("button", { name: "Novo projeto" }));
+  expect(onNewProject).toHaveBeenCalledOnce();
+});

@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import { useAuth } from "@/features/auth";
-import UserInbox from "@/features/inbox/components/UserInbox";
+import { UserInbox } from "@features/inbox/public/components";
 
 function getInitials(name, email) {
   const source = name?.trim() || email?.split("@")[0] || "Conta";

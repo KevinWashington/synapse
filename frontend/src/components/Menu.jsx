@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   BookOpen,
   FileText,
@@ -8,7 +8,7 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   Sheet,
@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/Sheet";
 import ThemeToggle from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
-import { projectService } from "@/features/projects/services/projectService";
 
 const NAV_ITEMS = [
   {
@@ -111,32 +110,8 @@ function ProjectNavItem({ project, index, onItemClick }) {
   );
 }
 
-function SidebarContent({ onItemClick }) {
-  const navigate = useNavigate();
-  const [projects, setProjects] = useState([]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadProjects() {
-      const response = await projectService.getAllProjects({ page: 1, limit: 6 });
-      if (!ignore) {
-        setProjects(response.projects);
-      }
-    }
-
-    loadProjects().catch(() => {
-      if (!ignore) {
-        setProjects([]);
-      }
-    });
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  const visibleProjects = useMemo(() => projects.slice(0, 6), [projects]);
+function SidebarContent({ onItemClick, projects = [], onNewProject }) {
+  const visibleProjects = projects.slice(0, 6);
 
   return (
     <div className="flex h-full flex-col bg-[var(--syn-sidebar-bg)]">
@@ -165,7 +140,7 @@ function SidebarContent({ onItemClick }) {
             type="button"
             onClick={() => {
               onItemClick?.();
-              navigate("/projetos");
+              onNewProject?.();
             }}
             className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[var(--syn-border)] bg-[var(--syn-bg-primary)] text-[var(--syn-text-primary)] transition-colors hover:bg-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
             aria-label="Novo projeto"
@@ -199,7 +174,7 @@ function SidebarContent({ onItemClick }) {
   );
 }
 
-function Menu() {
+function Menu({ projects = [], onNewProject }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
@@ -215,13 +190,13 @@ function Menu() {
             <SheetHeader className="sr-only">
               <SheetTitle>Menu de navegação</SheetTitle>
             </SheetHeader>
-            <SidebarContent onItemClick={() => setIsMobileOpen(false)} />
+            <SidebarContent projects={projects} onNewProject={onNewProject} onItemClick={() => setIsMobileOpen(false)} />
           </SheetContent>
         </Sheet>
       </div>
 
       <aside className="fixed left-0 top-0 z-40 hidden h-full w-[240px] border-r border-[var(--syn-border)] bg-[var(--syn-sidebar-bg)] md:block">
-        <SidebarContent />
+        <SidebarContent projects={projects} onNewProject={onNewProject} />
       </aside>
     </>
   );

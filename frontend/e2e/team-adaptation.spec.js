@@ -28,7 +28,7 @@ test("adaptation is previewed before applying and remains usable with many vacan
   await expect(page.getByText(/118 artigos serão adaptados/)).toBeVisible();
   expect(applied).toBe(false);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await page.screenshot({ path: `../docs/audits/team-adaptation-${testInfo.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: `test-results/evidence/team-adaptation-${testInfo.project.name}.png`, fullPage: true });
   await page.getByRole("button", { name: "Confirmar adaptação" }).click();
   await expect(page.getByText("Distribuição adaptada à equipe atual.")).toBeVisible();
   expect(appliedBody).toEqual({ phase: "screening", fingerprint: "a".repeat(64) });

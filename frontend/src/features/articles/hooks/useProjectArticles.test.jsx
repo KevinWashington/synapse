@@ -48,6 +48,25 @@ describe("useProjectArticles work queues", () => {
     mocks.promoteAllUniqueToScreening.mockResolvedValue({ movedCount: 0 });
   });
 
+  it("does not publish an old project's summary after a project switch", async () => {
+    let finishOld;
+    mocks.getSelectionSummary.mockImplementation((id) => id === 7 ? new Promise((resolve) => { finishOld = resolve; }) : Promise.resolve({ included: 2 }));
+    const { result, rerender } = renderHook(({ id }) => useProjectArticles({ id }), { initialProps: { id: 7 }, wrapper: wrapperAt("/projetos/7?flow=included") });
+    rerender({ id: 8 });
+    await waitFor(() => expect(result.current.summary).toEqual({ included: 2 }));
+    await act(async () => finishOld({ included: 99 }));
+    expect(result.current.summary).toEqual({ included: 2 });
+  });
+
+  it("retains the current queue and exposes an error when refresh fails", async () => {
+    mocks.getArticlesByProject.mockResolvedValueOnce({ articles: [{ id: 11, currentPhase: "included" }], total: 1 }).mockRejectedValueOnce(new Error("offline"));
+    const { result } = renderHook(() => useProjectArticles({ id: 7 }), { wrapper: wrapperAt("/projetos/7?flow=included") });
+    await waitFor(() => expect(result.current.articleTotal).toBe(1));
+    await act(async () => result.current.refreshAll());
+    expect(result.current.articles[0].id).toBe(11);
+    expect(result.current.remoteErrors[0].message).toBe("offline");
+  });
+
   it.each(["screening", "eligibility"])(
     "requests only active %s articles with server pagination",
     async (flow) => {

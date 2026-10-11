@@ -3,34 +3,30 @@ import { AlertTriangleIcon, ArrowLeftIcon, FileTextIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { EmptyState, LoadingState } from "@/components/layout";
-import {
-  EditProjectPanel,
-  ProjectDetailsHeader,
-  ProjectOverview,
-  useProjectDetailsPage,
-} from "@/features/projects";
+import { EditProjectPanel, ProjectDetailsHeader, ProjectOverview } from "@features/projects/public/components";
+import { useProjectDetailsPage } from "@features/projects/public/hooks";
 import { usePageTitle } from "@hooks/usePageTitle";
 import { useSearchParams } from "react-router-dom";
-import { useProjectCollaboration } from "@features/collaboration/hooks/useProjectCollaboration";
+import { useProjectCollaboration } from "@features/collaboration/public/hooks";
 
 const ProjectTeam = lazy(
-  () => import("@features/collaboration/components/ProjectTeam"),
+  () => import("@features/collaboration/public/lazy/ProjectTeam"),
 );
 
 const ProjectArticles = lazy(
-  () => import("@features/articles/components/ProjectArticles"),
+  () => import("@features/articles/public/lazy/ProjectArticles"),
 );
 const ProjectPrismaFlow = lazy(
-  () => import("@features/articles/components/ProjectPrismaFlow"),
+  () => import("@features/articles/public/lazy/ProjectPrismaFlow"),
 );
 const ProjectAnalytics = lazy(
-  () => import("@features/projects/components/ProjectAnalytics"),
+  () => import("@features/projects/public/lazy/ProjectAnalytics"),
 );
 const ProjectPlanning = lazy(
-  () => import("@features/projects/components/ProjectPlanning"),
+  () => import("@features/projects/public/lazy/ProjectPlanning"),
 );
 const SynthesisWorkspacePanel = lazy(
-  () => import("@features/articles/components/SynthesisWorkspacePanel"),
+  () => import("@features/articles/public/lazy/SynthesisWorkspacePanel"),
 );
 
 const PROJECT_TAB_LABELS = {

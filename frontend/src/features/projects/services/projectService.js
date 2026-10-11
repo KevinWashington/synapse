@@ -5,6 +5,11 @@ class ProjectService {
     this.endpoint = "/api/projetos";
   }
 
+  async getFrameworks() {
+    const response = await apiService.get(`${this.endpoint}/frameworks`);
+    return response.frameworks;
+  }
+
   async getAllProjects(filters = {}) {
     try {
       const params = {};

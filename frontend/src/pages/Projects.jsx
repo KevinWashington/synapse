@@ -30,11 +30,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
-import {
-  EditProjectPanel,
-  NewProjectModal,
-  useProjectsPage,
-} from "@/features/projects";
+import { EditProjectPanel, NewProjectModal } from "@features/projects/public/components";
+import { useProjectsPage } from "@features/projects/public/hooks";
 import { usePageTitle } from "@hooks/usePageTitle";
 import { cn } from "@/lib/utils";
 
