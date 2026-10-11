@@ -3,16 +3,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.routers import articles
+from app.services import article_index_service
 
 
 @pytest.mark.asyncio
-async def test_index_sync_failure_does_not_turn_a_committed_decision_into_an_error(monkeypatch):
-    monkeypatch.setattr(
-        articles,
-        "_sync_article_graph_state",
-        AsyncMock(side_effect=RuntimeError("neo4j unavailable")),
-    )
-    monkeypatch.setattr(articles, "_sync_article_vector_payload", AsyncMock())
+async def test_index_sync_failure_does_not_turn_a_committed_decision_into_an_error(monkeypatch, caplog):
+    service = SimpleNamespace(sync=AsyncMock(side_effect=RuntimeError("index unavailable")))
+    monkeypatch.setattr(article_index_service, "get_article_index_service", lambda: service)
 
-    await articles._sync_article_indexes(SimpleNamespace(id=42), db=None)
+    await article_index_service.sync_article_indexes(SimpleNamespace(id=42), db=None)
+
+    assert "Article 42 index synchronization failed" in caplog.text

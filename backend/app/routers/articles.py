@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import asyncio
 import csv
 import hashlib
 import logging
@@ -26,6 +27,7 @@ from app.models.collaboration import ReviewAssignment, ReviewConflict, ReviewDec
 from app.models.project import Project
 from app.models.user import User
 from app.services.ai_service import AIService
+from app.services.article_index_service import get_article_index_service, sync_article_indexes
 from app.services.project_access_service import (
     CAP_EDIT_PROJECT,
     CAP_REVIEW_ASSIGNED,
@@ -104,16 +106,6 @@ ACTIVE_OUTCOME = "active"
 EXCLUDED_OUTCOMES = ("duplicate_removed", "excluded_screening", "full_text_unavailable", "excluded_eligibility")
 
 _INVALID_ANCHOR_CHARS = re.compile(r"[^a-z0-9]+")
-
-
-def _graph_sync_http_error(message: str = "Falha ao sincronizar corpus incluído") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail={
-            "error": "Selection index unavailable",
-            "message": message,
-        },
-    )
 
 
 async def get_project_or_404(projectId: int, ownerId: int, db: AsyncSession) -> Project:
@@ -201,10 +193,6 @@ def _apply_ai_evaluation(article: Article, eval_result: dict) -> None:
     article.aiDatabase = eval_result.get("database")
     article.aiDomain = eval_result.get("domain")
     article.aiKeywords = eval_result.get("keywords", [])
-
-
-def _should_be_indexed(article: Article) -> bool:
-    return article.reviewOutcome == "included"
 
 
 def _set_legacy_state_from_workflow(article: Article) -> None:
@@ -830,67 +818,6 @@ def _build_synthesis_report(project: Project, articles: list[Article]) -> dict:
     }
 
 
-def _build_vector_payload(article: Article, qdrant) -> dict:
-    return qdrant.build_payload(
-        paper_id=article.paperId,
-        project_id=article.projectId,
-        metadata={
-            "article_id": article.id,
-            "title": article.title,
-            "authors": article.authors,
-            "year": article.year,
-            "journal": article.journal,
-            "abstract": article.abstract,
-            "methodology": article.aiMethodology,
-            "domain": article.aiDomain,
-            "keywords": article.aiKeywords,
-            "notas": article.notas,
-            "review_outcome": article.reviewOutcome,
-            "phase": article.currentPhase,
-            "source_name": article.sourceName,
-        },
-    )
-
-
-async def _sync_article_vector_payload(article: Article) -> None:
-    from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
-
-    qdrant = get_qdrant_retrieval_service()
-    embedding = getattr(article, "_embedding_cache", None)
-
-    if not _should_be_indexed(article) or embedding is None or not article.paperId:
-        await qdrant.delete_article(article.id)
-        return
-
-    payload = _build_vector_payload(article, qdrant)
-    await qdrant.upsert_payload(payload=payload, embedding=embedding)
-
-
-async def _sync_article_graph_state(article: Article, db: AsyncSession) -> None:
-    from app.services.graph_sync_service import get_graph_sync_service
-
-    graph_sync = get_graph_sync_service()
-    embedding = getattr(article, "_embedding_cache", None)
-    try:
-        if _should_be_indexed(article):
-            await graph_sync.sync_article_to_graph(article, db, embedding=embedding)
-        else:
-            await graph_sync.delete_article_from_graph(article.id)
-    except Exception as exc:
-        raise _graph_sync_http_error() from exc
-
-
-async def _sync_article_indexes(article: Article, db: AsyncSession) -> None:
-    try:
-        await _sync_article_graph_state(article, db)
-    except Exception as exc:  # pragma: no cover - best effort log
-        logger.warning("Falha ao sincronizar grafo do artigo %s: %s", article.id, exc)
-    try:
-        await _sync_article_vector_payload(article)
-    except Exception as exc:  # pragma: no cover - best effort log
-        logger.warning("Falha ao sincronizar payload vetorial do artigo %s: %s", article.id, exc)
-
-
 def _legacy_status_query_filter(status_value: str | None):
     if status_value == "pendente":
         return Article.reviewOutcome == "active"
@@ -1140,7 +1067,7 @@ async def _evaluate_article_if_possible(
         from app.services.embedding_service import get_embedding_service
 
         embedding_service = get_embedding_service()
-        embedding = embedding_service.generate_embedding(article.abstract)
+        embedding = await asyncio.to_thread(embedding_service.generate_embedding, article.abstract)
         if embedding:
             article._embedding_cache = embedding
     except Exception:  # pragma: no cover - external service
@@ -1729,7 +1656,7 @@ async def screening_decision(
         await db.commit()
         await db.refresh(result.article)
         if result.state == "consolidated":
-            await _sync_article_indexes(result.article, db)
+            await sync_article_indexes(result.article, db)
         return await _caller_article_response(db, result.article, current_user.id, phase="screening")
 
     if access.role != "owner":
@@ -1773,7 +1700,7 @@ async def screening_decision(
     _set_legacy_state_from_workflow(article)
     await db.commit()
     await db.refresh(article)
-    await _sync_article_indexes(article, db)
+    await sync_article_indexes(article, db)
     return _build_article_response(article)
 
 
@@ -1916,7 +1843,7 @@ async def update_full_text_status(
     _set_legacy_state_from_workflow(article)
     await db.commit()
     await db.refresh(article)
-    await _sync_article_indexes(article, db)
+    await sync_article_indexes(article, db)
     return await _caller_article_response(db, article, current_user.id)
 
 
@@ -1946,7 +1873,7 @@ async def eligibility_decision(
         await db.commit()
         await db.refresh(result.article)
         if result.state == "consolidated":
-            await _sync_article_indexes(result.article, db)
+            await sync_article_indexes(result.article, db)
         return await _caller_article_response(db, result.article, current_user.id, phase="eligibility")
 
     if access.role != "owner":
@@ -2003,7 +1930,7 @@ async def eligibility_decision(
     _set_legacy_state_from_workflow(article)
     await db.commit()
     await db.refresh(article)
-    await _sync_article_indexes(article, db)
+    await sync_article_indexes(article, db)
     return _build_article_response(article)
 
 
@@ -2148,7 +2075,7 @@ async def update_article(
     _set_legacy_state_from_workflow(article)
     await db.commit()
     await db.refresh(article)
-    await _sync_article_indexes(article, db)
+    await sync_article_indexes(article, db)
     return _build_article_response(article)
 
 
@@ -2204,7 +2131,7 @@ async def update_article_decision(
         _set_legacy_state_from_workflow(article)
         await db.commit()
         await db.refresh(article)
-        await _sync_article_indexes(article, db)
+        await sync_article_indexes(article, db)
         return _build_article_response(article)
 
     decision_payload = EligibilityDecisionRequest(
@@ -2229,7 +2156,7 @@ async def update_article_notes(
     article.notas = data.notas
     await db.commit()
     await db.refresh(article)
-    await _sync_article_indexes(article, db)
+    await sync_article_indexes(article, db)
     return await _caller_article_response(db, article, current_user.id)
 
 
@@ -2243,15 +2170,9 @@ async def delete_article(
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id, administrative=True)
     try:
-        await _sync_article_graph_state(article, db)
-    except HTTPException:
-        logger.warning("Falha ao limpar grafo do artigo %s antes da remoção", articleId)
-    try:
-        from app.services.qdrant_retrieval_service import get_qdrant_retrieval_service
-
-        await get_qdrant_retrieval_service().delete_article(articleId)
-    except Exception as exc:
-        logger.warning("Falha ao limpar vetor do artigo %s: %s", articleId, exc)
+        await get_article_index_service().remove(article_id=articleId, project_id=projectId)
+    except Exception:
+        logger.exception("Article %s index removal failed", articleId)
 
     await db.delete(article)
     await db.commit()
@@ -2446,7 +2367,7 @@ async def reprocess_project_graph(
     await db.commit()
 
     for article in all_articles:
-        await _sync_article_indexes(article, db)
+        await sync_article_indexes(article, db)
 
     return {
         "success": True,

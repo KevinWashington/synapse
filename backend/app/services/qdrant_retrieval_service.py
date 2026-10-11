@@ -152,6 +152,14 @@ class QdrantRetrievalService:
             },
         }
 
+    async def get_article_point(self, *, article_id: int, project_id: int) -> dict | None:
+        await self._ensure_collection()
+        points = await self.client.retrieve(collection_name=self.collection, ids=[article_id],
+                                            with_vectors=True, with_payload=True)
+        if not points or (points[0].payload or {}).get("project_id") != project_id:
+            return None
+        return {"payload": points[0].payload or {}, "vector": points[0].vector}
+
     async def delete_article(self, article_id: int | str) -> dict:
         await self._ensure_collection()
 

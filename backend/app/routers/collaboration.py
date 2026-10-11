@@ -393,9 +393,9 @@ async def adapt_team_assignments(projectId: int, data: AdaptationRequest, curren
     response, changed_articles = await adapt_reviews(db, access=access, phase=data.phase, fingerprint=data.fingerprint, actor_user_id=current_user.id)
     await db.commit()
     # Reuse the same best-effort index synchronization as manual review decisions.
-    from app.routers.articles import _sync_article_indexes
+    from app.services.article_index_service import sync_article_indexes
     for article in changed_articles:
-        await _sync_article_indexes(article, db)
+        await sync_article_indexes(article, db)
     return response
 
 

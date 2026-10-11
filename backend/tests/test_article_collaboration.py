@@ -74,7 +74,7 @@ def database():
 
 @pytest_asyncio.fixture
 async def scene(monkeypatch):
-    monkeypatch.setattr(articles, "_sync_article_indexes", AsyncMock())
+    monkeypatch.setattr(articles, "sync_article_indexes", AsyncMock())
     engine = create_async_engine(URL)
     async with engine.connect() as connection:
         transaction = await connection.begin()
