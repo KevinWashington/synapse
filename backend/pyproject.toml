@@ -37,6 +37,7 @@ include = [
     "tests/test_collaboration_concurrency.py",
     "tests/test_error_contract.py",
     "tests/test_migrations.py",
+    "tests/test_neo4j_write_confirmation.py",
     "tests/test_review_workflow.py",
     "tests/test_synthesis_contracts.py",
     "tests/test_user_auth_migration.py",

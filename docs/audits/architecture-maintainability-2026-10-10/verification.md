@@ -43,3 +43,9 @@ Ruff e checkJs são adoções graduais, com escopos documentados; não significa
 Aplicar a migration `0006_article_index_jobs` antes de iniciar API/worker no ambiente de destino. Busca possui consistência eventual. O [guia de operação](../../article-indexing.md) descreve inspeção, reconciliação e reversão preservando tarefas. Consulte [arquitetura](../../architecture.md) para novas mudanças.
 
 Os commits iniciais isolam correções de erros, índices e progresso. T4–T7 e a infraestrutura backend foram integrados em um commit coeso porque compartilham router, transações e dependências; essa adaptação evita commits intermediários quebrados.
+
+## Correção após revisão pré-merge — 2026-10-11
+
+A revisão independente identificou que o driver Neo4j 5.27 pode suprimir erros ao consumir resultados durante o fechamento da sessão. Todas as escritas agora consomem explicitamente o resultado dentro do mesmo timeout de execução, antes de informar sucesso ao worker. O health check também aguarda o resultado. Falhas de confirmação chegam ao mecanismo existente de retry.
+
+Antes da correção, os testes reproduziram sucesso indevido no worker e erros de commit suprimidos. Depois, 21 testes focados passaram e a suíte unitária completa passou com 189 testes, incluindo 13 novos casos de confirmação, timeout e recuperação. Os novos testes usam o fechamento real de sessão do driver com I/O simulado; os serviços externos, a suíte de integração e o E2E não foram repetidos nesta rodada. Uma revisão independente do diff da correção terminou sem novos achados.

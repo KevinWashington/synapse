@@ -5,6 +5,8 @@ import asyncio
 from neo4j import AsyncGraphDatabase, Query
 from app.config import settings
 
+QUERY_TIMEOUT = 30
+
 
 class Neo4jService:
     """Service for managing article nodes and relationships in Neo4j."""
@@ -24,7 +26,17 @@ class Neo4jService:
         return self._driver
 
     async def _run(self, session, query, **params):
-        return await asyncio.wait_for(session.run(Query(query, timeout=30), **params), timeout=30)
+        return await asyncio.wait_for(
+            session.run(Query(query, timeout=QUERY_TIMEOUT), **params), timeout=QUERY_TIMEOUT
+        )
+
+    async def _run_write(self, session, query, **params):
+        """Confirm implicit commit before returning; session cleanup suppresses failures."""
+        async def execute():
+            result = await session.run(Query(query, timeout=QUERY_TIMEOUT), **params)
+            return await result.consume()
+
+        return await asyncio.wait_for(execute(), timeout=QUERY_TIMEOUT)
 
     async def close(self):
         """Close the driver connection."""
@@ -50,7 +62,7 @@ class Neo4jService:
     ) -> None:
         """Create or update an article node in Neo4j."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MERGE (a:Article {id: $id})
                 SET a.projectId = $projectId,
@@ -86,7 +98,7 @@ class Neo4jService:
     async def delete_article_node(self, article_id: int) -> None:
         """Delete an article node and all its relationships."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MATCH (a:Article {id: $id})
                 DETACH DELETE a
@@ -102,7 +114,7 @@ class Neo4jService:
     ) -> None:
         """Create a semantic similarity relationship between articles."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -121,7 +133,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles using same methodology."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -140,7 +152,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles with shared authors."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -160,7 +172,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles that share keywords."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -181,7 +193,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles published in the same venue."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -205,7 +217,7 @@ class Neo4jService:
         """Create author/keyword/venue nodes connected to the article."""
         async with self.driver.session() as session:
             if authors:
-                await self._run(session,
+                await self._run_write(session,
                     """
                     MATCH (a:Article {id: $articleId, projectId: $projectId})
                     UNWIND $authors AS authorName
@@ -218,7 +230,7 @@ class Neo4jService:
                 )
 
             if keywords:
-                await self._run(session,
+                await self._run_write(session,
                     """
                     MATCH (a:Article {id: $articleId, projectId: $projectId})
                     UNWIND $keywords AS keywordTerm
@@ -231,7 +243,7 @@ class Neo4jService:
                 )
 
             if venue:
-                await self._run(session,
+                await self._run_write(session,
                     """
                     MATCH (a:Article {id: $articleId, projectId: $projectId})
                     MERGE (v:Venue {projectId: $projectId, name: $venue})
@@ -394,7 +406,7 @@ class Neo4jService:
     async def delete_project_graph(self, project_id: int) -> None:
         """Delete all nodes and relationships for a project."""
         async with self.driver.session() as session:
-            await self._run(session,
+            await self._run_write(session,
                 """
                 MATCH (n {projectId: $projectId})
                 DETACH DELETE n
@@ -431,8 +443,7 @@ class Neo4jService:
         params = params or {}
         try:
             async with self.driver.session() as session:
-                result = await self._run(session, cypher, **params)
-                summary = await result.consume()
+                summary = await self._run_write(session, cypher, **params)
                 counters = summary.counters
                 return {
                     "ok": True,
@@ -459,7 +470,7 @@ class Neo4jService:
         """MCP wrapper for graph.health operation."""
         try:
             async with self.driver.session() as session:
-                await self._run(session, "RETURN 1 as ok")
+                await self._run_write(session, "RETURN 1 as ok")
             return {
                 "connected": True,
                 "server": "neo4j",
