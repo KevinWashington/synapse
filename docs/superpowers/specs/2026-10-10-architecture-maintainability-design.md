@@ -1,13 +1,13 @@
 # Correção de arquitetura e manutenibilidade
 
 Data: 2026-10-10
-Status: proposta para revisão; implementação ainda não iniciada.
+Status: implementada e verificada em 11/10/2026; integração da branch pendente da escolha do usuário. Resultados em `docs/audits/architecture-maintainability-2026-10-10/verification.md`.
 
 ## Objetivo e contexto
 
 O usuário aprovou a direção da auditoria de frontend e backend e solicitou um plano de correção. O resultado esperado é tornar responsabilidades, contratos e dependências previsíveis, reduzindo a chance de uma alteração exigir mudanças em vários lugares.
 
-A auditoria foi estática. Os problemas de indexação e as divergências de regras devem ser reproduzidos com testes antes da correção. Não há uma medição de desempenho nem uma execução recente da suíte que sirva como baseline desta iniciativa.
+A auditoria inicial foi estática. A execução registrou um baseline, reproduziu os problemas de indexação e divergências de regras e acrescentou regressões comportamentais. Não foi realizada medição de desempenho.
 
 ## Abordagens consideradas
 

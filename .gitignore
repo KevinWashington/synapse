@@ -7,7 +7,6 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-.github
 .agents
 .codex
 .planning/*
@@ -37,3 +36,12 @@ backups/
 *.snapshot.tar
 *.backup-manifest.json
 *.restore-report.json
+
+.pytest_cache/
+.ruff_cache/
+.superpowers/
+frontend/playwright-report/
+frontend/test-results/
+
+backend/.e2e-sessions.json
+backend/pytest-t7*.txt

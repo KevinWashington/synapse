@@ -23,6 +23,7 @@ def _imported_modules(tree: ast.AST, current_module: str) -> set[str]:
             else:
                 module = node.module or ""
             modules.add(module)
+            modules.update(f"{module}.{alias.name}" for alias in node.names if alias.name != "*")
     return modules
 
 
@@ -52,6 +53,18 @@ def test_backend_import_boundaries():
                 if forbidden(module)
             )
     assert not violations, "Architecture import boundary violations:\n" + "\n".join(violations)
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("from app import routers", "app.routers"),
+        ("from app.core import dependencies", "app.core.dependencies"),
+        ("from .. import routers", "app.routers"),
+    ],
+)
+def test_boundary_resolution_covers_imported_submodules(source, expected):
+    assert expected in _imported_modules(ast.parse(source), "app.services.example")
 
 
 @pytest.mark.unit

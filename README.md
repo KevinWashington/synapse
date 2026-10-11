@@ -72,6 +72,8 @@ npm run test:e2e
 
 O E2E local usa uma sessão de teste gerada pelo backend para validar as áreas autenticadas sem criar um atalho de autenticação na aplicação. O login Google real precisa de um Client ID válido.
 
+A organização das camadas e o comando unificado de qualidade estão em [Arquitetura e responsabilidades](docs/architecture.md). Consulte [Operação da indexação](docs/article-indexing.md) para migração, worker, tentativas e reconciliação.
+
 ## Produção
 
 O domínio planejado é `https://synapse.labit.dev.br`. Antes de liberar tráfego, ainda é necessário configurar DNS, TLS e o OAuth Client no Google Cloud. Siga:
