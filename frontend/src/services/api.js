@@ -1,6 +1,45 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const SESSION_COOKIE_NAME = import.meta.env.VITE_SESSION_COOKIE_NAME || "synapse_session";
 
+function normalizeErrorData(errorData, status) {
+  const raw = errorData?.detail ?? errorData;
+  const fallbackCode = `HTTP_${status}`;
+  const fallbackMessage = "Erro na requisição";
+
+  if (Array.isArray(raw)) {
+    return {
+      code: status === 422 ? "VALIDATION_ERROR" : fallbackCode,
+      message: status === 422 ? "Confira os campos informados." : fallbackMessage,
+      context: { fields: raw },
+    };
+  }
+
+  if (typeof raw === "string") {
+    const isStableCode = /^[A-Z][A-Z0-9_]*$/.test(raw);
+    return {
+      code: isStableCode ? raw : fallbackCode,
+      message: isStableCode ? fallbackMessage : raw,
+    };
+  }
+
+  const detail = raw && typeof raw === "object" ? raw : {};
+  const rootExtras = errorData && typeof errorData === "object" && !Array.isArray(errorData)
+    ? Object.fromEntries(Object.entries(errorData).filter(([key]) => key !== "detail"))
+    : {};
+  const normalized = {
+    ...rootExtras,
+    ...detail,
+    code: detail.code || detail.errorCode || fallbackCode,
+    message: detail.message || detail.error || fallbackMessage,
+  };
+  if (detail.context && typeof detail.context === "object") {
+    normalized.context = detail.context;
+  } else if (Array.isArray(detail.fields)) {
+    normalized.context = { fields: detail.fields };
+  }
+  return normalized;
+}
+
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -57,14 +96,14 @@ class ApiService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
-        const detail = errorData.detail || errorData;
-        if (detail.code === "DEEPSEEK_KEY_REQUIRED") {
+        const data = normalizeErrorData(errorData, response.status);
+        if (data.code === "DEEPSEEK_KEY_REQUIRED") {
           window.dispatchEvent(new CustomEvent("synapse:deepseek-key-required"));
         }
         throw new ApiError(
-          detail.message || detail.error || "Erro na requisição",
+          data.message,
           response.status,
-          detail
+          data
         );
       }
 
@@ -84,6 +123,8 @@ class ApiService {
       }
 
       throw new ApiError("Erro de conexao com o servidor", 0, {
+        code: "NETWORK_ERROR",
+        message: "Erro de conexao com o servidor",
         originalError: error.message,
       });
     }
@@ -174,6 +215,7 @@ class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
     this.data = data;
+    this.code = data?.code;
   }
 }
 

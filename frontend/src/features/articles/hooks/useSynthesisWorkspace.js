@@ -126,7 +126,7 @@ export function useSynthesisWorkspace({ projectId, canEdit = false, onDirtyChang
       setDraftState((old) => ({ ...old, baseVersion: saved.version, dirty: false, conflict: null }));
       return saved;
     } catch (error) {
-      if (error.status === 409) setDraftState((old) => ({ ...old, conflict: error.detail }));
+      if (error.status === 409) setDraftState((old) => ({ ...old, conflict: error.data }));
       else setDraftState((old) => ({ ...old, conflict: { code: "SAVE_FAILED", message: error.message || "Não foi possível salvar o rascunho." } }));
       return null;
     }

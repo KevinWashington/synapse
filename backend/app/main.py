@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.core.csrf import require_csrf
+from app.core.error_handlers import install_error_handlers, normalize_http_detail
 from app.database import assert_database_revision, db_health_check, init_db, engine
 from app.routers import auth, projects, articles, ai, collaboration, inbox, settings as settings_router, stats, synthesis
 from app.core.dependencies import get_mcp_host, get_graph_mcp_service, get_sql_mcp_service
@@ -62,16 +63,16 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+install_error_handlers(app)
 
 
 @app.middleware("http")
 async def csrf_protection(request, call_next):
     try:
         require_csrf(request)
-    except Exception as exc:
-        if hasattr(exc, "status_code") and hasattr(exc, "detail"):
-            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-        raise
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code,
+                            content={"detail": normalize_http_detail(exc.detail, exc.status_code)})
     return await call_next(request)
 
 
