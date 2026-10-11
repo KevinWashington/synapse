@@ -158,6 +158,23 @@ describe("ArticleDetails extraction workspace", () => {
     );
   });
 
+  it("keeps whitespace and empty objects pending in the article list", async () => {
+    const listedArticle = articleList[2];
+    Object.assign(listedArticle, { extractionData: { resultado: "  ", extra: {} }, extractionCompletedAt: null });
+    project.dataExtractionSchema = [{ key: "resultado" }, { key: "extra" }];
+    try {
+      renderPage();
+      const listedTitle = (await screen.findAllByText("Próximo estudo"))[0];
+      const listedButton = listedTitle.closest("button");
+      expect(listedButton).toHaveTextContent("Pendente");
+      expect(listedButton).not.toHaveTextContent("Rascunho");
+      expect(screen.getByText("Em extração")).toBeInTheDocument();
+    } finally {
+      listedArticle.extractionData = article.extractionData;
+      project.dataExtractionSchema = [{ key: "resultado", label: "Resultado", type: "text" }];
+    }
+  });
+
   it("shows the server total instead of treating the loaded detail list as the whole stage", async () => {
     renderPage();
     await screen.findByPlaceholderText("Digite resultado...");

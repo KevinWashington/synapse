@@ -28,6 +28,7 @@ import ScreeningDecisionDialog from "@/features/articles/components/ScreeningDec
 import UploadPDFModal from "@/features/articles/components/UploadPDFModal";
 import { cn } from "@/lib/utils";
 import { collaborativeReview } from "@features/articles/utils/collaborativeReview";
+import { getExtractionProgress } from "@features/articles/utils/reviewWorkspace";
 import ReviewAssignmentStatus from "@features/articles/components/ReviewAssignmentStatus";
 
 const ArticleWorkspacePanel = lazy(() =>
@@ -80,22 +81,6 @@ function formatPercent(value, total) {
   return Math.round((value / total) * 100);
 }
 
-function hasExtractionProgress(article, schema) {
-  if (article?.extractionCompletedAt) {
-    return true;
-  }
-
-  const data = article?.extractionData || {};
-  if (!schema?.length) {
-    return Boolean(Object.keys(data).length);
-  }
-
-  return schema.some((field) => {
-    const value = data[field.key];
-    return value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length);
-  });
-}
-
 function getExtractionStatus(article, currentArticleId, schema) {
   if (String(article.id) === String(currentArticleId)) {
     return { label: "Em extração", className: "bg-[#eef1ff] text-[#6259ff]" };
@@ -105,7 +90,7 @@ function getExtractionStatus(article, currentArticleId, schema) {
     return { label: "Extraido", className: "bg-[#e8f8ef] text-[#258c55]" };
   }
 
-  if (hasExtractionProgress(article, schema)) {
+  if (getExtractionProgress(article, schema).state !== "not_started") {
     return { label: "Rascunho", className: "bg-[#fff6e5] text-[#d48700]" };
   }
 

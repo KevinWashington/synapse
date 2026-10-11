@@ -25,7 +25,7 @@ import { articleService } from "@features/articles/services/articleService";
 import { useProjectArticles } from "@features/articles/hooks/useProjectArticles";
 import { useWorkspaceArticle } from "@features/articles/hooks/useWorkspaceArticle";
 import { resolveSelectedArticle } from "@features/articles/utils/reviewFlow";
-import { getExtractionProgress } from "@features/articles/utils/reviewWorkspace";
+import { getExtractionProgress, hasExtractionValue } from "@features/articles/utils/reviewWorkspace";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import ImportBibTeXModal from "./ImportBibTeXModal";
@@ -256,15 +256,12 @@ export function ArticleDetailPanel({
     );
   }
 
-  const badge = getArticleBadge(article, activeStage, new Set());
+  const badge = getArticleBadge(article, activeStage, new Set(), project?.dataExtractionSchema || []);
   const review = collaborativeReview(article);
   const isIncludedStage = activeStage === "included";
   const extractionSchema = project?.dataExtractionSchema || [];
   const extractionData = article.extractionData || {};
-  const completedFields = extractionSchema.filter((field) => {
-    const value = extractionData[field.key];
-    return value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length);
-  }).length;
+  const completedFields = getExtractionProgress(article, extractionSchema).completed;
 
   return (
     <section className="min-w-0 rounded-lg border border-[#edf0f7] bg-white">
@@ -320,7 +317,7 @@ export function ArticleDetailPanel({
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {extractionSchema.length ? extractionSchema.slice(0, 6).map((field) => {
                   const value = extractionData[field.key];
-                  const filled = value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length);
+                  const filled = hasExtractionValue(value);
                   return (
                     <div key={field.key} className="rounded-lg border border-[#edf0f7] bg-white p-3">
                       <p className="line-clamp-1 text-xs font-semibold text-[#56627f]">{field.label}</p>

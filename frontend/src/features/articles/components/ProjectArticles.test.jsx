@@ -353,6 +353,41 @@ describe("collaborative article review", () => {
   });
 });
 
+describe("included article extraction progress", () => {
+  function renderIncludedDetail(extractionData) {
+    const included = { ...article, currentPhase: "included", reviewOutcome: "included", extractionData };
+    render(<ArticleDetailPanel
+      activeStage="included"
+      article={included}
+      currentIndex={0}
+      onClose={vi.fn()}
+      onNext={vi.fn()}
+      onOpenArticle={vi.fn()}
+      onOpenEligibility={vi.fn()}
+      onOpenScreening={vi.fn()}
+      onOpenUploadPdf={vi.fn()}
+      onPrevious={vi.fn()}
+      onSkip={vi.fn()}
+      project={{ dataExtractionSchema: [{ key: "a", label: "A" }, { key: "b", label: "B" }] }}
+      total={1}
+    />);
+  }
+
+  it("shows empty objects and whitespace as unfilled, matching queue progress", () => {
+    renderIncludedDetail({ a: "  ", b: {} });
+
+    expect(screen.getByText("Não iniciada")).toBeInTheDocument();
+    expect(screen.getByText((_, node) => node.textContent === "0 de 2 campos")).toBeInTheDocument();
+  });
+
+  it("counts zero and false as filled, matching queue progress", () => {
+    renderIncludedDetail({ a: 0, b: false });
+
+    expect(screen.getByText("Em andamento 2/2")).toBeInTheDocument();
+    expect(screen.getByText((_, node) => node.textContent === "2 de 2 campos")).toBeInTheDocument();
+  });
+});
+
 describe("duplicate review", () => {
   const candidates = [
     {

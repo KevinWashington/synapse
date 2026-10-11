@@ -40,6 +40,20 @@ describe("getExtractionProgress", () => {
     });
   });
 
+  it("does not count whitespace or empty objects as extracted values", () => {
+    expect(getExtractionProgress(
+      { extractionData: { a: "  ", b: {} } },
+      [{ key: "a" }, { key: "b" }]
+    )).toMatchObject({ completed: 0, state: "not_started" });
+  });
+
+  it("counts zero and false as extracted values", () => {
+    expect(getExtractionProgress(
+      { extractionData: { a: 0, b: false } },
+      [{ key: "a" }, { key: "b" }]
+    )).toMatchObject({ completed: 2, state: "in_progress" });
+  });
+
   it("prioritizes the persisted completion marker", () => {
     expect(getExtractionProgress({ extractionData: {}, extractionCompletedAt: "2026-10-09T12:00:00Z" }, schema)).toEqual({
       completed: 0,
