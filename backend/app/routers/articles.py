@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
-import asyncio
-import csv
-import hashlib
 import logging
-from io import BytesIO, StringIO
 import re
-from difflib import SequenceMatcher
+from datetime import datetime, timezone
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import case, func, or_, select
-from sqlalchemy.orm import load_only
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from app.core.dependencies import (
     get_current_user,
@@ -21,27 +17,10 @@ from app.core.dependencies import (
     get_user_ai_service,
 )
 from app.database import get_db
-from app.config import get_settings
 from app.models.article import Article
 from app.models.collaboration import ReviewAssignment, ReviewConflict, ReviewDecision
 from app.models.project import Project
 from app.models.user import User
-from app.services.ai_service import AIService
-from app.services.article_index_service import get_article_index_service, sync_article_indexes
-from app.services.project_access_service import (
-    CAP_EDIT_PROJECT,
-    CAP_REVIEW_ASSIGNED,
-    get_project_article,
-    require_capability,
-    resolve_project_access,
-)
-from app.services.review_decision_service import (
-    has_active_assignments,
-    require_assigned_write_if_managed,
-    resolution_state,
-    submit_review_decision,
-    visible_decision_payloads,
-)
 from app.schemas.article import (
     ArticleCreate,
     ArticleEvidenceUpdate,
@@ -69,20 +48,58 @@ from app.schemas.article import (
     PromoteUniqueToScreeningResponse,
     RelationshipCreate,
     ScreeningDecisionRequest,
-    SelectionReportCounts,
     SelectionReportResponse,
-    SelectionSummaryPhaseItem,
     SelectionSummaryResponse,
 )
+from app.services import article_mutation_service
+from app.services.ai_service import AIService
+from app.services.article_dedup_service import (
+    analyze_duplicates as analyze_article_duplicates,
+)
+from app.services.article_dedup_service import (
+    assign_duplicate_markers,
+    promote_unique_identification_articles,
+)
+from app.services.article_file_service import ArticleFileService
+from app.services.article_import_service import (
+    apply_ai_evaluation,
+    build_project_ai_context,
+    evaluate_article_if_possible,
+    import_bibtex_articles,
+)
+from app.services.article_index_jobs_service import enqueue_article_index
+from app.services.article_report_service import (
+    build_report_csv,
+    build_selection_report,
+    build_synthesis_report,
+    is_included_for_synthesis,
+    selection_summary_from_articles,
+)
+from app.services.article_response_service import build_article_response
 from app.services.evidence_service import (
-    QUALITY_RATING_ORDER,
     apply_quality_metrics,
-    calculate_quality_metrics,
     merge_extraction_data,
     merge_quality_assessment_answers,
-    normalize_quality_response,
 )
-
+from app.services.project_access_service import (
+    CAP_EDIT_PROJECT,
+    CAP_REVIEW_ASSIGNED,
+    get_project_article,
+    require_capability,
+    resolve_project_access,
+)
+from app.services.review_decision_service import (
+    has_active_assignments,
+    require_assigned_write_if_managed,
+    resolution_state,
+    submit_review_decision,
+    visible_decision_payloads,
+)
+from app.services.review_workflow_service import (
+    ReviewDecisionData,
+    apply_legacy_review_state,
+    apply_review_decision,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -103,7 +120,12 @@ SOURCE_NAME_OPTIONS = [
 
 CURRENT_PHASES = ("identification", "screening", "eligibility", "included")
 ACTIVE_OUTCOME = "active"
-EXCLUDED_OUTCOMES = ("duplicate_removed", "excluded_screening", "full_text_unavailable", "excluded_eligibility")
+EXCLUDED_OUTCOMES = (
+    "duplicate_removed",
+    "excluded_screening",
+    "full_text_unavailable",
+    "excluded_eligibility",
+)
 
 _INVALID_ANCHOR_CHARS = re.compile(r"[^a-z0-9]+")
 
@@ -112,154 +134,11 @@ async def get_project_or_404(projectId: int, ownerId: int, db: AsyncSession) -> 
     return (await resolve_project_access(db, project_id=projectId, user_id=ownerId)).project
 
 
-async def get_article_or_404(articleId: int, projectId: int, ownerId: int, db: AsyncSession) -> Article:
+async def get_article_or_404(
+    articleId: int, projectId: int, ownerId: int, db: AsyncSession
+) -> Article:
     await resolve_project_access(db, project_id=projectId, user_id=ownerId)
     return await get_project_article(db, project_id=projectId, article_id=articleId)
-
-
-def _normalize_paper_id(paper_id: str | None) -> str | None:
-    if not paper_id:
-        return None
-    normalized = _INVALID_ANCHOR_CHARS.sub("-", paper_id.strip().lower()).strip("-")
-    return normalized or None
-
-
-def _generate_paper_id(doi: str | None, title: str | None, year: int | None) -> str:
-    doi_normalized = _normalize_paper_id(doi)
-    if doi_normalized:
-        return doi_normalized[:120]
-
-    title_base = _normalize_paper_id(title or "paper") or "paper"
-    year_base = str(year) if year is not None else "unknown"
-    digest = hashlib.sha1(f"{title_base}|{year_base}".encode("utf-8")).hexdigest()[:10]
-    suffix = f"-{year_base}-{digest}"
-    return f"{title_base[:120 - len(suffix)]}{suffix}"
-
-
-def _resolve_paper_id(
-    *,
-    provided: str | None,
-    doi: str | None,
-    title: str | None,
-    year: int | None,
-) -> str:
-    normalized = _normalize_paper_id(provided)
-    if normalized:
-        return normalized
-    return _generate_paper_id(doi=doi, title=title, year=year)
-
-
-def _normalize_text(value: str | None) -> str:
-    if not value:
-        return ""
-    normalized = re.sub(r"\s+", " ", value).strip().lower()
-    normalized = _INVALID_ANCHOR_CHARS.sub(" ", normalized)
-    return re.sub(r"\s+", " ", normalized).strip()
-
-
-def _normalize_doi(value: str | None) -> str | None:
-    if not value:
-        return None
-    normalized = _normalize_text(value).replace(" ", "")
-    return normalized or None
-
-
-def _title_year_key(title: str | None, year: int | None) -> str | None:
-    normalized_title = _normalize_text(title)
-    if not normalized_title or year is None:
-        return None
-    return f"{normalized_title}|{year}"
-
-
-def _shared_author_signature(authors: str | None) -> set[str]:
-    normalized = (authors or "").replace(" and ", ";")
-    return {part.strip().lower() for part in normalized.split(";") if part.strip()}
-
-
-def _build_project_ai_context(project: Project) -> dict[str, list[str]]:
-    return {
-        "criteriosInclusao": project.criteriosInclusao or [],
-        "criteriosExclusao": project.criteriosExclusao or [],
-        "researchQuestions": project.researchQuestions or [],
-    }
-
-
-def _apply_ai_evaluation(article: Article, eval_result: dict) -> None:
-    article.aiEvaluation = eval_result.get("justification")
-    article.aiSuggestedStatus = eval_result.get("suggestedStatus")
-    article.aiRelevanceScore = eval_result.get("relevanceScore")
-    article.aiSuggestedRQs = eval_result.get("suggestedRQs", [])
-    article.aiMethodology = eval_result.get("methodology")
-    article.aiDatabase = eval_result.get("database")
-    article.aiDomain = eval_result.get("domain")
-    article.aiKeywords = eval_result.get("keywords", [])
-
-
-def _set_legacy_state_from_workflow(article: Article) -> None:
-    if article.reviewOutcome == "included":
-        article.status = "analisado"
-        article.manualDecision = "incluido"
-        article.manualDecisionReason = article.eligibilityReasonText
-        article.decisionUpdatedAt = article.eligibilityReviewedAt or article.includedAt
-        article.exclusionCriteria = []
-        return
-
-    if article.reviewOutcome in {"excluded_screening", "excluded_eligibility", "full_text_unavailable", "duplicate_removed"}:
-        article.status = "excluido"
-        article.manualDecision = "excluido"
-        article.manualDecisionReason = article.eligibilityReasonText or article.screeningReasonText or article.duplicateReasonText
-        article.decisionUpdatedAt = (
-            article.eligibilityReviewedAt
-            or article.screeningReviewedAt
-            or article.updatedAt
-        )
-        if article.reviewOutcome == "excluded_screening":
-            article.exclusionCriteria = [article.screeningReasonText] if article.screeningReasonText else []
-        elif article.reviewOutcome in {"excluded_eligibility", "full_text_unavailable"}:
-            article.exclusionCriteria = [article.eligibilityReasonText] if article.eligibilityReasonText else []
-        elif article.reviewOutcome == "duplicate_removed":
-            article.exclusionCriteria = [article.duplicateReasonText] if article.duplicateReasonText else []
-        return
-
-    if article.currentPhase == "eligibility":
-        article.status = "analisado"
-    else:
-        article.status = "pendente"
-
-    if article.screeningDecision == "excluded":
-        article.manualDecision = "excluido"
-        article.manualDecisionReason = article.screeningReasonText
-    elif article.currentPhase == "eligibility" and article.screeningDecision == "included":
-        article.manualDecision = "incluido"
-        article.manualDecisionReason = article.screeningReasonText
-    else:
-        article.manualDecision = None
-        article.manualDecisionReason = None
-
-    article.decisionUpdatedAt = article.eligibilityReviewedAt or article.screeningReviewedAt
-    if article.manualDecision != "excluido":
-        article.exclusionCriteria = []
-
-
-def _build_article_response(article: Article) -> ArticleResponse:
-    _set_legacy_state_from_workflow(article)
-    # reviewDecisions is also an ORM relationship; never lazily load or expose it.
-    response = ArticleResponse.model_validate({
-        name: getattr(article, name)
-        for name in ArticleResponse.model_fields
-        if name not in {"reviewState", "reviewDecisions", "hasActiveReviewAssignments", "myReviewAssignment", "reviewAssignments", "canWriteReview", "canDecideReview", "canManageArticle", "hasPdf"}
-        and hasattr(article, name)
-    })
-    response.hasPdf = article.pdfData is not None
-    response.eligibilityChecklistAnswers = article.eligibilityChecklistAnswers or {}
-    response.extractionData = article.extractionData or {}
-    response.qualityAssessmentAnswers = article.qualityAssessmentAnswers or {}
-    response.aiSuggestedRQs = article.aiSuggestedRQs or []
-    response.aiKeywords = article.aiKeywords or []
-    response.exclusionCriteria = article.exclusionCriteria or []
-    response.answeringRQs = article.answeringRQs or []
-    response.qualityRating = article.qualityRating or "unrated"
-    return response
 
 
 def _review_phase(article: Article) -> str:
@@ -278,7 +157,7 @@ async def _require_article_write(db, article, user_id, *, administrative=False):
 
 
 async def _article_responses(db, rows, *, access, user_id, phase=None):
-    responses = [_build_article_response(row) for row in rows]
+    responses = [build_article_response(row) for row in rows]
     for response in responses:
         response.canManageArticle = CAP_EDIT_PROJECT in access.capabilities
         response.canWriteReview = response.canManageArticle if access.role != "reviewer" else False
@@ -286,38 +165,65 @@ async def _article_responses(db, rows, *, access, user_id, phase=None):
     if not rows:
         return responses
     ids = [row.id for row in rows]
-    assignments = (await db.execute(select(ReviewAssignment).where(
-        ReviewAssignment.articleId.in_(ids), ReviewAssignment.status != "cancelled"
-    ).order_by(ReviewAssignment.slot))).scalars().all()
+    assignments = (
+        (
+            await db.execute(
+                select(ReviewAssignment)
+                .where(ReviewAssignment.articleId.in_(ids), ReviewAssignment.status != "cancelled")
+                .order_by(ReviewAssignment.slot)
+            )
+        )
+        .scalars()
+        .all()
+    )
     if not assignments:
         return responses
-    decisions = (await db.execute(select(ReviewDecision).where(
-        ReviewDecision.assignmentId.in_([item.id for item in assignments]), ReviewDecision.status == "submitted"
-    ))).scalars().all()
-    conflicts = (await db.execute(select(ReviewConflict).where(
-        ReviewConflict.articleId.in_(ids)
-    ))).scalars().all()
+    decisions = (
+        (
+            await db.execute(
+                select(ReviewDecision).where(
+                    ReviewDecision.assignmentId.in_([item.id for item in assignments]),
+                    ReviewDecision.status == "submitted",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    conflicts = (
+        (await db.execute(select(ReviewConflict).where(ReviewConflict.articleId.in_(ids))))
+        .scalars()
+        .all()
+    )
     for row, response in zip(rows, responses):
         relevant_phase = phase if phase in {"screening", "eligibility"} else _review_phase(row)
-        active = [item for item in assignments if item.articleId == row.id and item.phase == relevant_phase]
+        active = [
+            item
+            for item in assignments
+            if item.articleId == row.id and item.phase == relevant_phase
+        ]
         own = next((item for item in active if item.reviewerUserId == user_id), None)
         response.hasActiveReviewAssignments = bool(active)
         response.myReviewAssignment = ArticleReviewAssignment.model_validate(own) if own else None
-        response.reviewAssignments = [ArticleReviewAssignment.model_validate(item) for item in active]
+        response.reviewAssignments = [
+            ArticleReviewAssignment.model_validate(item) for item in active
+        ]
         response.canWriteReview = response.canManageArticle or bool(
             own and own.status not in {"needs_reassignment", "cancelled"}
         )
         response.canDecideReview = bool(
-            own
-            and own.status == "pending"
-            and CAP_REVIEW_ASSIGNED in access.capabilities
+            own and own.status == "pending" and CAP_REVIEW_ASSIGNED in access.capabilities
         )
         if not active:
             continue
         active_ids = {item.id for item in active}
         submitted = [item for item in decisions if item.assignmentId in active_ids]
-        complete = len(submitted) == len(active) and all(item.status == "submitted" for item in active)
-        phase_conflicts = [item for item in conflicts if item.articleId == row.id and item.phase == relevant_phase]
+        complete = len(submitted) == len(active) and all(
+            item.status == "submitted" for item in active
+        )
+        phase_conflicts = [
+            item for item in conflicts if item.articleId == row.id and item.phase == relevant_phase
+        ]
         if not complete:
             response.reviewState = "waiting_for_reviewer"
         elif any(item.status == "open" for item in phase_conflicts):
@@ -326,496 +232,15 @@ async def _article_responses(db, rows, *, access, user_id, phase=None):
             response.reviewState = "consolidated"
         else:
             response.reviewState = resolution_state(submitted, assignment_count=len(active))
-        response.reviewDecisions = visible_decision_payloads(submitted, current_user_id=user_id, complete=complete)
+        response.reviewDecisions = visible_decision_payloads(
+            submitted, current_user_id=user_id, complete=complete
+        )
     return responses
 
 
 async def _caller_article_response(db, article, user_id, *, phase=None):
     access = await resolve_project_access(db, project_id=article.projectId, user_id=user_id)
     return (await _article_responses(db, [article], access=access, user_id=user_id, phase=phase))[0]
-
-
-def _is_included_for_synthesis(article: Article) -> bool:
-    review_outcome = getattr(article, "reviewOutcome", None)
-    if review_outcome:
-        return review_outcome == "included"
-
-    if getattr(article, "manualDecision", None) == "incluido":
-        return True
-    if getattr(article, "manualDecision", None) == "excluido":
-        return False
-    return getattr(article, "status", None) == "analisado"
-
-
-def _build_evidence_excerpt(article: Article) -> str | None:
-    candidate = (
-        getattr(article, "eligibilityReasonText", None)
-        or getattr(article, "screeningReasonText", None)
-        or getattr(article, "manualDecisionReason", None)
-        or getattr(article, "aiEvaluation", None)
-        or getattr(article, "notas", None)
-        or ""
-    ).strip()
-    if not candidate:
-        return None
-    if len(candidate) <= 280:
-        return candidate
-    return candidate[:277] + "..."
-
-
-def _linked_rqs_for_article(article: Article, rq_count: int) -> list[int]:
-    return sorted({rq for rq in (getattr(article, "answeringRQs", None) or []) if 1 <= rq <= rq_count})
-
-
-def _decision_label_for_article(article: Article) -> str:
-    if getattr(article, "reviewOutcome", None):
-        return article.reviewOutcome
-    return getattr(article, "manualDecision", None) or getattr(article, "status", None) or "-"
-
-
-def _build_rq_synthesis_payload(research_questions: list[str], included_articles: list[Article]) -> dict:
-    rq_count = len(research_questions)
-    rq_to_articles: dict[int, list[Article]] = {index: [] for index in range(1, rq_count + 1)}
-    included_without_rq: list[Article] = []
-
-    for article in included_articles:
-        linked_rqs = _linked_rqs_for_article(article, rq_count)
-        if not linked_rqs:
-            included_without_rq.append(article)
-            continue
-        for rq in linked_rqs:
-            rq_to_articles[rq].append(article)
-
-    rq_synthesis = []
-    for index, question in enumerate(research_questions, start=1):
-        rq_articles = rq_to_articles.get(index, [])
-        rq_synthesis.append(
-            {
-                "rqNumber": index,
-                "question": question,
-                "evidenceCount": len(rq_articles),
-                "articles": [
-                    {
-                        "id": article.id,
-                        "paperId": article.paperId,
-                        "title": article.title,
-                        "authors": getattr(article, "authors", None),
-                        "year": getattr(article, "year", None),
-                        "status": getattr(article, "status", None),
-                        "manualDecision": getattr(article, "manualDecision", None),
-                        "reason": getattr(article, "eligibilityReasonText", None)
-                        or getattr(article, "manualDecisionReason", None),
-                        "evidenceExcerpt": _build_evidence_excerpt(article),
-                    }
-                    for article in rq_articles
-                ],
-            }
-        )
-
-    matrix = []
-    for article in included_articles:
-        matrix.append(
-            {
-                "articleId": article.id,
-                "paperId": getattr(article, "paperId", None),
-                "title": getattr(article, "title", None),
-                "year": getattr(article, "year", None),
-                "decision": _decision_label_for_article(article),
-                "rqs": _linked_rqs_for_article(article, rq_count),
-            }
-        )
-
-    answered_rqs = sum(1 for index in range(1, rq_count + 1) if rq_to_articles.get(index))
-    coverage_percentage = round((answered_rqs / rq_count) * 100, 2) if rq_count else 0
-
-    return {
-        "rqCount": rq_count,
-        "rqSynthesis": rq_synthesis,
-        "matrix": matrix,
-        "coverage": {
-            "answeredRQCount": answered_rqs,
-            "answeredRQPercentage": coverage_percentage,
-            "includedArticles": len(included_articles),
-            "includedWithoutRQLinks": len(included_without_rq),
-        },
-        "unlinkedIncludedArticles": [
-            {
-                "id": article.id,
-                "paperId": getattr(article, "paperId", None),
-                "title": getattr(article, "title", None),
-                "year": getattr(article, "year", None),
-                "status": getattr(article, "status", None),
-                "manualDecision": getattr(article, "manualDecision", None),
-            }
-            for article in included_without_rq
-        ],
-    }
-
-
-def _build_distribution_rows(
-    counts: dict[str, int],
-    *,
-    denominator: int,
-    order: list[str] | tuple[str, ...] | None = None,
-) -> list[dict]:
-    keys = list(order) if order else sorted(counts.keys())
-    rows = []
-    for key in keys:
-        count = counts.get(key, 0)
-        if count == 0 and not order:
-            continue
-        percentage = round((count / denominator) * 100, 2) if denominator else 0
-        rows.append(
-            {
-                "value": key,
-                "count": count,
-                "percentage": percentage,
-            }
-        )
-    return rows
-
-
-def _stringify_distribution_value(value) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return str(value)
-
-
-def _select_visualization_field(extraction_schema: list[dict], rq_number: int) -> dict | None:
-    rq_key = f"rq_{rq_number}"
-    for field in extraction_schema:
-        if field.get("key") == rq_key:
-            return field
-
-    fallback_index = rq_number - 1
-    if 0 <= fallback_index < len(extraction_schema):
-        return extraction_schema[fallback_index]
-    return None
-
-
-def _visualization_type_for_field(field_type: str | None) -> str:
-    if field_type == "number":
-        return "bar_chart"
-    if field_type == "boolean":
-        return "category_bar_chart"
-    if field_type == "single_select":
-        return "category_bar_chart"
-    if field_type == "multi_select":
-        return "multi_category_bar_chart"
-    if field_type == "text":
-        return "qualitative_table"
-    return "not_available"
-
-
-def _visualization_reason_for_field(field_type: str | None) -> str:
-    reasons = {
-        "number": "Campo numerico permite comparar valores extraidos entre estudos.",
-        "boolean": "Campo booleano permite comparar a frequencia de respostas Sim e Nao.",
-        "single_select": "Campo categorico permite comparar a frequencia de cada categoria extraida.",
-        "multi_select": "Campo de selecao multipla permite contar a recorrencia de cada opcao nos estudos.",
-        "text": "Campo textual deve ser apresentado como tabela qualitativa para preservar o contexto da resposta.",
-    }
-    return reasons.get(field_type or "", "Nao ha tipo de campo estruturado para sugerir uma visualizacao.")
-
-
-def _coerce_visualization_number(value) -> int | float | None:
-    if value is None or value == "" or isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().replace(",", ".")
-        if not normalized:
-            return None
-        try:
-            number = float(normalized)
-        except ValueError:
-            return None
-        return int(number) if number.is_integer() else number
-    return None
-
-
-def _articles_for_visualization_rq(
-    included_articles: list[Article],
-    rq_number: int,
-    rq_count: int,
-) -> list[Article]:
-    linked_articles = [
-        article
-        for article in included_articles
-        if rq_number in _linked_rqs_for_article(article, rq_count)
-    ]
-    return linked_articles or included_articles
-
-
-def _build_visualization_rows(field: dict, articles: list[Article], denominator: int) -> list[dict]:
-    field_key = field.get("key")
-    field_type = field.get("type") or "text"
-
-    if not field_key:
-        return []
-
-    if field_type == "number":
-        rows = []
-        for article in articles:
-            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
-            value = _coerce_visualization_number(raw_value)
-            if value is None:
-                continue
-            rows.append(
-                {
-                    "articleId": article.id,
-                    "title": getattr(article, "title", None),
-                    "year": getattr(article, "year", None),
-                    "value": value,
-                }
-            )
-        return rows
-
-    if field_type in {"boolean", "single_select", "multi_select"}:
-        counts: dict[str, int] = {}
-        counted_values = 0
-        for article in articles:
-            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
-            values = raw_value if field_type == "multi_select" and isinstance(raw_value, list) else [raw_value]
-            for item in values:
-                normalized = _stringify_distribution_value(item)
-                if normalized is None or normalized == "":
-                    continue
-                counts[normalized] = counts.get(normalized, 0) + 1
-                counted_values += 1
-
-        return _build_distribution_rows(counts, denominator=counted_values or denominator)
-
-    if field_type == "text":
-        rows = []
-        for article in articles:
-            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
-            value = str(raw_value or "").strip()
-            if not value:
-                continue
-            rows.append(
-                {
-                    "articleId": article.id,
-                    "title": getattr(article, "title", None),
-                    "year": getattr(article, "year", None),
-                    "value": value,
-                }
-            )
-        return rows
-
-    return []
-
-
-def _build_visualization_suggestions(
-    research_questions: list[str],
-    extraction_schema: list[dict],
-    included_articles: list[Article],
-) -> list[dict]:
-    rq_count = len(research_questions)
-    suggestions = []
-
-    for rq_number, question in enumerate(research_questions, start=1):
-        field = _select_visualization_field(extraction_schema, rq_number)
-        if not field:
-            suggestions.append(
-                {
-                    "rqNumber": rq_number,
-                    "question": question,
-                    "field": None,
-                    "visualizationType": "not_available",
-                    "status": "missing_field",
-                    "reason": "Nenhum campo de extracao foi configurado para esta pergunta.",
-                    "rows": [],
-                }
-            )
-            continue
-
-        field_type = field.get("type") or "text"
-        candidate_articles = _articles_for_visualization_rq(included_articles, rq_number, rq_count)
-        rows = _build_visualization_rows(field, candidate_articles, denominator=len(candidate_articles))
-        suggestions.append(
-            {
-                "rqNumber": rq_number,
-                "question": question,
-                "field": {
-                    "key": field.get("key"),
-                    "label": field.get("label") or field.get("key"),
-                    "type": field_type,
-                },
-                "visualizationType": _visualization_type_for_field(field_type),
-                "status": "ready" if rows else "needs_data",
-                "reason": _visualization_reason_for_field(field_type),
-                "rows": rows,
-            }
-        )
-
-    return suggestions
-
-
-def _build_synthesis_report(project: Project, articles: list[Article]) -> dict:
-    research_questions = project.researchQuestions or []
-    extraction_schema = project.dataExtractionSchema or []
-    quality_schema = project.qualityAssessmentSchema or []
-    included_articles = [article for article in articles if _is_included_for_synthesis(article)]
-
-    rq_payload = _build_rq_synthesis_payload(research_questions, included_articles)
-
-    extraction_rows = []
-    distribution_charts = []
-
-    year_counts: dict[str, int] = {}
-    quality_rating_counts = {rating: 0 for rating in QUALITY_RATING_ORDER}
-    quality_summary_articles = []
-
-    for article in included_articles:
-        quality_score, quality_rating = calculate_quality_metrics(
-            getattr(article, "qualityAssessmentAnswers", None) or {},
-            quality_schema,
-        )
-        quality_summary_articles.append(
-            {
-                "articleId": article.id,
-                "score": quality_score,
-                "rating": quality_rating,
-                "answers": getattr(article, "qualityAssessmentAnswers", None) or {},
-            }
-        )
-        quality_rating_counts[quality_rating] = quality_rating_counts.get(quality_rating, 0) + 1
-
-        year_value = getattr(article, "year", None)
-        if year_value is not None:
-            year_key = str(year_value)
-            year_counts[year_key] = year_counts.get(year_key, 0) + 1
-
-        extraction_values = {}
-        article_extraction_data = getattr(article, "extractionData", None) or {}
-        for field in extraction_schema:
-            extraction_values[field["key"]] = article_extraction_data.get(field["key"])
-
-        extraction_rows.append(
-            {
-                "articleId": article.id,
-                "paperId": getattr(article, "paperId", None),
-                "title": getattr(article, "title", None),
-                "year": getattr(article, "year", None),
-                "sourceName": getattr(article, "sourceName", None),
-                "rqs": _linked_rqs_for_article(article, len(research_questions)),
-                "qualityScore": quality_score,
-                "qualityRating": quality_rating,
-                "values": extraction_values,
-            }
-        )
-
-    if included_articles:
-        distribution_charts.append(
-            {
-                "key": "year",
-                "label": "Publication Year",
-                "rows": _build_distribution_rows(year_counts, denominator=len(included_articles)),
-            }
-        )
-        distribution_charts.append(
-            {
-                "key": "qualityRating",
-                "label": "Quality Rating",
-                "rows": _build_distribution_rows(
-                    quality_rating_counts,
-                    denominator=len(included_articles),
-                    order=QUALITY_RATING_ORDER,
-                ),
-            }
-        )
-
-    for field in extraction_schema:
-        if field.get("type") not in {"single_select", "multi_select", "boolean"}:
-            continue
-
-        field_counts: dict[str, int] = {}
-        denominator = 0
-        field_key = field["key"]
-
-        for article in included_articles:
-            raw_value = (getattr(article, "extractionData", None) or {}).get(field_key)
-            if field.get("type") == "multi_select":
-                values = raw_value if isinstance(raw_value, list) else []
-                if not values:
-                    continue
-                for item in values:
-                    normalized = _stringify_distribution_value(item)
-                    if not normalized:
-                        continue
-                    field_counts[normalized] = field_counts.get(normalized, 0) + 1
-                    denominator += 1
-                continue
-
-            normalized = _stringify_distribution_value(raw_value)
-            if normalized is None or normalized == "":
-                continue
-            field_counts[normalized] = field_counts.get(normalized, 0) + 1
-            denominator += 1
-
-        if not field_counts:
-            continue
-
-        distribution_charts.append(
-            {
-                "key": field_key,
-                "label": field.get("label") or field_key,
-                "rows": _build_distribution_rows(field_counts, denominator=denominator),
-            }
-        )
-
-    rated_scores = [item["score"] for item in quality_summary_articles if item["score"] is not None]
-    by_criterion = []
-    for criterion in quality_schema:
-        criterion_counts = {value: 0 for value in ("yes", "partial", "no", "na")}
-        answered_count = 0
-        for article_info in quality_summary_articles:
-            response = normalize_quality_response(article_info["answers"].get(criterion["key"]))
-            if response is None:
-                continue
-            criterion_counts[response] += 1
-            answered_count += 1
-
-        by_criterion.append(
-            {
-                "key": criterion["key"],
-                "label": criterion["label"],
-                "rows": _build_distribution_rows(
-                    criterion_counts,
-                    denominator=answered_count,
-                    order=("yes", "partial", "no", "na"),
-                ),
-            }
-        )
-
-    return {
-        "projectId": project.id,
-        "projectTitle": project.title,
-        **rq_payload,
-        "extractionColumns": extraction_schema,
-        "extractionRows": extraction_rows,
-        "distributionCharts": distribution_charts,
-        "visualizationSuggestions": _build_visualization_suggestions(
-            research_questions,
-            extraction_schema,
-            included_articles,
-        ),
-        "qualitySummary": {
-            "ratedArticles": len(rated_scores),
-            "unratedArticles": max(len(included_articles) - len(rated_scores), 0),
-            "averageScore": round(sum(rated_scores) / len(rated_scores), 2) if rated_scores else None,
-            "byRating": _build_distribution_rows(
-                quality_rating_counts,
-                denominator=len(included_articles),
-                order=QUALITY_RATING_ORDER,
-            ),
-            "byCriterion": by_criterion,
-        },
-    }
 
 
 def _legacy_status_query_filter(status_value: str | None):
@@ -826,429 +251,6 @@ def _legacy_status_query_filter(status_value: str | None):
     if status_value == "excluido":
         return Article.reviewOutcome.in_(EXCLUDED_OUTCOMES)
     return None
-
-
-def _format_source_breakdown(rows: list[Article]) -> list[dict]:
-    by_source: dict[tuple[str, str], dict] = {}
-    for article in rows:
-        key = (article.sourceCategory, article.sourceName)
-        item = by_source.setdefault(
-            key,
-            {
-                "sourceCategory": article.sourceCategory,
-                "sourceName": article.sourceName,
-                "total": 0,
-                "included": 0,
-                "duplicatesRemoved": 0,
-                "excluded": 0,
-            },
-        )
-        item["total"] += 1
-        if article.reviewOutcome == "included":
-            item["included"] += 1
-        elif article.reviewOutcome == "duplicate_removed":
-            item["duplicatesRemoved"] += 1
-        elif article.reviewOutcome in {"excluded_screening", "excluded_eligibility", "full_text_unavailable"}:
-            item["excluded"] += 1
-    return sorted(by_source.values(), key=lambda item: (item["sourceCategory"], item["sourceName"]))
-
-
-def _selection_summary_from_articles(project_id: int, articles: list[Article]) -> SelectionSummaryResponse:
-    identification_total = len(articles)
-    identification_active = sum(
-        1 for article in articles if article.currentPhase == "identification" and article.reviewOutcome == "active"
-    )
-    duplicates_removed = sum(1 for article in articles if article.reviewOutcome == "duplicate_removed")
-
-    screening_total = sum(
-        1
-        for article in articles
-        if article.currentPhase in {"screening", "eligibility", "included"}
-        or article.reviewOutcome in {"excluded_screening", "excluded_eligibility", "full_text_unavailable", "included"}
-    )
-    screening_active = sum(
-        1 for article in articles if article.currentPhase == "screening" and article.reviewOutcome == "active"
-    )
-    screening_excluded = sum(1 for article in articles if article.reviewOutcome == "excluded_screening")
-
-    eligibility_total = sum(
-        1
-        for article in articles
-        if article.currentPhase in {"eligibility", "included"}
-        or article.reviewOutcome in {"excluded_eligibility", "full_text_unavailable", "included"}
-    )
-    eligibility_active = sum(
-        1 for article in articles if article.currentPhase == "eligibility" and article.reviewOutcome == "active"
-    )
-    eligibility_excluded = sum(
-        1 for article in articles if article.reviewOutcome in {"excluded_eligibility", "full_text_unavailable"}
-    )
-
-    return SelectionSummaryResponse(
-        projectId=project_id,
-        totalRecords=len(articles),
-        identification=SelectionSummaryPhaseItem(
-            total=identification_total,
-            active=identification_active,
-            excluded=duplicates_removed,
-        ),
-        screening=SelectionSummaryPhaseItem(
-            total=screening_total,
-            active=screening_active,
-            excluded=screening_excluded,
-        ),
-        eligibility=SelectionSummaryPhaseItem(
-            total=eligibility_total,
-            active=eligibility_active,
-            excluded=eligibility_excluded,
-        ),
-        included=sum(1 for article in articles if article.reviewOutcome == "included"),
-        pendingExtraction=sum(
-            1
-            for article in articles
-            if article.reviewOutcome == "included"
-            and getattr(article, "extractionCompletedAt", None) is None
-        ),
-        duplicatesRemoved=duplicates_removed,
-        greyLiterature=sum(1 for article in articles if article.sourceCategory == "grey_literature"),
-        fullTextUnavailable=sum(1 for article in articles if article.reviewOutcome == "full_text_unavailable"),
-        bySource=_format_source_breakdown(articles),
-    )
-
-
-def _selection_report_from_articles(project: Project, articles: list[Article]) -> SelectionReportResponse:
-    exclusion_reason_map = {
-        "screening": {},
-        "eligibility": {},
-    }
-    for article in articles:
-        if article.reviewOutcome == "excluded_screening" and article.screeningReasonText:
-            exclusion_reason_map["screening"][article.screeningReasonText] = (
-                exclusion_reason_map["screening"].get(article.screeningReasonText, 0) + 1
-            )
-        if article.reviewOutcome in {"excluded_eligibility", "full_text_unavailable"}:
-            reason = article.eligibilityReasonText or "Texto completo indisponível"
-            exclusion_reason_map["eligibility"][reason] = exclusion_reason_map["eligibility"].get(reason, 0) + 1
-
-    exclusion_reasons = {
-        key: [
-            {"reason": reason, "count": count}
-            for reason, count in sorted(values.items(), key=lambda item: (-item[1], item[0]))
-        ]
-        for key, values in exclusion_reason_map.items()
-    }
-
-    screening_pool = sum(
-        1 for article in articles if article.currentPhase in {"screening", "eligibility", "included"} or article.reviewOutcome == "excluded_screening"
-    )
-    eligibility_pool = sum(
-        1 for article in articles if article.currentPhase in {"eligibility", "included"} or article.reviewOutcome in {"excluded_eligibility", "full_text_unavailable"}
-    )
-
-    return SelectionReportResponse(
-        projectId=project.id,
-        projectTitle=project.title,
-        counts=SelectionReportCounts(
-            identified=len(articles),
-            duplicatesRemoved=sum(1 for article in articles if article.reviewOutcome == "duplicate_removed"),
-            screeningPool=screening_pool,
-            excludedScreening=sum(1 for article in articles if article.reviewOutcome == "excluded_screening"),
-            eligibilityPool=eligibility_pool,
-            fullTextUnavailable=sum(1 for article in articles if article.reviewOutcome == "full_text_unavailable"),
-            excludedEligibility=sum(1 for article in articles if article.reviewOutcome == "excluded_eligibility"),
-            included=sum(1 for article in articles if article.reviewOutcome == "included"),
-        ),
-        bySource=_format_source_breakdown(articles),
-        exclusionReasons=exclusion_reasons,
-        greyLiteratureCount=sum(1 for article in articles if article.sourceCategory == "grey_literature"),
-    )
-
-
-def _build_report_csv(report: SelectionReportResponse) -> str:
-    output = StringIO()
-    writer = csv.writer(output)
-
-    writer.writerow(["metric", "value"])
-    writer.writerow(["identified", report.counts.identified])
-    writer.writerow(["duplicates_removed", report.counts.duplicatesRemoved])
-    writer.writerow(["screening_pool", report.counts.screeningPool])
-    writer.writerow(["excluded_screening", report.counts.excludedScreening])
-    writer.writerow(["eligibility_pool", report.counts.eligibilityPool])
-    writer.writerow(["full_text_unavailable", report.counts.fullTextUnavailable])
-    writer.writerow(["excluded_eligibility", report.counts.excludedEligibility])
-    writer.writerow(["included", report.counts.included])
-    writer.writerow(["grey_literature", report.greyLiteratureCount])
-    writer.writerow([])
-    writer.writerow(["source_category", "source_name", "total", "included", "duplicates_removed", "excluded"])
-    for item in report.bySource:
-        writer.writerow(
-            [
-                item["sourceCategory"],
-                item["sourceName"],
-                item["total"],
-                item["included"],
-                item["duplicatesRemoved"],
-                item["excluded"],
-            ]
-        )
-    writer.writerow([])
-    writer.writerow(["phase", "reason", "count"])
-    for phase, reasons in report.exclusionReasons.items():
-        for item in reasons:
-            writer.writerow([phase, item["reason"], item["count"]])
-
-    return output.getvalue()
-
-
-def _create_article_entity(
-    *,
-    payload,
-    project_id: int,
-    owner_id: int,
-    entry_method: str,
-    source_category: str,
-    source_name: str,
-    import_batch_label: str | None,
-    study_type: str | None = None,
-) -> Article:
-    article = Article(
-        title=payload.title,
-        authors=payload.authors,
-        year=payload.year,
-        journal=payload.journal,
-        doi=payload.doi,
-        abstract=payload.abstract,
-        keywords=payload.keywords,
-        pages=payload.pages,
-        volume=payload.volume,
-        number=payload.number,
-        issn=payload.issn,
-        notas=payload.notas,
-        projectId=project_id,
-        ownerId=owner_id,
-        entryMethod=entry_method,
-        sourceCategory=source_category,
-        sourceName=source_name,
-        importBatchLabel=import_batch_label,
-        studyType=study_type if study_type is not None else getattr(payload, "studyType", None),
-        currentPhase="identification",
-        reviewOutcome="active",
-        screeningDecision="pending",
-        fullTextStatus="not_requested",
-        eligibilityDecision="pending",
-    )
-    article.paperId = _resolve_paper_id(
-        provided=getattr(payload, "paperId", None),
-        doi=article.doi,
-        title=article.title,
-        year=article.year,
-    )
-    _set_legacy_state_from_workflow(article)
-    return article
-
-
-async def _evaluate_article_if_possible(
-    article: Article, project: Project, ai_service: AIService | None
-) -> None:
-    if not article.abstract:
-        return
-
-    try:
-        if ai_service is not None:
-            eval_result = await ai_service.evaluate_article(
-                {"title": article.title, "abstract": article.abstract},
-                _build_project_ai_context(project),
-            )
-            _apply_ai_evaluation(article, eval_result)
-    except Exception:  # pragma: no cover - external service
-        logger.exception("Erro ao avaliar artigo %s com IA", article.title)
-
-    try:
-        from app.services.embedding_service import get_embedding_service
-
-        embedding_service = get_embedding_service()
-        embedding = await asyncio.to_thread(embedding_service.generate_embedding, article.abstract)
-        if embedding:
-            article._embedding_cache = embedding
-    except Exception:  # pragma: no cover - external service
-        logger.exception("Erro ao gerar embedding do artigo %s", article.title)
-
-
-def _build_duplicate_candidates_from_articles(articles: list[Article]) -> list[DuplicateCandidate]:
-    groups: dict[str, DuplicateCandidate] = {}
-    candidate_pool = [article for article in articles if article.reviewOutcome == "active"]
-
-    used_ids: set[int] = set()
-    doi_groups: dict[str, list[Article]] = {}
-    for article in candidate_pool:
-        normalized_doi = _normalize_doi(article.doi)
-        if normalized_doi:
-            doi_groups.setdefault(normalized_doi, []).append(article)
-
-    for normalized_doi, matches in doi_groups.items():
-        if len(matches) < 2:
-            continue
-        group_key = f"doi:{normalized_doi}"
-        groups[group_key] = DuplicateCandidate(
-            groupKey=group_key,
-            reasonCode="same_doi",
-            reasonText="DOI idêntico detectado automaticamente.",
-            candidateIds=[article.id for article in matches],
-            articles=[
-                DuplicateCandidateArticle(
-                    id=article.id,
-                    title=article.title,
-                    authors=article.authors,
-                    year=article.year,
-                    journal=article.journal,
-                    doi=article.doi,
-                    sourceName=article.sourceName,
-                    sourceCategory=article.sourceCategory,
-                    reviewOutcome=article.reviewOutcome,
-                )
-                for article in matches
-            ],
-        )
-        used_ids.update(article.id for article in matches)
-
-    title_year_groups: dict[str, list[Article]] = {}
-    for article in candidate_pool:
-        if article.id in used_ids:
-            continue
-        key = _title_year_key(article.title, article.year)
-        if key:
-            title_year_groups.setdefault(key, []).append(article)
-
-    for title_year_key, matches in title_year_groups.items():
-        if len(matches) < 2:
-            continue
-        group_key = f"title-year:{title_year_key}"
-        groups[group_key] = DuplicateCandidate(
-            groupKey=group_key,
-            reasonCode="same_title_year",
-            reasonText="Título normalizado e ano coincidem.",
-            candidateIds=[article.id for article in matches],
-            articles=[
-                DuplicateCandidateArticle(
-                    id=article.id,
-                    title=article.title,
-                    authors=article.authors,
-                    year=article.year,
-                    journal=article.journal,
-                    doi=article.doi,
-                    sourceName=article.sourceName,
-                    sourceCategory=article.sourceCategory,
-                    reviewOutcome=article.reviewOutcome,
-                )
-                for article in matches
-            ],
-        )
-        used_ids.update(article.id for article in matches)
-
-    remaining = [article for article in candidate_pool if article.id not in used_ids]
-    strong_group_index = 0
-    strong_groups: list[list[Article]] = []
-    visited: set[int] = set()
-    for article in remaining:
-        if article.id in visited:
-            continue
-        cluster = [article]
-        visited.add(article.id)
-        article_title = _normalize_text(article.title)
-        article_authors = _shared_author_signature(article.authors)
-        article_doi = _normalize_doi(article.doi)
-        for other in remaining:
-            if other.id in visited or other.id == article.id:
-                continue
-            if article.year != other.year:
-                continue
-            other_doi = _normalize_doi(other.doi)
-            if article_doi and other_doi and article_doi != other_doi:
-                continue
-            other_title = _normalize_text(other.title)
-            if not article_title or not other_title:
-                continue
-            similarity = SequenceMatcher(None, article_title, other_title).ratio()
-            other_authors = _shared_author_signature(other.authors)
-            if similarity >= 0.96 and (article_authors & other_authors or _normalize_text(article.journal) == _normalize_text(other.journal)):
-                cluster.append(other)
-                visited.add(other.id)
-        if len(cluster) > 1:
-            strong_groups.append(cluster)
-
-    for matches in strong_groups:
-        strong_group_index += 1
-        group_key = f"strong:{strong_group_index}"
-        groups[group_key] = DuplicateCandidate(
-            groupKey=group_key,
-            reasonCode="strong_metadata_match",
-            reasonText="Alta similaridade entre título, ano e metadados.",
-            candidateIds=[article.id for article in matches],
-            articles=[
-                DuplicateCandidateArticle(
-                    id=article.id,
-                    title=article.title,
-                    authors=article.authors,
-                    year=article.year,
-                    journal=article.journal,
-                    doi=article.doi,
-                    sourceName=article.sourceName,
-                    sourceCategory=article.sourceCategory,
-                    reviewOutcome=article.reviewOutcome,
-                )
-                for article in matches
-            ],
-        )
-
-    return sorted(groups.values(), key=lambda item: item.groupKey)
-
-
-def _assign_duplicate_markers(articles: list[Article], candidates: list[DuplicateCandidate]) -> None:
-    for article in articles:
-        if article.reviewOutcome == "active":
-            article.duplicateGroupKey = None
-            article.duplicateReasonCode = None
-            article.duplicateReasonText = None
-
-    article_map = {article.id: article for article in articles}
-    for candidate in candidates:
-        for article_id in candidate.candidateIds:
-            article = article_map.get(article_id)
-            if article is None or article.reviewOutcome != "active":
-                continue
-            article.duplicateGroupKey = candidate.groupKey
-            article.duplicateReasonCode = candidate.reasonCode
-            article.duplicateReasonText = candidate.reasonText
-
-
-def _promote_unique_identification_articles(articles: list[Article]) -> dict[str, int]:
-    identification_articles = [
-        article
-        for article in articles
-        if article.reviewOutcome == "active" and article.currentPhase == "identification"
-    ]
-    candidates = _build_duplicate_candidates_from_articles(identification_articles)
-    _assign_duplicate_markers(identification_articles, candidates)
-
-    unresolved_ids = {
-        article_id
-        for candidate in candidates
-        for article_id in candidate.candidateIds
-    }
-    moved_count = 0
-    for article in identification_articles:
-        if article.id in unresolved_ids:
-            continue
-        article.currentPhase = "screening"
-        article.screeningDecision = "pending"
-        _set_legacy_state_from_workflow(article)
-        moved_count += 1
-
-    return {
-        "movedCount": moved_count,
-        "unresolvedDuplicateGroups": len(candidates),
-        "unresolvedDuplicateRecords": len(unresolved_ids),
-    }
 
 
 @router.get("/source-options")
@@ -1296,16 +298,25 @@ async def get_articles_by_project(
         query = query.where(Article.currentPhase == phase)
 
     if assignedToMe:
-        relevant_phase = phase if phase in {"screening", "eligibility"} else case(
-            (Article.currentPhase.in_(["identification", "screening"]), "screening"), else_="eligibility"
+        relevant_phase = (
+            phase
+            if phase in {"screening", "eligibility"}
+            else case(
+                (Article.currentPhase.in_(["identification", "screening"]), "screening"),
+                else_="eligibility",
+            )
         )
-        query = query.where(select(ReviewAssignment.id).where(
-            ReviewAssignment.articleId == Article.id,
-            ReviewAssignment.projectId == projectId,
-            ReviewAssignment.reviewerUserId == current_user.id,
-            ReviewAssignment.phase == relevant_phase,
-            ReviewAssignment.status != "cancelled",
-        ).exists())
+        query = query.where(
+            select(ReviewAssignment.id)
+            .where(
+                ReviewAssignment.articleId == Article.id,
+                ReviewAssignment.projectId == projectId,
+                ReviewAssignment.reviewerUserId == current_user.id,
+                ReviewAssignment.phase == relevant_phase,
+                ReviewAssignment.status != "cancelled",
+            )
+            .exists()
+        )
 
     if outcome:
         query = query.where(Article.reviewOutcome == outcome)
@@ -1330,7 +341,9 @@ async def get_articles_by_project(
     articles = result.scalars().all()
 
     return ArticleListResponse(
-        articles=await _article_responses(db, articles, access=access, user_id=current_user.id, phase=phase),
+        articles=await _article_responses(
+            db, articles, access=access, user_id=current_user.id, phase=phase
+        ),
         total=total,
         page=page,
         limit=limit,
@@ -1344,11 +357,9 @@ async def get_project_selection_summary(
     db: AsyncSession = Depends(get_db),
 ):
     await get_project_or_404(projectId, current_user.id, db)
-    result = await db.execute(
-        select(Article).where(Article.projectId == projectId)
-    )
+    result = await db.execute(select(Article).where(Article.projectId == projectId))
     articles = result.scalars().all()
-    return _selection_summary_from_articles(projectId, articles)
+    return selection_summary_from_articles(projectId, articles)
 
 
 @router.get("/{projectId}/artigos/filter-summary")
@@ -1357,7 +368,9 @@ async def get_project_filter_summary(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    summary = await get_project_selection_summary(projectId=projectId, current_user=current_user, db=db)
+    summary = await get_project_selection_summary(
+        projectId=projectId, current_user=current_user, db=db
+    )
     return summary.model_dump()
 
 
@@ -1368,11 +381,9 @@ async def get_project_selection_report(
     db: AsyncSession = Depends(get_db),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
-    result = await db.execute(
-        select(Article).where(Article.projectId == projectId)
-    )
+    result = await db.execute(select(Article).where(Article.projectId == projectId))
     articles = result.scalars().all()
-    return _selection_report_from_articles(project, articles)
+    return build_selection_report(project, articles)
 
 
 @router.get("/{projectId}/selection-report/export")
@@ -1382,19 +393,25 @@ async def export_project_selection_report(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    report = await get_project_selection_report(projectId=projectId, current_user=current_user, db=db)
+    report = await get_project_selection_report(
+        projectId=projectId, current_user=current_user, db=db
+    )
     if format == "csv":
-        csv_content = _build_report_csv(report)
+        csv_content = build_report_csv(report)
         return StreamingResponse(
             iter([csv_content]),
             media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="selection-report-{projectId}.csv"'},
+            headers={
+                "Content-Disposition": f'attachment; filename="selection-report-{projectId}.csv"'
+            },
         )
 
     return JSONResponse(content=report.model_dump())
 
 
-@router.post("/{projectId}/artigos", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{projectId}/artigos", response_model=ArticleResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_article(
     projectId: int,
     data: ArticleCreate,
@@ -1403,25 +420,12 @@ async def create_article(
     ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
-    require_capability(access, CAP_EDIT_PROJECT)
-    project = access.project
-    article = _create_article_entity(
-        payload=data,
-        project_id=projectId,
-        owner_id=current_user.id,
-        entry_method=data.entryMethod,
-        source_category=data.sourceCategory,
-        source_name=data.sourceName,
-        import_batch_label=data.importBatchLabel,
-        study_type=data.studyType,
+    article = await article_mutation_service.create_article(
+        db, access=access, request=data, actor_user_id=current_user.id, ai_service=ai_service
     )
-
-    await _evaluate_article_if_possible(article, project, ai_service)
-
-    db.add(article)
     await db.commit()
     await db.refresh(article)
-    return _build_article_response(article)
+    return build_article_response(article)
 
 
 @router.post("/{projectId}/artigos/import-bibtex", response_model=ImportBibTeXResponse)
@@ -1434,35 +438,16 @@ async def import_bibtex_entries(
     ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
-    require_capability(access, CAP_EDIT_PROJECT)
-    project = access.project
-    batch_label = data.importBatchLabel or f"bibtex-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-    article_ids: list[int] = []
-
-    for entry in data.entries:
-        article = _create_article_entity(
-            payload=entry,
-            project_id=projectId,
-            owner_id=current_user.id,
-            entry_method="bibtex",
-            source_category=data.sourceCategory,
-            source_name=data.sourceName,
-            import_batch_label=batch_label,
-            study_type=data.studyType,
-        )
-        if evaluate_ai:
-            await _evaluate_article_if_possible(article, project, ai_service)
-        db.add(article)
-        await db.flush()
-        article_ids.append(article.id)
-
-    await db.commit()
-    return ImportBibTeXResponse(
-        projectId=projectId,
-        importedCount=len(article_ids),
-        batchLabel=batch_label,
-        articleIds=article_ids,
+    response = await import_bibtex_articles(
+        db,
+        access=access,
+        request=data,
+        actor_user_id=current_user.id,
+        ai_service=ai_service,
+        evaluate_ai=evaluate_ai,
     )
+    await db.commit()
+    return response
 
 
 @router.post("/{projectId}/artigos/dedup/analyze", response_model=DedupAnalyzeResponse)
@@ -1473,12 +458,10 @@ async def analyze_duplicates(
 ):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     require_capability(access, CAP_EDIT_PROJECT)
-    result = await db.execute(
-        select(Article).where(Article.projectId == projectId)
-    )
+    result = await db.execute(select(Article).where(Article.projectId == projectId))
     articles = result.scalars().all()
-    candidates = _build_duplicate_candidates_from_articles(articles)
-    _assign_duplicate_markers(articles, candidates)
+    candidates = analyze_article_duplicates(articles)
+    assign_duplicate_markers(articles, candidates)
     await db.commit()
 
     return DedupAnalyzeResponse(
@@ -1549,11 +532,16 @@ async def apply_duplicate_decisions(
     removed_duplicates = 0
 
     for decision in data.decisions:
-        canonical = await get_article_or_404(decision.canonicalArticleId, projectId, current_user.id, db)
+        canonical = await get_article_or_404(
+            decision.canonicalArticleId, projectId, current_user.id, db
+        )
         if canonical.duplicateGroupKey != decision.groupKey:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Grupo inválido", "message": "Artigo canônico fora do grupo selecionado."},
+                detail={
+                    "error": "Grupo inválido",
+                    "message": "Artigo canônico fora do grupo selecionado.",
+                },
             )
 
         canonical.duplicateGroupKey = None
@@ -1571,10 +559,11 @@ async def apply_duplicate_decisions(
             duplicate.eligibilityDecision = "excluded"
             duplicate.fullTextStatus = "not_requested"
             duplicate.answeringRQs = []
-            _set_legacy_state_from_workflow(duplicate)
+            apply_legacy_review_state(duplicate)
+            await enqueue_article_index(db, article_id=duplicate.id, project_id=projectId)
             removed_duplicates += 1
 
-        _set_legacy_state_from_workflow(canonical)
+        apply_legacy_review_state(canonical)
         applied_groups += 1
 
     await db.commit()
@@ -1601,7 +590,7 @@ async def promote_articles_to_screening(
             continue
         article.currentPhase = "screening"
         article.screeningDecision = "pending"
-        _set_legacy_state_from_workflow(article)
+        apply_legacy_review_state(article)
         moved_count += 1
 
     await db.commit()
@@ -1626,7 +615,7 @@ async def promote_unique_articles_to_screening(
             Article.reviewOutcome == "active",
         )
     )
-    counts = _promote_unique_identification_articles(list(result.scalars().all()))
+    counts = promote_unique_identification_articles(list(result.scalars().all()))
     await db.commit()
     return PromoteUniqueToScreeningResponse(projectId=projectId, **counts)
 
@@ -1652,17 +641,22 @@ async def screening_decision(
             reviewer_user_id=current_user.id,
         )
         if result.state == "consolidated":
-            _set_legacy_state_from_workflow(result.article)
+            apply_legacy_review_state(result.article)
+        if result.state == "consolidated":
+            await enqueue_article_index(db, article_id=result.article.id, project_id=projectId)
         await db.commit()
         await db.refresh(result.article)
-        if result.state == "consolidated":
-            await sync_article_indexes(result.article, db)
-        return await _caller_article_response(db, result.article, current_user.id, phase="screening")
+        return await _caller_article_response(
+            db, result.article, current_user.id, phase="screening"
+        )
 
     if access.role != "owner":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "REVIEW_NOT_ASSIGNED", "message": "Este artigo não foi atribuído a você."},
+            detail={
+                "code": "REVIEW_NOT_ASSIGNED",
+                "message": "Este artigo não foi atribuído a você.",
+            },
         )
 
     if article.reviewOutcome != "active":
@@ -1671,37 +665,22 @@ async def screening_decision(
     if article.currentPhase not in {"screening", "identification"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Etapa inválida", "message": "O artigo não está disponível para screening."},
+            detail={
+                "error": "Etapa inválida",
+                "message": "O artigo não está disponível para screening.",
+            },
         )
 
-    if data.decision == "excluded" and not (data.reasonText or "").strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Justificativa obrigatória", "message": "Informe o motivo da exclusão no screening."},
-        )
-
-    article.currentPhase = "screening"
-    article.screeningDecision = data.decision
-    article.screeningReasonText = (data.reasonText or "").strip() or None
-    article.screeningReviewedAt = datetime.utcnow()
-    article.duplicateGroupKey = None
-    article.duplicateReasonCode = None
-    article.duplicateReasonText = None
-
-    if data.decision == "included":
-        article.currentPhase = "eligibility"
-        article.reviewOutcome = "active"
-        article.fullTextStatus = "uploaded" if article.pdfData is not None else "pending_upload"
-    else:
-        article.reviewOutcome = "excluded_screening"
-        article.eligibilityDecision = "excluded"
-        article.answeringRQs = []
-
-    _set_legacy_state_from_workflow(article)
+    apply_review_decision(
+        article,
+        phase="screening",
+        decision=ReviewDecisionData(decision=data.decision, reason_text=data.reasonText),
+        now=datetime.now(timezone.utc),
+    )
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
-    await sync_article_indexes(article, db)
-    return _build_article_response(article)
+    return build_article_response(article)
 
 
 @router.post("/{projectId}/artigos/{articleId}/evaluate", response_model=ArticleResponse)
@@ -1715,10 +694,11 @@ async def evaluate_single_article(
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     project = await get_project_or_404(projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id, administrative=True)
-    await _evaluate_article_if_possible(article, project, ai_service)
+    await evaluate_article_if_possible(article, project, ai_service)
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
-    return _build_article_response(article)
+    return build_article_response(article)
 
 
 @router.post("/{projectId}/artigos/screening/batch-evaluate", response_model=BatchEvaluateResponse)
@@ -1762,7 +742,7 @@ async def batch_evaluate_screening(
     if not candidates:
         return BatchEvaluateResponse(projectId=projectId, summary=BatchEvaluateSummary(**summary))
 
-    project_data = _build_project_ai_context(project)
+    project_data = build_project_ai_context(project)
 
     for article in candidates:
         if not article.abstract:
@@ -1782,7 +762,7 @@ async def batch_evaluate_screening(
             {"title": article.title, "abstract": article.abstract},
             project_data,
         )
-        _apply_ai_evaluation(article, eval_result)
+        apply_ai_evaluation(article, eval_result)
         summary["evaluated"] += 1
         if article.aiSuggestedStatus == "incluido":
             summary["suggestedIncluded"] += 1
@@ -1806,20 +786,30 @@ async def update_full_text_status(
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
     # Protect managed outcomes after consolidation while the collaborative rollout is active.
-    managed = await db.scalar(select(ReviewAssignment.id).where(
-        ReviewAssignment.articleId == articleId,
-        ReviewAssignment.phase == "eligibility",
-        ReviewAssignment.status != "cancelled",
-    ).limit(1))
+    managed = await db.scalar(
+        select(ReviewAssignment.id)
+        .where(
+            ReviewAssignment.articleId == articleId,
+            ReviewAssignment.phase == "eligibility",
+            ReviewAssignment.status != "cancelled",
+        )
+        .limit(1)
+    )
     if managed is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={
-            "code": "MANAGED_REVIEW",
-            "message": "Revisão gerenciada: use eligibility-decision para texto completo indisponível ou o endpoint PDF para enviar o arquivo.",
-        })
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "MANAGED_REVIEW",
+                "message": "Revisão gerenciada: use eligibility-decision para texto completo indisponível ou o endpoint PDF para enviar o arquivo.",
+            },
+        )
     if article.currentPhase != "eligibility":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Etapa inválida", "message": "O status de texto completo só pode ser alterado na elegibilidade."},
+            detail={
+                "error": "Etapa inválida",
+                "message": "O status de texto completo só pode ser alterado na elegibilidade.",
+            },
         )
 
     article.fullTextStatus = data.fullTextStatus
@@ -1827,7 +817,10 @@ async def update_full_text_status(
         if not (data.reasonText or "").strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Justificativa obrigatória", "message": "Informe o motivo para texto completo indisponível."},
+                detail={
+                    "error": "Justificativa obrigatória",
+                    "message": "Informe o motivo para texto completo indisponível.",
+                },
             )
         article.reviewOutcome = "full_text_unavailable"
         article.eligibilityDecision = "excluded"
@@ -1840,14 +833,16 @@ async def update_full_text_status(
         article.eligibilityReasonText = None
         article.eligibilityReviewedAt = None
 
-    _set_legacy_state_from_workflow(article)
+    apply_legacy_review_state(article)
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
-    await sync_article_indexes(article, db)
     return await _caller_article_response(db, article, current_user.id)
 
 
-@router.post("/{projectId}/artigos/{articleId}/eligibility-decision", response_model=ArticleResponse)
+@router.post(
+    "/{projectId}/artigos/{articleId}/eligibility-decision", response_model=ArticleResponse
+)
 async def eligibility_decision(
     projectId: int,
     articleId: int,
@@ -1869,17 +864,22 @@ async def eligibility_decision(
         )
         if result.state == "consolidated":
             apply_quality_metrics(result.article, project.qualityAssessmentSchema or [])
-            _set_legacy_state_from_workflow(result.article)
+            apply_legacy_review_state(result.article)
+        if result.state == "consolidated":
+            await enqueue_article_index(db, article_id=result.article.id, project_id=projectId)
         await db.commit()
         await db.refresh(result.article)
-        if result.state == "consolidated":
-            await sync_article_indexes(result.article, db)
-        return await _caller_article_response(db, result.article, current_user.id, phase="eligibility")
+        return await _caller_article_response(
+            db, result.article, current_user.id, phase="eligibility"
+        )
 
     if access.role != "owner":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail={"code": "REVIEW_NOT_ASSIGNED", "message": "Este artigo não foi atribuído a você."},
+            detail={
+                "code": "REVIEW_NOT_ASSIGNED",
+                "message": "Este artigo não foi atribuído a você.",
+            },
         )
     if article.currentPhase not in {"eligibility", "included"}:
         raise HTTPException(
@@ -1887,51 +887,24 @@ async def eligibility_decision(
             detail={"error": "Etapa inválida", "message": "O artigo não está em elegibilidade."},
         )
 
-    reason_text = (data.reasonText or "").strip() or None
-    if data.decision in {"excluded", "full_text_unavailable"} and not reason_text:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Justificativa obrigatória", "message": "Informe o motivo da decisão final."},
-        )
-
-    article.eligibilityReviewedAt = datetime.utcnow()
-    article.eligibilityChecklistAnswers = data.checklistAnswers or {}
-
-    if data.decision == "included":
-        if article.pdfData is None and article.fullTextStatus != "uploaded":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "PDF obrigatório", "message": "Faça upload do texto completo antes de incluir no corpus final."},
-            )
-        article.currentPhase = "included"
-        article.reviewOutcome = "included"
-        article.fullTextStatus = "uploaded"
-        article.eligibilityDecision = "included"
-        article.eligibilityReasonText = reason_text
-        article.includedAt = datetime.utcnow()
-        article.answeringRQs = sorted({rq for rq in data.answeringRQs if isinstance(rq, int) and rq > 0})
-    elif data.decision == "full_text_unavailable":
-        article.currentPhase = "eligibility"
-        article.reviewOutcome = "full_text_unavailable"
-        article.fullTextStatus = "unavailable"
-        article.eligibilityDecision = "excluded"
-        article.eligibilityReasonText = reason_text
-        article.includedAt = None
-        article.answeringRQs = []
-    else:
-        article.currentPhase = "eligibility"
-        article.reviewOutcome = "excluded_eligibility"
-        article.eligibilityDecision = "excluded"
-        article.eligibilityReasonText = reason_text
-        article.includedAt = None
-        article.answeringRQs = []
+    apply_review_decision(
+        article,
+        phase="eligibility",
+        decision=ReviewDecisionData(
+            decision=data.decision,
+            reason_text=data.reasonText,
+            checklist_answers=data.checklistAnswers,
+            answering_rqs=data.answeringRQs,
+        ),
+        now=datetime.now(timezone.utc),
+    )
 
     apply_quality_metrics(article, project.qualityAssessmentSchema or [])
-    _set_legacy_state_from_workflow(article)
+    apply_legacy_review_state(article)
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
-    await sync_article_indexes(article, db)
-    return _build_article_response(article)
+    return build_article_response(article)
 
 
 @router.patch("/{projectId}/artigos/{articleId}/evidence", response_model=ArticleResponse)
@@ -1946,7 +919,7 @@ async def update_article_evidence(
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
 
-    if not _is_included_for_synthesis(article):
+    if not is_included_for_synthesis(article):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -1972,6 +945,7 @@ async def update_article_evidence(
     if data.markExtractionComplete:
         article.extractionCompletedAt = datetime.utcnow()
 
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
     return await _caller_article_response(db, article, current_user.id)
@@ -1986,25 +960,50 @@ async def get_project_synthesis_report(
     db: AsyncSession = Depends(get_db),
 ):
     project = await get_project_or_404(projectId, current_user.id, db)
-    total = await db.scalar(select(func.count(Article.id)).where(Article.projectId == projectId)) or 0
+    total = (
+        await db.scalar(select(func.count(Article.id)).where(Article.projectId == projectId)) or 0
+    )
     result = await db.execute(
         select(Article)
-        .options(load_only(
-            Article.id, Article.paperId, Article.title, Article.authors, Article.year, Article.journal,
-            Article.sourceName, Article.sourceCategory, Article.reviewOutcome, Article.manualDecision,
-            Article.answeringRQs, Article.extractionData, Article.extractionCompletedAt,
-            Article.qualityAssessmentAnswers, Article.qualityScore, Article.qualityRating,
-            Article.eligibilityReasonText, Article.screeningReasonText, Article.manualDecisionReason,
-            Article.aiEvaluation, Article.notas, Article.status,
-        ))
+        .options(
+            load_only(
+                Article.id,
+                Article.paperId,
+                Article.title,
+                Article.authors,
+                Article.year,
+                Article.journal,
+                Article.sourceName,
+                Article.sourceCategory,
+                Article.reviewOutcome,
+                Article.manualDecision,
+                Article.answeringRQs,
+                Article.extractionData,
+                Article.extractionCompletedAt,
+                Article.qualityAssessmentAnswers,
+                Article.qualityScore,
+                Article.qualityRating,
+                Article.eligibilityReasonText,
+                Article.screeningReasonText,
+                Article.manualDecisionReason,
+                Article.aiEvaluation,
+                Article.notas,
+                Article.status,
+            )
+        )
         .where(Article.projectId == projectId)
         .order_by(Article.title, Article.id)
         .offset((page - 1) * pageSize)
         .limit(pageSize)
     )
     articles = result.scalars().all()
-    report = _build_synthesis_report(project, articles)
-    report["pagination"] = {"page": page, "pageSize": pageSize, "total": int(total), "isComplete": pageSize >= total and page == 1}
+    report = build_synthesis_report(project, articles)
+    report["pagination"] = {
+        "page": page,
+        "pageSize": pageSize,
+        "total": int(total),
+        "isComplete": pageSize >= total and page == 1,
+    }
     return report
 
 
@@ -2016,7 +1015,9 @@ async def get_project_rq_synthesis(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    report = await get_project_synthesis_report(projectId=projectId, page=page, pageSize=pageSize, current_user=current_user, db=db)
+    report = await get_project_synthesis_report(
+        projectId=projectId, page=page, pageSize=pageSize, current_user=current_user, db=db
+    )
     return {
         "projectId": report["projectId"],
         "projectTitle": report["projectTitle"],
@@ -2050,33 +1051,19 @@ async def update_article(
     db: AsyncSession = Depends(get_db),
     ai_service: AIService | None = Depends(get_optional_user_ai_service),
 ):
-    article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    project = await get_project_or_404(projectId, current_user.id, db)
-    await _require_article_write(db, article, current_user.id, administrative=True)
-
-    update_data = data.model_dump(exclude_unset=True)
-    anchor_fields_changed = any(key in update_data for key in ("paperId", "doi", "title", "year"))
-    abstract_changed = "abstract" in update_data
-
-    for field, value in update_data.items():
-        setattr(article, field, value)
-
-    if anchor_fields_changed:
-        article.paperId = _resolve_paper_id(
-            provided=article.paperId,
-            doi=article.doi,
-            title=article.title,
-            year=article.year,
-        )
-
-    if abstract_changed:
-        await _evaluate_article_if_possible(article, project, ai_service)
-
-    _set_legacy_state_from_workflow(article)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    article = await article_mutation_service.update_article(
+        db,
+        access=access,
+        article_id=articleId,
+        request=data,
+        actor_user_id=current_user.id,
+        ai_service=ai_service,
+    )
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
-    await sync_article_indexes(article, db)
-    return _build_article_response(article)
+    return build_article_response(article)
 
 
 @router.patch("/{projectId}/artigos/{articleId}/status", response_model=ArticleResponse)
@@ -2092,7 +1079,7 @@ async def update_article_status(
     article.status = data.status
     await db.commit()
     await db.refresh(article)
-    return _build_article_response(article)
+    return build_article_response(article)
 
 
 @router.put("/{projectId}/artigos/{articleId}/decision", response_model=ArticleResponse)
@@ -2105,8 +1092,16 @@ async def update_article_decision(
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
-    if data.decision == "pendente" and await has_active_assignments(db, article_id=articleId, phase=_review_phase(article)):
-        raise HTTPException(status_code=409, detail={"code": "ASSIGNED_REVIEW_ACTIVE", "message": "Reabra a revisão pelo fluxo de coordenação."})
+    if data.decision == "pendente" and await has_active_assignments(
+        db, article_id=articleId, phase=_review_phase(article)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ASSIGNED_REVIEW_ACTIVE",
+                "message": "Reabra a revisão pelo fluxo de coordenação.",
+            },
+        )
     if article.currentPhase in {"identification", "screening"}:
         decision_payload = ScreeningDecisionRequest(
             decision="excluded" if data.decision == "excluido" else "included",
@@ -2117,10 +1112,10 @@ async def update_article_decision(
             article.reviewOutcome = "active"
             article.screeningDecision = "pending"
             article.screeningReasonText = None
-            _set_legacy_state_from_workflow(article)
+            apply_legacy_review_state(article)
             await db.commit()
             await db.refresh(article)
-            return _build_article_response(article)
+            return build_article_response(article)
         return await screening_decision(projectId, articleId, decision_payload, current_user, db)
 
     if data.decision == "pendente":
@@ -2128,11 +1123,11 @@ async def update_article_decision(
         article.reviewOutcome = "active"
         article.eligibilityDecision = "pending"
         article.eligibilityReasonText = None
-        _set_legacy_state_from_workflow(article)
+        apply_legacy_review_state(article)
+        await enqueue_article_index(db, article_id=article.id, project_id=projectId)
         await db.commit()
         await db.refresh(article)
-        await sync_article_indexes(article, db)
-        return _build_article_response(article)
+        return build_article_response(article)
 
     decision_payload = EligibilityDecisionRequest(
         decision="included" if data.decision == "incluido" else "excluded",
@@ -2154,9 +1149,9 @@ async def update_article_notes(
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
     article.notas = data.notas
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
-    await sync_article_indexes(article, db)
     return await _caller_article_response(db, article, current_user.id)
 
 
@@ -2167,14 +1162,11 @@ async def delete_article(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    await _require_article_write(db, article, current_user.id, administrative=True)
-    try:
-        await get_article_index_service().remove(article_id=articleId, project_id=projectId)
-    except Exception:
-        logger.exception("Article %s index removal failed", articleId)
-
-    await db.delete(article)
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    await article_mutation_service.delete_article(
+        db, access=access, article_id=articleId, actor_user_id=current_user.id
+    )
+    await enqueue_article_index(db, article_id=articleId, project_id=projectId)
     await db.commit()
     return {"success": True, "message": "Artigo removido com sucesso"}
 
@@ -2189,36 +1181,10 @@ async def upload_pdf(
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
     await _require_article_write(db, article, current_user.id)
-    if article.currentPhase != "eligibility":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Etapa inválida", "message": "O upload do PDF só é permitido na elegibilidade."},
-        )
-
-    if file.content_type != "application/pdf":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Tipo inválido", "message": "Apenas arquivos PDF são permitidos"},
-        )
-
-    content = await file.read()
-    if len(content) > 10 * 1024 * 1024:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "Arquivo muito grande", "message": "O tamanho máximo permitido é 10MB"},
-        )
-
-    article.pdfData = content
-    article.pdfFilename = file.filename
-    article.pdfContentType = file.content_type
-    article.fullTextStatus = "uploaded"
-    if article.reviewOutcome == "full_text_unavailable":
-        article.reviewOutcome = "active"
-        article.eligibilityDecision = "pending"
-        article.eligibilityReasonText = None
-        article.eligibilityReviewedAt = None
-
-    _set_legacy_state_from_workflow(article)
+    ArticleFileService().store_pdf(
+        article, content=await file.read(), filename=file.filename, content_type=file.content_type
+    )
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     await db.refresh(article)
     return await _caller_article_response(db, article, current_user.id)
@@ -2232,16 +1198,11 @@ async def get_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    if not article.pdfData:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "PDF não encontrado", "message": "Este artigo não possui PDF"},
-        )
-
+    content, content_type, filename = ArticleFileService().read_pdf(article)
     return StreamingResponse(
-        BytesIO(article.pdfData),
-        media_type=article.pdfContentType,
-        headers={"Content-Disposition": f'inline; filename="{article.pdfFilename or "artigo.pdf"}"'},
+        BytesIO(content),
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 
@@ -2253,16 +1214,11 @@ async def download_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    if not article.pdfData:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "PDF não encontrado", "message": "Este artigo não possui PDF"},
-        )
-
+    content, content_type, filename = ArticleFileService().read_pdf(article)
     return StreamingResponse(
-        BytesIO(article.pdfData),
-        media_type=article.pdfContentType,
-        headers={"Content-Disposition": f'attachment; filename="{article.pdfFilename or "artigo.pdf"}"'},
+        BytesIO(content),
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -2308,7 +1264,11 @@ async def get_relationships(
     db: AsyncSession = Depends(get_db),
 ):
     article = await get_article_or_404(articleId, projectId, current_user.id, db)
-    return {"related_articles": [_build_article_response(related).model_dump() for related in article.relatedArticles]}
+    return {
+        "related_articles": [
+            build_article_response(related).model_dump() for related in article.relatedArticles
+        ]
+    }
 
 
 @router.get("/{projectId}/grafo")
@@ -2350,9 +1310,7 @@ async def reprocess_project_graph(
     project = await get_project_or_404(projectId, current_user.id, db)
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     require_capability(access, CAP_EDIT_PROJECT)
-    result = await db.execute(
-        select(Article).where(Article.projectId == projectId)
-    )
+    result = await db.execute(select(Article).where(Article.projectId == projectId))
     all_articles = result.scalars().all()
     if not all_articles:
         return {"success": True, "message": "Nenhum artigo encontrado", "processed": 0}
@@ -2361,13 +1319,12 @@ async def reprocess_project_graph(
     for article in all_articles:
         if not article.abstract:
             continue
-        await _evaluate_article_if_possible(article, project, ai_service)
+        await evaluate_article_if_possible(article, project, ai_service)
         processed += 1
 
+    for article in sorted(all_articles, key=lambda item: item.id):
+        await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
-
-    for article in all_articles:
-        await sync_article_indexes(article, db)
 
     return {
         "success": True,

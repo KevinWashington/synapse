@@ -45,6 +45,7 @@ POST_BASELINE_TABLES = {
     "project_audit_events",
     "rq_syntheses",
     "synthesis_generation_jobs",
+    "article_index_tasks",
 }
 
 

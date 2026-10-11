@@ -1,40 +1,34 @@
 import asyncio
 
-import asyncpg
 import pytest
 import pytest_asyncio
+from app.database import Base
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from app.database import Base
+from db_test_support import (
+    create_test_database,
+    database_url_for_test,
+    drop_test_database,
+    new_test_database,
+)
 
-
-SYNTHESIS_TEST_DATABASE = "synapse_synthesis_identity_test"
-SYNTHESIS_TEST_URL = f"postgresql+asyncpg://synapse:synapse@localhost:5432/{SYNTHESIS_TEST_DATABASE}"
+SYNTHESIS_TEST_DATABASE = new_test_database("synthesis_identity")
+SYNTHESIS_TEST_URL = database_url_for_test(SYNTHESIS_TEST_DATABASE)
 
 
 @pytest.fixture(scope="module")
 def synthesis_database():
     async def reset(create: bool) -> None:
-        connection = await asyncpg.connect("postgresql://synapse:synapse@localhost:5432/postgres")
-        try:
-            await connection.execute(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                "WHERE datname = $1 AND pid <> pg_backend_pid()",
-                SYNTHESIS_TEST_DATABASE,
-            )
-            await connection.execute(f'DROP DATABASE IF EXISTS "{SYNTHESIS_TEST_DATABASE}"')
-            if create:
-                await connection.execute(f'CREATE DATABASE "{SYNTHESIS_TEST_DATABASE}"')
-        finally:
-            await connection.close()
-
         if create:
+            await create_test_database(SYNTHESIS_TEST_DATABASE)
             engine = create_async_engine(SYNTHESIS_TEST_URL)
             try:
                 async with engine.begin() as connection:
                     await connection.run_sync(Base.metadata.create_all)
             finally:
                 await engine.dispose()
+        else:
+            await drop_test_database(SYNTHESIS_TEST_DATABASE)
 
     asyncio.run(reset(True))
     yield SYNTHESIS_TEST_URL

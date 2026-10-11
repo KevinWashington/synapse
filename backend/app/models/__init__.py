@@ -1,5 +1,6 @@
 """SQLAlchemy models exported for metadata discovery."""
 
+from app.models.article_index import ArticleIndexTask
 from app.models.article import Article
 from app.models.collaboration import (
     ProjectAuditEvent,
@@ -16,6 +17,7 @@ from app.models.user import User
 
 __all__ = [
     "Article",
+    "ArticleIndexTask",
     "Project",
     "ProjectAuditEvent",
     "ProjectInvitation",

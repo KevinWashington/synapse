@@ -10,7 +10,7 @@ class QdrantRetrievalService:
     def __init__(self):
         self.url = settings.QDRANT_URL
         self.collection = settings.QDRANT_COLLECTION
-        self.client = AsyncQdrantClient(url=self.url)
+        self.client = AsyncQdrantClient(url=self.url, timeout=30)
         self.vector_size = 768
         self._collection_ready = False
 

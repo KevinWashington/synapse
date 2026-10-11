@@ -2,19 +2,12 @@ import asyncio
 
 import pytest
 from alembic import command
+from app.models.user import User
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from app.models.user import User
-from test_migrations import TEST_DATABASE_URL, _config, _reset_database
-
-
-@pytest.fixture(autouse=True)
-def migration_database():
-    asyncio.run(_reset_database())
-    yield
-    asyncio.run(_reset_database())
+from test_migrations import TEST_DATABASE_URL, _config
 
 
 def test_user_model_exposes_google_and_encrypted_key_fields():
@@ -28,6 +21,7 @@ def test_user_model_exposes_google_and_encrypted_key_fields():
     assert columns["deepseekKeyUpdatedAt"].nullable is True
 
 
+@pytest.mark.usefixtures("migration_database")
 def test_auth_migration_preserves_existing_user_project_ownership():
     command.upgrade(_config(), "0001_existing_schema")
 
@@ -65,8 +59,7 @@ def test_auth_migration_preserves_existing_user_project_ownership():
                 )
                 columns = await connection.run_sync(
                     lambda sync_connection: {
-                        column["name"]
-                        for column in inspect(sync_connection).get_columns("users")
+                        column["name"] for column in inspect(sync_connection).get_columns("users")
                     }
                 )
                 return int(owner_id), columns
@@ -84,6 +77,7 @@ def test_auth_migration_preserves_existing_user_project_ownership():
     } <= columns
 
 
+@pytest.mark.usefixtures("migration_database")
 def test_google_sub_is_unique_when_present():
     command.upgrade(_config(), "head")
 

@@ -111,3 +111,39 @@ async def test_embedding_failure_does_not_delete_existing_projection():
     with pytest.raises(RuntimeError):
         await service.sync(article(abstract='changed'), None)
     assert vector.points[42]['vector'] == [5.0, 1.0]
+
+
+@pytest.mark.asyncio
+async def test_graph_failure_keeps_vector_work_and_can_retry():
+    from app.services.article_index_service import ArticleIndexService
+
+    class FailingGraph(Graph):
+        async def sync_article_to_graph(self, article, db, embedding=None):
+            raise RuntimeError('graph unavailable')
+
+    vector = Vector()
+    service = ArticleIndexService(FailingGraph(), vector, Embedder())
+    with pytest.raises(RuntimeError, match='synchronization failed'):
+        await service.sync(article(abstract='short'), None)
+    assert vector.points[42]['vector'] == [5.0, 1.0]
+    service.graph = Graph()
+    await service.sync(article(abstract='short'), None)
+    assert service.graph.nodes[42] == 'Study'
+    assert vector.points[42]['vector'] == [5.0, 1.0]
+
+
+@pytest.mark.asyncio
+async def test_graph_removal_failure_still_attempts_vector_removal():
+    from app.services.article_index_service import ArticleIndexService
+
+    class FailingGraph(Graph):
+        async def delete_article_from_graph(self, article_id):
+            raise RuntimeError('graph unavailable')
+
+    vector = Vector()
+    service = ArticleIndexService(Graph(), vector, Embedder())
+    await service.sync(article(abstract='short'), None)
+    service.graph = FailingGraph()
+    with pytest.raises(RuntimeError, match='removal failed'):
+        await service.remove(article_id=42, project_id=5)
+    assert vector.points == {}

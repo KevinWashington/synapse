@@ -29,15 +29,11 @@ langchain-openai==0.3.0
 langchain-core==0.3.29
 
 # Vector DB
-qdrant-client>=1.8,<2
+qdrant-client==1.19.1
 
 # Utils
 python-dotenv==1.0.1
 
-# Dev
-pytest==8.3.0
-pytest-asyncio==0.24.0
-
-huggingface_hub
-numpy
+huggingface_hub==2.1.1
+numpy==2.5.3
 

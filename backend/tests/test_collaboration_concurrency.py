@@ -1,11 +1,7 @@
 import asyncio
 from types import SimpleNamespace
 
-import asyncpg
 import pytest
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-
 from app.database import Base
 from app.models.article import Article
 from app.models.collaboration import (
@@ -23,19 +19,33 @@ from app.services.project_access_service import (
     CAP_REVIEW_ASSIGNED,
     ProjectAccess,
 )
-from app.services.review_assignment_service import distribute_reviews
+from app.services.review_adaptation_service import adapt_reviews, preview_adaptation
+from app.services.review_assignment_service import (
+    distribute_reviews,
+    mark_reviewer_unavailable,
+)
 from app.services.review_decision_service import submit_review_decision
-from app.services.review_adaptation_service import preview_adaptation, adapt_reviews
-from app.services.review_assignment_service import mark_reviewer_unavailable
 from app.services.team_lock_service import lock_project_team
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from db_test_support import (
+    create_test_database,
+    database_url_for_test,
+    drop_test_database,
+    new_test_database,
+)
 
-DATABASE = "synapse_assignment_concurrency_test"
-URL = f"postgresql+asyncpg://synapse:synapse@localhost:5432/{DATABASE}"
+DATABASE = new_test_database("assignment_concurrency")
+URL = database_url_for_test(DATABASE)
 
 
 def test_active_assignment_slot_index_treats_reassignment_as_occupied():
-    index = next(item for item in ReviewAssignment.__table__.indexes if item.name == "uq_review_assignments_active_slot")
+    index = next(
+        item
+        for item in ReviewAssignment.__table__.indexes
+        if item.name == "uq_review_assignments_active_slot"
+    )
 
     assert "status <> 'cancelled'" in str(index.dialect_options["postgresql"]["where"])
 
@@ -43,18 +53,14 @@ def test_active_assignment_slot_index_treats_reassignment_as_occupied():
 @pytest.fixture(scope="module")
 def assignment_database():
     async def reset(create: bool) -> None:
-        connection = await asyncpg.connect("postgresql://synapse:synapse@localhost:5432/postgres")
-        try:
-            await connection.execute(f'DROP DATABASE IF EXISTS "{DATABASE}"')
-            if create:
-                await connection.execute(f'CREATE DATABASE "{DATABASE}"')
-        finally:
-            await connection.close()
         if create:
+            await create_test_database(DATABASE)
             engine = create_async_engine(URL)
             async with engine.begin() as database_connection:
                 await database_connection.run_sync(Base.metadata.create_all)
             await engine.dispose()
+        else:
+            await drop_test_database(DATABASE)
 
     asyncio.run(reset(True))
     yield
@@ -75,22 +81,63 @@ async def test_removal_waits_for_adaptation_then_invalidates_new_assignments(ass
             project = Project(title="Adaptation race", objetivo="Test", ownerId=owner.id)
             setup.add(project)
             await setup.flush()
-            member = ProjectMember(projectId=project.id, userId=reviewer.id, role="reviewer", status="active", participatesInReview=True)
-            article = Article(projectId=project.id, ownerId=owner.id, title="Race fixture", authors="QA", year=2026, journal="QA", currentPhase="screening", reviewOutcome="active")
+            member = ProjectMember(
+                projectId=project.id,
+                userId=reviewer.id,
+                role="reviewer",
+                status="active",
+                participatesInReview=True,
+            )
+            article = Article(
+                projectId=project.id,
+                ownerId=owner.id,
+                title="Race fixture",
+                authors="QA",
+                year=2026,
+                journal="QA",
+                currentPhase="screening",
+                reviewOutcome="active",
+            )
             setup.add_all([member, article])
             await setup.flush()
-            setup.add(ReviewAssignment(projectId=project.id, articleId=article.id, phase="screening", reviewerUserId=owner.id, slot=1, status="pending"))
+            setup.add(
+                ReviewAssignment(
+                    projectId=project.id,
+                    articleId=article.id,
+                    phase="screening",
+                    reviewerUserId=owner.id,
+                    slot=1,
+                    status="pending",
+                )
+            )
             await setup.commit()
-        access = ProjectAccess(project=project, role="owner", capabilities=frozenset({CAP_MANAGE_DISTRIBUTION}), participates_in_review=True)
+        access = ProjectAccess(
+            project=project,
+            role="owner",
+            capabilities=frozenset({CAP_MANAGE_DISTRIBUTION}),
+            participates_in_review=True,
+        )
         preview = await preview_adaptation(first_session, access=access, phase="screening")
         assert preview["assignedCount"] == 1
-        await adapt_reviews(first_session, access=access, phase="screening", fingerprint=preview["fingerprint"], actor_user_id=owner.id)
+        await adapt_reviews(
+            first_session,
+            access=access,
+            phase="screening",
+            fingerprint=preview["fingerprint"],
+            actor_user_id=owner.id,
+        )
 
         async def remove_reviewer():
             await lock_project_team(second_session, project.id)
-            row = (await second_session.execute(select(ProjectMember).where(ProjectMember.id == member.id))).scalar_one()
+            row = (
+                await second_session.execute(
+                    select(ProjectMember).where(ProjectMember.id == member.id)
+                )
+            ).scalar_one()
             row.status = "inactive"
-            count = await mark_reviewer_unavailable(second_session, project_id=project.id, reviewer_user_id=reviewer.id)
+            count = await mark_reviewer_unavailable(
+                second_session, project_id=project.id, reviewer_user_id=reviewer.id
+            )
             await second_session.commit()
             return count
 
@@ -101,7 +148,14 @@ async def test_removal_waits_for_adaptation_then_invalidates_new_assignments(ass
             await first_session.commit()
             assert await asyncio.wait_for(removal, timeout=5) == 1
             async with AsyncSession(engine) as check:
-                replacement = (await check.execute(select(ReviewAssignment).where(ReviewAssignment.articleId == article.id, ReviewAssignment.reviewerUserId == reviewer.id))).scalar_one()
+                replacement = (
+                    await check.execute(
+                        select(ReviewAssignment).where(
+                            ReviewAssignment.articleId == article.id,
+                            ReviewAssignment.reviewerUserId == reviewer.id,
+                        )
+                    )
+                ).scalar_one()
                 assert replacement.status == "needs_reassignment"
         finally:
             if not removal.done():
@@ -176,8 +230,16 @@ async def test_concurrent_distribution_is_serialized_and_idempotent(assignment_d
         assert second.article_count == 0
         assert second.assignments == ()
         async with AsyncSession(engine) as verification:
-            assignment_count = await verification.scalar(select(func.count(ReviewAssignment.id)).where(ReviewAssignment.projectId == project_id))
-            notification_count = await verification.scalar(select(func.count(ProjectNotification.id)).where(ProjectNotification.projectId == project_id))
+            assignment_count = await verification.scalar(
+                select(func.count(ReviewAssignment.id)).where(
+                    ReviewAssignment.projectId == project_id
+                )
+            )
+            notification_count = await verification.scalar(
+                select(func.count(ProjectNotification.id)).where(
+                    ProjectNotification.projectId == project_id
+                )
+            )
         assert assignment_count == 1
         assert notification_count == 1
     finally:
@@ -219,10 +281,24 @@ async def test_concurrent_decisions_finalize_exactly_once(
             project = Project(title="Concurrent decisions", objetivo="Test", ownerId=owner.id)
             setup.add(project)
             await setup.flush()
-            setup.add_all([
-                ProjectMember(projectId=project.id, userId=reviewer_one.id, role="reviewer", status="active", participatesInReview=True),
-                ProjectMember(projectId=project.id, userId=reviewer_two.id, role="reviewer", status="active", participatesInReview=True),
-            ])
+            setup.add_all(
+                [
+                    ProjectMember(
+                        projectId=project.id,
+                        userId=reviewer_one.id,
+                        role="reviewer",
+                        status="active",
+                        participatesInReview=True,
+                    ),
+                    ProjectMember(
+                        projectId=project.id,
+                        userId=reviewer_two.id,
+                        role="reviewer",
+                        status="active",
+                        participatesInReview=True,
+                    ),
+                ]
+            )
             article = Article(
                 projectId=project.id,
                 ownerId=owner.id,
@@ -234,10 +310,28 @@ async def test_concurrent_decisions_finalize_exactly_once(
             )
             setup.add(article)
             await setup.flush()
-            setup.add_all([
-                ReviewAssignment(projectId=project.id, articleId=article.id, reviewerUserId=reviewer_one.id, assignedByUserId=owner.id, phase="screening", slot=1, status="pending"),
-                ReviewAssignment(projectId=project.id, articleId=article.id, reviewerUserId=reviewer_two.id, assignedByUserId=owner.id, phase="screening", slot=2, status="pending"),
-            ])
+            setup.add_all(
+                [
+                    ReviewAssignment(
+                        projectId=project.id,
+                        articleId=article.id,
+                        reviewerUserId=reviewer_one.id,
+                        assignedByUserId=owner.id,
+                        phase="screening",
+                        slot=1,
+                        status="pending",
+                    ),
+                    ReviewAssignment(
+                        projectId=project.id,
+                        articleId=article.id,
+                        reviewerUserId=reviewer_two.id,
+                        assignedByUserId=owner.id,
+                        phase="screening",
+                        slot=2,
+                        status="pending",
+                    ),
+                ]
+            )
             await setup.commit()
             project_id, article_id, owner_id = project.id, article.id, owner.id
             reviewer_one_id, reviewer_two_id = reviewer_one.id, reviewer_two.id
@@ -279,10 +373,20 @@ async def test_concurrent_decisions_finalize_exactly_once(
         assert second.state == expected_state
 
         async with AsyncSession(engine) as verification:
-            outcome = await verification.scalar(select(Article.reviewOutcome).where(Article.id == article_id))
-            decision_count = await verification.scalar(select(func.count(ReviewDecision.id)).where(ReviewDecision.articleId == article_id))
-            conflict_count = await verification.scalar(select(func.count(ReviewConflict.id)).where(ReviewConflict.articleId == article_id))
-            notification_count = await verification.scalar(select(func.count(ProjectNotification.id)).where(ProjectNotification.projectId == project_id))
+            outcome = await verification.scalar(
+                select(Article.reviewOutcome).where(Article.id == article_id)
+            )
+            decision_count = await verification.scalar(
+                select(func.count(ReviewDecision.id)).where(ReviewDecision.articleId == article_id)
+            )
+            conflict_count = await verification.scalar(
+                select(func.count(ReviewConflict.id)).where(ReviewConflict.articleId == article_id)
+            )
+            notification_count = await verification.scalar(
+                select(func.count(ProjectNotification.id)).where(
+                    ProjectNotification.projectId == project_id
+                )
+            )
         assert outcome == expected_outcome
         assert decision_count == 2
         assert conflict_count == expected_conflicts

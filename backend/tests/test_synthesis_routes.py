@@ -12,6 +12,7 @@ def test_synthesis_workspace_routes_are_registered():
         ("/api/projetos/{projectId}/synthesis/charts", "GET"),
         ("/api/projetos/{projectId}/synthesis/quality/criteria", "GET"),
         ("/api/projetos/{projectId}/synthesis/quality/studies", "GET"),
+        ("/api/projetos/{projectId}/synthesis/quality/studies/{articleId}", "GET"),
         ("/api/projetos/{projectId}/synthesis/rqs/{rqNumber}/generations", "POST"),
         ("/api/projetos/{projectId}/synthesis/rqs/{rqNumber}", "PATCH"),
         ("/api/projetos/{projectId}/synthesis/rqs/{rqNumber}", "DELETE"),
@@ -20,6 +21,10 @@ def test_synthesis_workspace_routes_are_registered():
         ("/api/projetos/{projectId}/synthesis/exports/{kind}", "GET"),
     }
     assert expected <= routes
+
+    openapi = app.openapi()
+    response_schema = openapi["paths"]["/api/projetos/{projectId}/synthesis/rqs"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    assert response_schema["$ref"].endswith("/RQListResponse")
 
 
 def test_export_cells_are_formula_safe_and_unicode_preserving():

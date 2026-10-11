@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 
 from app.config import settings
 from app.schemas.ai import MCPError, MCPRequestEnvelope, MCPResponseEnvelope
@@ -33,6 +34,7 @@ class MCPHostService:
         self.max_retries = max_retries if max_retries is not None else settings.MCP_MAX_RETRIES
         self.protocol_version = protocol_version or settings.MCP_PROTOCOL_VERSION
         self._servers: dict[str, MCPServerRegistration] = {}
+
 
     def register_server(self, name: str, capabilities: list[str]) -> None:
         self._servers[name] = MCPServerRegistration(name=name, capabilities=capabilities)
@@ -242,3 +244,9 @@ class MCPHostService:
                 "hint": hint,
             },
         )
+
+
+@lru_cache()
+def get_mcp_host() -> MCPHostService:
+    """Return the shared in-process MCP host used by API and domain services."""
+    return MCPHostService()

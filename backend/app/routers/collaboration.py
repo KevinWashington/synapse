@@ -49,6 +49,7 @@ from app.services.review_decision_service import (
 )
 from app.services.review_adaptation_service import preview_adaptation, adapt_reviews
 from app.services.team_lock_service import lock_project_team
+from app.services.article_index_jobs_service import enqueue_article_index
 
 
 router = APIRouter()
@@ -391,11 +392,9 @@ async def preview_team_adaptation(projectId: int, data: DistributionRequest, cur
 async def adapt_team_assignments(projectId: int, data: AdaptationRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     response, changed_articles = await adapt_reviews(db, access=access, phase=data.phase, fingerprint=data.fingerprint, actor_user_id=current_user.id)
+    for article in sorted(changed_articles, key=lambda item: item.id):
+        await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
-    # Reuse the same best-effort index synchronization as manual review decisions.
-    from app.services.article_index_service import sync_article_indexes
-    for article in changed_articles:
-        await sync_article_indexes(article, db)
     return response
 
 
@@ -455,6 +454,7 @@ async def get_conflicts(projectId: int, current_user: User = Depends(get_current
 async def resolve_review_conflict(projectId: int, conflictId: int, data: ConflictResolutionRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     conflict = await resolve_conflict(db, access=access, conflict_id=conflictId, decision_value=data.decision, reason=data.reason, resolved_by_user_id=current_user.id)
+    await enqueue_article_index(db, article_id=conflict.articleId, project_id=projectId)
     await db.commit()
     await db.refresh(conflict)
     return conflict
@@ -464,5 +464,6 @@ async def resolve_review_conflict(projectId: int, conflictId: int, data: Conflic
 async def reopen_article_review(projectId: int, articleId: int, data: ReopenReviewRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
     article = await reopen_assigned_review(db, access=access, article_id=articleId, phase=data.phase, reason=data.reason, actor_user_id=current_user.id)
+    await enqueue_article_index(db, article_id=article.id, project_id=projectId)
     await db.commit()
     return {"success": True, "articleId": article.id, "phase": data.phase}

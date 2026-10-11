@@ -8,7 +8,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.core.dependencies import get_user_ai_service
+from app.core.errors import ApplicationError
 from app.database import async_session_maker
 from app.models.project import Project
 from app.models.synthesis import RQSynthesis, SynthesisGenerationJob
@@ -24,6 +24,7 @@ from app.services.synthesis_generation_service import (
 )
 from app.services.synthesis_identity_service import question_fingerprint
 from app.services.synthesis_query_service import list_evidence
+from app.services.user_ai_service import build_user_ai_service
 
 
 LEASE_SECONDS = 180
@@ -389,7 +390,7 @@ async def run_claimed_job(
     lease_token: str,
     session_factory: async_sessionmaker = async_session_maker,
     credential_vault: CredentialVault | None = None,
-    ai_service_factory=get_user_ai_service,
+    ai_service_factory=build_user_ai_service,
     heartbeat_interval: float = 30,
 ) -> None:
     permission_error = False
@@ -450,8 +451,11 @@ async def run_claimed_job(
             status="cancelled" if code == "CANCELLED" else "conflict",
             error_code=code,
         )
-    except Exception as exc:
-        code = "DEEPSEEK_KEY_REQUIRED" if exc.__class__.__name__ == "DeepSeekKeyRequiredError" else "GENERATION_FAILED"
+    except ApplicationError as exc:
+        code = exc.code if exc.code == "DEEPSEEK_KEY_REQUIRED" else "GENERATION_FAILED"
+        await _finish_job(job_id, lease_token, session_factory, status="failed", error_code=code)
+    except Exception:
+        code = "GENERATION_FAILED"
         await _finish_job(job_id, lease_token, session_factory, status="failed", error_code=code)
     finally:
         heartbeat.cancel()

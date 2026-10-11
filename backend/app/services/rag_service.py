@@ -8,8 +8,8 @@ from difflib import SequenceMatcher
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_mcp_host
 from app.models.article import Article
+from app.services.mcp_host_service import get_mcp_host
 from app.models.project import Project
 
 logger = logging.getLogger(__name__)

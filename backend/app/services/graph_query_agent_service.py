@@ -3,7 +3,7 @@
 import re
 import unicodedata
 
-from app.core.dependencies import get_mcp_host
+from app.services.mcp_host_service import get_mcp_host
 
 
 class GraphQueryAgentService:

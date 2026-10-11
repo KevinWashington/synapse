@@ -8,15 +8,17 @@ from app.config import settings
 from app.core.security import decode_session_token
 from app.models.user import User
 from app.services.ai_service import AIService
+from app.core.errors import ApplicationError
 from app.services.credential_vault import (
     CredentialVault,
     CredentialVaultError,
     get_credential_vault,
 )
-from app.services.mcp_host_service import MCPHostService
+from app.services.mcp_host_service import get_mcp_host
 from app.services.neo4j_service import Neo4jService, get_neo4j_service
 from app.services.postgres_mcp_service import PostgresMCPService, get_postgres_mcp_service
 from app.services.project_access_service import ProjectAccess, resolve_project_access
+from app.services.user_ai_service import build_user_ai_service
 
 
 async def get_current_user(
@@ -83,17 +85,6 @@ async def get_project_access(
     return await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
 
 
-class DeepSeekKeyRequiredError(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
-            detail={
-                "code": "DEEPSEEK_KEY_REQUIRED",
-                "message": "Configure sua chave DeepSeek nas configurações para usar recursos de IA.",
-            },
-        )
-
-
 def get_optional_credential_vault() -> CredentialVault | None:
     try:
         return get_credential_vault()
@@ -105,17 +96,7 @@ async def get_user_ai_service(
     current_user: User = Depends(get_current_user),
     vault: CredentialVault = Depends(get_credential_vault),
 ) -> AIService:
-    if not current_user.deepseekKeyCiphertext or not current_user.deepseekKeyVersion:
-        raise DeepSeekKeyRequiredError()
-    try:
-        api_key = vault.decrypt(
-            current_user.id,
-            current_user.deepseekKeyCiphertext,
-            current_user.deepseekKeyVersion,
-        )
-    except CredentialVaultError as exc:
-        raise DeepSeekKeyRequiredError() from exc
-    return AIService(api_key=api_key)
+    return build_user_ai_service(current_user, vault)
 
 
 async def get_optional_user_ai_service(
@@ -126,14 +107,10 @@ async def get_optional_user_ai_service(
         return None
     try:
         return await get_user_ai_service(current_user, vault)
-    except DeepSeekKeyRequiredError:
+    except ApplicationError as exc:
+        if exc.code != "DEEPSEEK_KEY_REQUIRED":
+            raise
         return None
-
-
-@lru_cache()
-def get_mcp_host() -> MCPHostService:
-    """Dependency provider for MCP host orchestrator service."""
-    return MCPHostService()
 
 
 @lru_cache()

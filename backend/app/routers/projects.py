@@ -38,6 +38,7 @@ from app.services.evidence_service import (
     sanitize_quality_assessment_schema,
 )
 from app.services.synthesis_identity_service import reconcile_research_questions
+from app.services.article_index_jobs_service import enqueue_article_index
 
 
 router = APIRouter()
@@ -494,6 +495,11 @@ async def delete_project(
     require_capability(access, CAP_DELETE_PROJECT)
     project = access.project
     
+    # FOR UPDATE conflicts with new article FK checks before taking the cleanup snapshot.
+    await db.scalar(select(Project.id).where(Project.id == projectId).with_for_update())
+    article_ids = (await db.scalars(select(Article.id).where(Article.projectId == projectId).order_by(Article.id))).all()
+    for article_id in article_ids:
+        await enqueue_article_index(db, article_id=article_id, project_id=projectId)
     await db.delete(project)
     await db.commit()
     

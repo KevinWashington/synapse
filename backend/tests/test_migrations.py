@@ -4,13 +4,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-import asyncpg
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect, text
-from sqlalchemy.ext.asyncio import create_async_engine
-
 from app.database import Base, assert_database_revision
 from app.models.article import Article  # noqa: F401
 from app.models.collaboration import (  # noqa: F401
@@ -25,39 +21,25 @@ from app.models.collaboration import (  # noqa: F401
 from app.models.project import Project  # noqa: F401
 from app.models.synthesis import RQSynthesis, SynthesisGenerationJob  # noqa: F401
 from app.models.user import User  # noqa: F401
+from sqlalchemy import inspect, text
+from sqlalchemy.ext.asyncio import create_async_engine
 
+from db_test_support import (
+    database_url_for_test,
+    new_test_database,
+    validate_test_database_name,
+)
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-TEST_DATABASE = "synapse_migration_test"
-ADMIN_URL = os.getenv(
-    "MIGRATION_TEST_ADMIN_URL",
-    "postgresql://synapse:synapse@localhost:5432/postgres",
-)
-TEST_DATABASE_URL = os.getenv(
-    "MIGRATION_TEST_DATABASE_URL",
-    f"postgresql+asyncpg://synapse:synapse@localhost:5432/{TEST_DATABASE}",
-)
+TEST_DATABASE = new_test_database("migration")
+TEST_DATABASE_URL = os.getenv("MIGRATION_TEST_DATABASE_URL", database_url_for_test(TEST_DATABASE))
+if os.getenv("MIGRATION_TEST_DATABASE_URL"):
+    from urllib.parse import urlparse
+
+    TEST_DATABASE = validate_test_database_name(urlparse(TEST_DATABASE_URL).path.lstrip("/"))
 
 
-async def _reset_database() -> None:
-    connection = await asyncpg.connect(ADMIN_URL)
-    try:
-        await connection.execute(
-            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-            "WHERE datname = $1 AND pid <> pg_backend_pid()",
-            TEST_DATABASE,
-        )
-        await connection.execute(f'DROP DATABASE IF EXISTS "{TEST_DATABASE}"')
-        await connection.execute(f'CREATE DATABASE "{TEST_DATABASE}"')
-    finally:
-        await connection.close()
-
-
-@pytest.fixture(autouse=True)
-def migration_database():
-    asyncio.run(_reset_database())
-    yield
-    asyncio.run(_reset_database())
+pytestmark = pytest.mark.usefixtures("migration_database")
 
 
 def _config() -> Config:
@@ -89,8 +71,7 @@ async def _schema_snapshot() -> tuple[set[str], dict[str, set[str]]]:
                     set(inspect(sync_connection).get_table_names()),
                     {
                         table: {
-                            column["name"]
-                            for column in inspect(sync_connection).get_columns(table)
+                            column["name"] for column in inspect(sync_connection).get_columns(table)
                         }
                         for table in (
                             "users",
@@ -150,15 +131,27 @@ def test_empty_database_upgrades_to_baseline_schema():
         "projectId",
         "ownerId",
     } <= columns["articles"]
-    assert {"projectId", "userId", "role", "status", "participatesInReview"} <= columns["project_members"]
-    assert {"projectId", "emailNormalized", "role", "status", "expiresAt"} <= columns["project_invitations"]
-    assert {"articleId", "phase", "reviewerUserId", "slot", "status"} <= columns["review_assignments"]
+    assert {"projectId", "userId", "role", "status", "participatesInReview"} <= columns[
+        "project_members"
+    ]
+    assert {"projectId", "emailNormalized", "role", "status", "expiresAt"} <= columns[
+        "project_invitations"
+    ]
+    assert {"articleId", "phase", "reviewerUserId", "slot", "status"} <= columns[
+        "review_assignments"
+    ]
     assert {"assignmentId", "decision", "status", "submittedAt"} <= columns["review_decisions"]
     assert {"articleId", "phase", "status", "resolvedDecision"} <= columns["review_conflicts"]
     assert {"recipientUserId", "type", "readAt", "payload"} <= columns["project_notifications"]
-    assert {"actorUserId", "action", "entityType", "reason", "payload"} <= columns["project_audit_events"]
-    assert {"projectId", "rqNumber", "questionSnapshot", "content", "version"} <= columns["rq_syntheses"]
-    assert {"projectId", "rqNumber", "requesterUserId", "idempotencyKey", "status"} <= columns["synthesis_generation_jobs"]
+    assert {"actorUserId", "action", "entityType", "reason", "payload"} <= columns[
+        "project_audit_events"
+    ]
+    assert {"projectId", "rqNumber", "questionSnapshot", "content", "version"} <= columns[
+        "rq_syntheses"
+    ]
+    assert {"projectId", "rqNumber", "requesterUserId", "idempotencyKey", "status"} <= columns[
+        "synthesis_generation_jobs"
+    ]
 
 
 def test_synthesis_revision_can_be_downgraded_and_reapplied():
@@ -169,7 +162,9 @@ def test_synthesis_revision_can_be_downgraded_and_reapplied():
         engine = create_async_engine(TEST_DATABASE_URL)
         try:
             async with engine.connect() as connection:
-                tables = await connection.run_sync(lambda sync: set(inspect(sync).get_table_names()))
+                tables = await connection.run_sync(
+                    lambda sync: set(inspect(sync).get_table_names())
+                )
                 return {"rq_syntheses", "synthesis_generation_jobs"} <= tables
         finally:
             await engine.dispose()
@@ -188,28 +183,54 @@ def test_collaboration_constraints_and_partial_indexes():
             async with engine.connect() as connection:
                 return await connection.run_sync(
                     lambda sync_connection: {
-                        "member_unique": inspect(sync_connection).get_unique_constraints("project_members"),
-                        "assignment_checks": inspect(sync_connection).get_check_constraints("review_assignments"),
-                        "invitation_indexes": inspect(sync_connection).get_indexes("project_invitations"),
-                        "assignment_indexes": inspect(sync_connection).get_indexes("review_assignments"),
-                        "decision_indexes": inspect(sync_connection).get_indexes("review_decisions"),
-                        "conflict_indexes": inspect(sync_connection).get_indexes("review_conflicts"),
+                        "member_unique": inspect(sync_connection).get_unique_constraints(
+                            "project_members"
+                        ),
+                        "assignment_checks": inspect(sync_connection).get_check_constraints(
+                            "review_assignments"
+                        ),
+                        "invitation_indexes": inspect(sync_connection).get_indexes(
+                            "project_invitations"
+                        ),
+                        "assignment_indexes": inspect(sync_connection).get_indexes(
+                            "review_assignments"
+                        ),
+                        "decision_indexes": inspect(sync_connection).get_indexes(
+                            "review_decisions"
+                        ),
+                        "conflict_indexes": inspect(sync_connection).get_indexes(
+                            "review_conflicts"
+                        ),
                     }
                 )
         finally:
             await engine.dispose()
 
     state = asyncio.run(inspect_constraints())
-    assert any(set(item["column_names"]) == {"projectId", "userId"} for item in state["member_unique"])
+    assert any(
+        set(item["column_names"]) == {"projectId", "userId"} for item in state["member_unique"]
+    )
     assert {item["name"] for item in state["assignment_checks"]} >= {
         "ck_review_assignments_phase",
         "ck_review_assignments_slot",
         "ck_review_assignments_status",
     }
-    assert any(item["name"] == "uq_project_invitations_pending" and item["unique"] for item in state["invitation_indexes"])
-    assert any(item["name"] == "uq_review_assignments_active_slot" and item["unique"] for item in state["assignment_indexes"])
-    assert any(item["name"] == "uq_review_decisions_current" and item["unique"] for item in state["decision_indexes"])
-    assert any(item["name"] == "uq_review_conflicts_open" and item["unique"] for item in state["conflict_indexes"])
+    assert any(
+        item["name"] == "uq_project_invitations_pending" and item["unique"]
+        for item in state["invitation_indexes"]
+    )
+    assert any(
+        item["name"] == "uq_review_assignments_active_slot" and item["unique"]
+        for item in state["assignment_indexes"]
+    )
+    assert any(
+        item["name"] == "uq_review_decisions_current" and item["unique"]
+        for item in state["decision_indexes"]
+    )
+    assert any(
+        item["name"] == "uq_review_conflicts_open" and item["unique"]
+        for item in state["conflict_indexes"]
+    )
 
 
 def test_baseline_matches_application_model_metadata():
@@ -316,7 +337,7 @@ def test_migration_runner_stamps_compatible_legacy_schema():
         finally:
             await engine.dispose()
 
-    assert asyncio.run(preserved_state()) == ("0005_evidence_synthesis", 1)
+    assert asyncio.run(preserved_state()) == ("0006_article_index_jobs", 1)
 
 
 def test_migration_runner_rejects_partial_legacy_schema():
@@ -333,3 +354,30 @@ def test_migration_runner_rejects_partial_legacy_schema():
 
     assert result.returncode != 0
     assert "incompatible legacy schema" in (result.stdout + result.stderr).lower()
+
+
+def test_index_outbox_revision_round_trip_retains_independent_cleanup_ids():
+    command.upgrade(_config(), "head")
+
+    async def inspect_outbox():
+        engine = create_async_engine(TEST_DATABASE_URL)
+        try:
+            async with engine.connect() as connection:
+                return await connection.run_sync(
+                    lambda sync: (
+                        {
+                            column["name"]
+                            for column in inspect(sync).get_columns("article_index_tasks")
+                        },
+                        inspect(sync).get_foreign_keys("article_index_tasks"),
+                    )
+                )
+        finally:
+            await engine.dispose()
+
+    columns, foreign_keys = asyncio.run(inspect_outbox())
+    assert {"articleId", "projectId", "status", "attempts", "nextAttemptAt", "lastError"} <= columns
+    assert foreign_keys == []
+    command.downgrade(_config(), "0005_evidence_synthesis")
+    command.upgrade(_config(), "head")
+    assert asyncio.run(inspect_outbox()) == (columns, foreign_keys)

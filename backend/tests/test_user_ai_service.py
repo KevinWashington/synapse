@@ -3,7 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.core.dependencies import DeepSeekKeyRequiredError, get_user_ai_service
+from app.core.dependencies import get_optional_user_ai_service
+from app.core.errors import ApplicationError
+from app.services.user_ai_service import build_user_ai_service
 
 
 class Vault:
@@ -23,19 +25,20 @@ def user(user_id, ciphertext="encrypted"):
     )
 
 
-@pytest.mark.asyncio
-async def test_user_ai_service_requires_configured_valid_key():
-    with pytest.raises(DeepSeekKeyRequiredError):
-        await get_user_ai_service(user(1, None), Vault())
-    with pytest.raises(DeepSeekKeyRequiredError):
-        await get_user_ai_service(user(1, "corrupt"), Vault())
+def test_user_ai_service_requires_configured_valid_key():
+    with pytest.raises(ApplicationError) as missing:
+        build_user_ai_service(user(1, None), Vault())
+    assert missing.value.code == "DEEPSEEK_KEY_REQUIRED"
+    with pytest.raises(ApplicationError) as corrupted:
+        build_user_ai_service(user(1, "corrupt"), Vault())
+    assert corrupted.value.code == "DEEPSEEK_KEY_REQUIRED"
 
 
 @pytest.mark.asyncio
 async def test_concurrent_users_receive_only_their_own_key():
     first, second = await asyncio.gather(
-        get_user_ai_service(user(1), Vault()),
-        get_user_ai_service(user(2), Vault()),
+        asyncio.to_thread(build_user_ai_service, user(1), Vault()),
+        asyncio.to_thread(build_user_ai_service, user(2), Vault()),
     )
 
     assert first.api_key == "key-for-1"
@@ -63,6 +66,12 @@ def test_optional_vault_tolerates_missing_development_master_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_optional_ai_service_stays_disabled_when_vault_is_unavailable():
-    from app.core.dependencies import get_optional_user_ai_service
-
     assert await get_optional_user_ai_service(user(1), None) is None
+
+
+def test_missing_user_key_raises_framework_independent_application_error():
+    with pytest.raises(ApplicationError) as error:
+        build_user_ai_service(user(1, None), Vault())
+
+    assert error.value.code == "DEEPSEEK_KEY_REQUIRED"
+    assert error.value.status_code == 428

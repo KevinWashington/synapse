@@ -1,30 +1,36 @@
 """Neo4j service for managing article relationship graphs."""
 
-from neo4j import AsyncGraphDatabase
+import asyncio
+
+from neo4j import AsyncGraphDatabase, Query
 from app.config import settings
 
 
 class Neo4jService:
     """Service for managing article nodes and relationships in Neo4j."""
-    
+
     def __init__(self):
         self._driver = None
-    
+
     @property
     def driver(self):
         """Lazy loading of Neo4j driver."""
         if self._driver is None:
             self._driver = AsyncGraphDatabase.driver(
                 settings.NEO4J_URI,
-                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
+                auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+                connection_timeout=30, connection_acquisition_timeout=30, max_transaction_retry_time=30
             )
         return self._driver
-    
+
+    async def _run(self, session, query, **params):
+        return await asyncio.wait_for(session.run(Query(query, timeout=30), **params), timeout=30)
+
     async def close(self):
         """Close the driver connection."""
         if self._driver:
             await self._driver.close()
-    
+
     async def create_article_node(
         self,
         article_id: int,
@@ -44,7 +50,7 @@ class Neo4jService:
     ) -> None:
         """Create or update an article node in Neo4j."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MERGE (a:Article {id: $id})
                 SET a.projectId = $projectId,
@@ -76,18 +82,18 @@ class Neo4jService:
                 keywords=keywords or [],
                 abstract=abstract,
             )
-    
+
     async def delete_article_node(self, article_id: int) -> None:
         """Delete an article node and all its relationships."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MATCH (a:Article {id: $id})
                 DETACH DELETE a
                 """,
                 id=article_id
             )
-    
+
     async def create_semantic_relationship(
         self,
         article_id: int,
@@ -96,7 +102,7 @@ class Neo4jService:
     ) -> None:
         """Create a semantic similarity relationship between articles."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -107,7 +113,7 @@ class Neo4jService:
                 relatedId=related_id,
                 score=similarity_score
             )
-    
+
     async def create_same_methodology_relationship(
         self,
         article_id: int,
@@ -115,7 +121,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles using same methodology."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -124,8 +130,8 @@ class Neo4jService:
                 articleId=article_id,
                 relatedId=related_id
             )
-    
-    
+
+
     async def create_same_author_relationship(
         self,
         article_id: int,
@@ -134,7 +140,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles with shared authors."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -154,7 +160,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles that share keywords."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -175,7 +181,7 @@ class Neo4jService:
     ) -> None:
         """Create relationship for articles published in the same venue."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MATCH (a:Article {id: $articleId})
                 MATCH (b:Article {id: $relatedId})
@@ -199,7 +205,7 @@ class Neo4jService:
         """Create author/keyword/venue nodes connected to the article."""
         async with self.driver.session() as session:
             if authors:
-                await session.run(
+                await self._run(session,
                     """
                     MATCH (a:Article {id: $articleId, projectId: $projectId})
                     UNWIND $authors AS authorName
@@ -212,7 +218,7 @@ class Neo4jService:
                 )
 
             if keywords:
-                await session.run(
+                await self._run(session,
                     """
                     MATCH (a:Article {id: $articleId, projectId: $projectId})
                     UNWIND $keywords AS keywordTerm
@@ -225,7 +231,7 @@ class Neo4jService:
                 )
 
             if venue:
-                await session.run(
+                await self._run(session,
                     """
                     MATCH (a:Article {id: $articleId, projectId: $projectId})
                     MERGE (v:Venue {projectId: $projectId, name: $venue})
@@ -235,7 +241,7 @@ class Neo4jService:
                     projectId=project_id,
                     venue=venue,
                 )
-    
+
     async def get_project_graph(
         self,
         project_id: int,
@@ -323,7 +329,7 @@ class Neo4jService:
                     coalesce(r.score, 1.0) AS score
             """
 
-            links_result = await session.run(links_query, **params)
+            links_result = await self._run(session, links_query, **params)
             links = []
             async for record in links_result:
                 links.append(
@@ -336,7 +342,7 @@ class Neo4jService:
                 )
 
             # Get all nodes from supported labels so filters can show one relation type at a time.
-            nodes_result = await session.run(
+            nodes_result = await self._run(session,
                 """
                 MATCH (n {projectId: $projectId})
                 WHERE n:Article OR n:Author OR n:Keyword OR n:Venue
@@ -384,11 +390,11 @@ class Neo4jService:
                 })
 
             return {"nodes": nodes, "links": links}
-    
+
     async def delete_project_graph(self, project_id: int) -> None:
         """Delete all nodes and relationships for a project."""
         async with self.driver.session() as session:
-            await session.run(
+            await self._run(session,
                 """
                 MATCH (n {projectId: $projectId})
                 DETACH DELETE n
@@ -401,7 +407,7 @@ class Neo4jService:
         params = params or {}
         try:
             async with self.driver.session() as session:
-                result = await session.run(cypher, **params)
+                result = await self._run(session, cypher, **params)
                 rows = [record.data() async for record in result]
                 return {
                     "ok": True,
@@ -425,7 +431,7 @@ class Neo4jService:
         params = params or {}
         try:
             async with self.driver.session() as session:
-                result = await session.run(cypher, **params)
+                result = await self._run(session, cypher, **params)
                 summary = await result.consume()
                 counters = summary.counters
                 return {
@@ -453,7 +459,7 @@ class Neo4jService:
         """MCP wrapper for graph.health operation."""
         try:
             async with self.driver.session() as session:
-                await session.run("RETURN 1 as ok")
+                await self._run(session, "RETURN 1 as ok")
             return {
                 "connected": True,
                 "server": "neo4j",
@@ -483,12 +489,12 @@ class Neo4jService:
         """
         if not ids:
             return {"related_papers": []}
-            
+
         relations = relations or ["SAME_METHODOLOGY", "SIMILAR_TO", "SAME_AUTHOR", "SHARES_KEYWORD", "SAME_VENUE"]
-        
+
         # Formata o Cypher para incluir as relações de forma dinâmica (protegido contra injeção pelo uso de params)
         rel_pattern = "|".join(relations)
-        
+
         cypher = f"""
             MATCH (a:Article)
             WHERE a.projectId = $projectId AND a.paperId IN $seedIds
@@ -496,17 +502,17 @@ class Neo4jService:
             WHERE related.projectId = $projectId AND NOT related.paperId IN $seedIds
             RETURN DISTINCT related.id AS article_id,
                             related.paperId AS paper_id,
-                            related.title AS title, 
-                            related.methodology AS methodology, 
+                            related.title AS title,
+                            related.methodology AS methodology,
                             type(r) AS relation_type
             LIMIT 30
         """
-        
+
         result = await self.mcp_query(cypher, params={"projectId": project_id, "seedIds": ids})
-        
+
         if not result.get("ok"):
              raise RuntimeError(f"Neo4j expansion failed: {result.get('error')}")
-             
+
         # Formata a resposta adicionando o source_type para a rastreabilidade (Fase 5)
         related_papers = []
         for row in result.get("rows", []):
@@ -517,7 +523,7 @@ class Neo4jService:
                 "methodology": row["methodology"],
                 "source_type": f"graph_expansion ({row['relation_type']})"
             })
-            
+
         return {"related_papers": related_papers}
 
     async def cluster_project(self, project_id: int, limit: int = 12) -> dict:
@@ -717,7 +723,7 @@ class Neo4jService:
 
     async def read_schema(self) -> dict:
         """
-        Retorna as propriedades e labels disponíveis no grafo. 
+        Retorna as propriedades e labels disponíveis no grafo.
         """
         return {
             "nodes": {

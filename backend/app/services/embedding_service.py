@@ -15,7 +15,7 @@ class EmbeddingService:
             if not hf_token:
                 raise ValueError("HF_TOKEN not set")
 
-            self._client = InferenceClient(api_key=hf_token)
+            self._client = InferenceClient(api_key=hf_token, timeout=30)
 
         return self._client
 

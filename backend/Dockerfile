@@ -8,8 +8,8 @@ RUN apt-get update --fix-missing && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-linux.lock .
+RUN pip install --no-cache-dir -r requirements-linux.lock
 
 # Copy application code
 COPY . .

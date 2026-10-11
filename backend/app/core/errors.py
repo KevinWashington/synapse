@@ -2,7 +2,9 @@
 
 
 class ApplicationError(Exception):
-    def __init__(self, code: str, message: str, *, status_code: int = 400, context: dict | None = None):
+    def __init__(
+        self, code: str, message: str, *, status_code: int = 400, context: dict | None = None
+    ):
         super().__init__(message)
         self.code = code
         self.message = message

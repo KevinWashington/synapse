@@ -1,0 +1,46 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["app", "tests"]
+include = [
+    "app/core/error_handlers.py",
+    "app/core/errors.py",
+    "app/index_worker.py",
+    "app/models/article_index.py",
+    "app/routers/articles.py",
+    "app/routers/synthesis.py",
+    "app/services/article_dedup_service.py",
+    "app/services/article_file_service.py",
+    "app/services/article_import_service.py",
+    "app/services/article_index_service.py",
+    "app/services/article_index_jobs_service.py",
+    "app/services/article_mutation_service.py",
+    "app/services/article_report_service.py",
+    "app/services/article_response_service.py",
+    "app/services/review_adaptation_service.py",
+    "app/services/review_decision_service.py",
+    "app/services/review_workflow_service.py",
+    "migrations/versions/0006_article_index_jobs.py",
+    "tests/conftest.py",
+    "tests/db_test_support.py",
+    "tests/synthesis_test_support.py",
+    "tests/test_architecture_boundaries.py",
+    "tests/test_article_application_services.py",
+    "tests/test_article_collaboration.py",
+    "tests/test_article_index_jobs.py",
+    "tests/test_article_response_service.py",
+    "tests/test_collaboration_concurrency.py",
+    "tests/test_error_contract.py",
+    "tests/test_migrations.py",
+    "tests/test_review_workflow.py",
+    "tests/test_synthesis_contracts.py",
+    "tests/test_user_auth_migration.py",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

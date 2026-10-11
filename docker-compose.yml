@@ -83,7 +83,6 @@
       - sh
       - -c
       - >-
-        python -m pip show qdrant-client > /dev/null 2>&1 || python -m pip install --no-cache-dir "qdrant-client>=1.8,<2";
         python migrate_database.py;
         uvicorn app.main:app --host 0.0.0.0 --port 5000
     healthcheck:
@@ -112,6 +111,26 @@
     volumes:
       - ./backend/app:/app/app
     command: ["python", "-m", "app.synthesis_worker"]
+    restart: unless-stopped
+
+  index-worker:
+    build: ./backend
+    container_name: synapse-index-worker
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://synapse:synapse@postgres:5432/synapse
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=synapse123
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION=articles
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/app:/app/app
+    command: ["python", "-m", "app.index_worker"]
     restart: unless-stopped
 
   frontend:
