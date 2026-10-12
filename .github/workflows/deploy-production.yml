@@ -37,9 +37,10 @@ jobs:
         run: |
           umask 077
           mkdir -p "$HOME/.ssh"
-          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/synapse_deploy"
+          printf '%s\n' "$DEPLOY_KEY" | tr -d '\r' > "$HOME/.ssh/synapse_deploy"
+          ssh-keygen -y -f "$HOME/.ssh/synapse_deploy" > /dev/null
           printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           trap 'rm -f "$HOME/.ssh/synapse_deploy"' EXIT
           docker save "synapse-backend:$RELEASE_SHA" "synapse-frontend:$RELEASE_SHA" | gzip -1 | \
-            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 \
+            ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 \
               -i "$HOME/.ssh/synapse_deploy" ubuntu@69.62.97.120 "deploy $RELEASE_SHA"
