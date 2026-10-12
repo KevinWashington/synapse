@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 
 import { LoadingState } from "@components/layout";
 import ProtectedRoute from "@components/ProtectedRoute";
-import { Toaster } from "@components/ui/Sonner";
+import { Toaster } from "@components/ui/sonner";
 import { AuthProvider } from "@features/auth";
 import { toast } from "@/lib/toast";
 

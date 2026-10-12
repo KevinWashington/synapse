@@ -1,0 +1,45 @@
+name: Deploy production
+on:
+  workflow_run:
+    workflows: [Quality]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: synapse-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - name: Build backend and static frontend before contacting production
+        env:
+          GOOGLE_CLIENT_ID: ${{ vars.SYNAPSE_GOOGLE_CLIENT_ID }}
+        run: |
+          test -n "$GOOGLE_CLIENT_ID"
+          docker build -t "synapse-backend:$RELEASE_SHA" backend
+          docker build -t "synapse-frontend:$RELEASE_SHA" \
+            --build-arg VITE_API_URL=https://synapse.labit.dev.br \
+            --build-arg VITE_GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+            --build-arg VITE_BASE_PATH=/ frontend
+      - name: Transfer images and deploy through restricted SSH key
+        env:
+          DEPLOY_KEY: ${{ secrets.SYNAPSE_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ vars.SYNAPSE_SSH_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/synapse_deploy"
+          printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          trap 'rm -f "$HOME/.ssh/synapse_deploy"' EXIT
+          docker save "synapse-backend:$RELEASE_SHA" "synapse-frontend:$RELEASE_SHA" | gzip -1 | \
+            ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=15 \
+              -i "$HOME/.ssh/synapse_deploy" ubuntu@69.62.97.120 "deploy $RELEASE_SHA"

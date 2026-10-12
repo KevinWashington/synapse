@@ -1,0 +1,13 @@
+[Unit]
+Description=Restrict external access to legacy PostgreSQL without changing Docker networks
+After=docker.service network-online.target
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /home/ubuntu/Synapse/deploy/restrict-legacy-postgres.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=docker.service

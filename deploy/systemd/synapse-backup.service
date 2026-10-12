@@ -1,0 +1,16 @@
+[Unit]
+Description=Complete Synapse backup with isolated restore verification
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 /home/ubuntu/synapse-current/scripts/backup-production.py
+TimeoutStartSec=30min
+TimeoutStopSec=5min
+KillMode=process
+ExecStopPost=/usr/bin/bash /home/ubuntu/synapse-current/deploy/recover-backup-services.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

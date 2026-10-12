@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Synapse backup at 03:30 America/Fortaleza
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 America/Fortaleza
+Persistent=true
+Unit=synapse-backup.service
+
+[Install]
+WantedBy=timers.target

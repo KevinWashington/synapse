@@ -18,8 +18,22 @@ jobs:
       - run: pip install -r backend/requirements-linux.lock -r backend/requirements-dev.txt
       - run: npm ci
         working-directory: frontend
+      - run: python scripts/check-import-paths.py
+      - run: python -m unittest discover -s scripts/tests -p 'test_*.py'
       - run: ./scripts/check-quality.ps1
         shell: pwsh
+      - name: Check production frontend in Chromium
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/synapse-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid"' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/check-production-browser.mjs http://127.0.0.1:4173
   postgres-integration:
     runs-on: ubuntu-latest
     services:
