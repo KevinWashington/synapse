@@ -57,5 +57,13 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r backend/requirements-linux.lock -r backend/requirements-dev.txt
+      - name: Generate an isolated test credential encryption key
+        run: |
+          python - <<'PY'
+          import os
+          from cryptography.fernet import Fernet
+          with open(os.environ["GITHUB_ENV"], "a") as stream:
+              stream.write("CREDENTIAL_ENCRYPTION_KEY=" + Fernet.generate_key().decode() + "\n")
+          PY
       - run: python -m pytest -m integration -q
         working-directory: backend
