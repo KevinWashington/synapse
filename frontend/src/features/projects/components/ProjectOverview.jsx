@@ -8,8 +8,6 @@ import {
   FileTextIcon,
   FilterIcon,
   LoaderIcon,
-  ShieldCheckIcon,
-  StarIcon,
 } from "lucide-react";
 import {
   Cell,
@@ -27,6 +25,7 @@ import { articleService } from "@features/articles/public/services";
 import { projectService } from "@/features/projects/services/projectService";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import ReviewSummaryHeader from "@/components/layout/ReviewSummaryHeader";
 
 const FUNNEL_STEPS = [
   { key: "identified", label: "Identificação", color: "#6259ff" },
@@ -67,84 +66,57 @@ function totalFromStats(stats) {
   return stats?.identified || 0;
 }
 
-function MetricCard({ icon: Icon, label, value, description, colorClass, className }) {
-  return (
-    <div className={cn("flex min-h-[132px] rounded-lg border border-[#edf0f7] bg-white p-6", className)}>
-      <div className="flex items-start gap-4">
-        <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", colorClass)}>
-          <Icon className="h-6 w-6" />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-[#667391]">{label}</p>
-          <p className="mt-1 text-2xl font-semibold text-[#111936]">{value}</p>
-          <p className="mt-1 text-xs text-[#667391]">{description}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function FunnelChart({ stats }) {
-  const maxValue = Math.max(stats.identified, 1);
+  const maxValue = Math.max(stats.identified || 0, 1);
   const steps = FUNNEL_STEPS.map((step, index) => ({
     ...step,
     value: stats[step.key] || 0,
     opacity: 1 - index * 0.08,
-    width: Math.max(44, ((stats[step.key] || 0) / maxValue) * 100),
   }));
 
   return (
-    <div className="h-full rounded-lg border border-[#edf0f7] bg-white p-5">
-      <p className="mb-5 text-sm font-semibold text-[#111936]">Progresso da revisão (PRISMA)</p>
+    <section aria-label="Progresso da revisão" className="min-w-0 p-4 sm:p-5">
+      <h3 className="mb-5 text-sm font-semibold text-[#111936]">Progresso da revisão (PRISMA)</h3>
       <div className="space-y-2">
         {steps.map((step) => (
           <div
             key={step.key}
-            className="grid min-h-10 grid-cols-[minmax(140px,1fr)_48px_minmax(120px,180px)] items-center gap-4 text-sm"
+            className="grid min-h-10 grid-cols-[minmax(0,1fr)_48px] items-center gap-3 text-sm sm:grid-cols-[minmax(0,1fr)_48px_minmax(60px,120px)]"
           >
             <div className="flex min-w-0 items-center gap-3">
               <span style={{ backgroundColor: step.color }} className="h-2 w-2 shrink-0 rounded-full" />
               <span className="truncate font-semibold text-[#253252]">{step.label}</span>
             </div>
             <span className="text-right font-semibold text-[#111936]">{formatNumber(step.value)}</span>
-            <div className="flex h-10 w-full items-center justify-center">
+            <div className="hidden h-8 w-full items-center sm:flex">
               <div
                 style={{
-                  width: `${step.width}%`,
+                  width: `${(step.value / maxValue) * 100}%`,
                   backgroundColor: step.color,
                   opacity: step.opacity,
                 }}
-                className="h-10 rounded-md"
+                className="h-6 rounded-sm"
               />
             </div>
           </div>
         ))}
-        <div className="grid grid-cols-[minmax(140px,1fr)_48px_minmax(120px,180px)] gap-4 pt-2">
-          <div />
-          <div />
-          <div className="text-center">
-            <p className="text-lg font-semibold leading-none text-[#111936]">{formatNumber(stats.included)}</p>
-            <p className="mt-1 text-xs text-[#667391]">estudos incluídos</p>
-          </div>
-        </div>
       </div>
-    </div>
+    </section>
   );
 }
 
 function DataSourcesCard({ sources }) {
   return (
-    <div data-testid="overview-data-sources" className="min-h-[280px] rounded-lg border border-[#edf0f7] bg-white p-5">
+    <section aria-label="Fontes de dados" className="min-w-0 p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#111936]">Fontes de dados</p>
-        <span className="text-xs font-semibold text-[#6259ff]">Ver todas</span>
+        <h3 className="text-sm font-semibold text-[#111936]">Fontes de dados</h3>
+        <span className="text-xs text-[#667391]">{sources.length} fontes</span>
       </div>
-      <div className="space-y-3">
-        {sources.length ? sources.slice(0, 5).map((source) => (
-          <div key={`${source.sourceCategory}-${source.sourceName}`} className="grid grid-cols-[70px_1fr_auto] items-center gap-3 text-xs">
-            <span className="font-semibold text-[#ff7a00]">{source.sourceName.slice(0, 8)}</span>
-            <span className="truncate text-[#253252]">{source.sourceName}</span>
-            <span className="text-[#56627f]">{formatNumber(source.total)} artigos</span>
+      <div tabIndex={0} aria-label="Lista de fontes" className="max-h-[320px] space-y-3 overflow-y-auto rounded-sm pr-1 focus-visible:outline-2 focus-visible:outline-[#6259ff]">
+        {sources.length ? sources.map((source) => (
+          <div key={`${source.sourceCategory}-${source.sourceName}`} className="flex items-start justify-between gap-3 border-b border-[#edf0f7] pb-3 text-sm last:border-0">
+            <span className="min-w-0 break-words text-[#253252]">{source.sourceName}</span>
+            <span className="shrink-0 text-xs text-[#56627f]">{formatNumber(source.total)} artigos</span>
           </div>
         )) : (
           <p className="text-sm text-[#667391]">Nenhuma fonte registrada.</p>
@@ -154,16 +126,16 @@ function DataSourcesCard({ sources }) {
         <span>Total</span>
         <span>{formatNumber(sources.reduce((total, source) => total + source.total, 0))} artigos</span>
       </div>
-    </div>
+    </section>
   );
 }
 
 function EvolutionCard({ evolution }) {
   return (
-    <div data-testid="overview-evolution" className="min-h-[280px] rounded-lg border border-[#edf0f7] bg-white p-5">
+    <section aria-label="Evolução das etapas" className="min-w-0 p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#111936]">Evolução das etapas</p>
-        <span className="rounded-lg border border-[#edf0f7] px-3 py-1 text-xs text-[#56627f]">Últimos 10 dias</span>
+        <h3 className="text-sm font-semibold text-[#111936]">Evolução das etapas</h3>
+        <span className="text-xs text-[#56627f]">Últimas {evolution.length} datas</span>
       </div>
       {evolution.length ? (
         <div className="h-[210px]">
@@ -172,10 +144,10 @@ function EvolutionCard({ evolution }) {
               <XAxis dataKey="date" tickFormatter={formatDate} tick={{ fontSize: 11, fill: "#667391" }} />
               <YAxis tick={{ fontSize: 11, fill: "#667391" }} width={36} />
               <Tooltip labelFormatter={formatDate} />
-              <Line type="monotone" dataKey="identification" stroke="#6259ff" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="screening" stroke="#736bff" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="eligibility" stroke="#49c987" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="included" stroke="#ffc35a" strokeWidth={2} dot={false} />
+              <Line name="Identificação" type="monotone" dataKey="identification" stroke="#6259ff" strokeWidth={2} dot={false} />
+              <Line name="Triagem" type="monotone" dataKey="screening" stroke="#736bff" strokeWidth={2} dot={false} />
+              <Line name="Elegibilidade" type="monotone" dataKey="eligibility" stroke="#49c987" strokeWidth={2} dot={false} />
+              <Line name="Inclusão" type="monotone" dataKey="included" stroke="#ffc35a" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -184,7 +156,7 @@ function EvolutionCard({ evolution }) {
           Sem eventos suficientes para montar a evolução.
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -196,9 +168,9 @@ function StudyTypeCard({ studyTypes, included }) {
   }));
 
   return (
-    <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
-      <p className="mb-4 text-sm font-semibold text-[#111936]">Distribuição por tipo de estudo</p>
-      <div className="grid items-center gap-4 md:grid-cols-[150px_1fr]">
+    <section aria-label="Distribuição por tipo de estudo" className="min-w-0 p-4 sm:p-5">
+      <h3 className="mb-4 text-sm font-semibold text-[#111936]">Distribuição por tipo de estudo</h3>
+      <div className="grid items-center gap-4 sm:grid-cols-[150px_minmax(0,1fr)]">
         <div className="relative h-[150px]">
           {chartData.length ? (
             <ResponsiveContainer width="100%" height="100%">
@@ -216,7 +188,7 @@ function StudyTypeCard({ studyTypes, included }) {
             <span className="text-xs text-[#667391]">incluídos</span>
           </div>
         </div>
-        <div className="space-y-3">
+        <div className="max-h-[280px] space-y-3 overflow-y-auto">
           {chartData.length ? chartData.map((item, index) => (
             <div key={item.name} className="flex items-center justify-between gap-3 text-xs">
               <span className="flex items-center gap-2 text-[#253252]">
@@ -230,72 +202,73 @@ function StudyTypeCard({ studyTypes, included }) {
           )}
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
 function PlanningSummaryCard({ summary, onOpenPlanning }) {
   return (
-    <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
+    <section aria-label="Resumo do planejamento" className="min-w-0 p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#111936]">Resumo do planejamento</p>
+        <h3 className="text-sm font-semibold text-[#111936]">Resumo do planejamento</h3>
         <button type="button" onClick={onOpenPlanning} className="cursor-pointer rounded-sm text-xs font-semibold text-[#6259ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40">
           Ver planejamento
         </button>
       </div>
       <div className="space-y-4 text-xs">
-        <div className="grid grid-cols-[150px_1fr] gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
           <span className="text-[#667391]">Framework</span>
           <span className="font-medium text-[#253252]">{summary.framework}</span>
         </div>
-        <div className="grid grid-cols-[150px_1fr] gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
           <span className="text-[#667391]">String de busca</span>
           <span className="font-medium text-[#253252]">{summary.searchStringCount} string(s) cadastrada(s)</span>
         </div>
-        <div className="grid grid-cols-[150px_1fr] gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
           <span className="text-[#667391]">Critérios</span>
           <span className="font-medium text-[#253252]">
             {summary.inclusionCriteriaCount} inclusão / {summary.exclusionCriteriaCount} exclusão
           </span>
         </div>
-        <div className="grid grid-cols-[150px_1fr] gap-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
           <span className="text-[#667391]">Extração de dados</span>
           <span className="font-medium text-[#253252]">{summary.extractionFieldCount} campo(s) configurado(s)</span>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
 function RecentActivitiesCard({ activities, onOpenArticle }) {
   return (
-    <div data-testid="overview-activities" className="min-h-[280px] rounded-lg border border-[#edf0f7] bg-white p-5">
+    <section aria-label="Atividades recentes" className="min-w-0 p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-semibold text-[#111936]">Atividades recentes</p>
-        <span className="text-xs font-semibold text-[#6259ff]">Ver todas</span>
+        <h3 className="text-sm font-semibold text-[#111936]">Atividades recentes</h3>
+        <span className="text-xs text-[#667391]">{activities.length} eventos recentes</span>
       </div>
-      <div className="space-y-3">
+      <div tabIndex={0} aria-label="Lista de atividades recentes" className="max-h-[320px] space-y-3 overflow-y-auto rounded-sm pr-1 focus-visible:outline-2 focus-visible:outline-[#6259ff]">
         {activities.length ? activities.map((activity) => (
           <button
             key={activity.id}
             type="button"
             onClick={() => activity.articleId && onOpenArticle(activity.articleId)}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
+            disabled={!activity.articleId}
+            className="flex w-full cursor-pointer items-start gap-3 rounded-sm text-left disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]/40"
           >
             <span className={cn("flex h-7 w-7 items-center justify-center rounded-full", ACTIVITY_STYLES[activity.type] || ACTIVITY_STYLES.created)}>
               {activity.type === "included" ? <CheckCircle2Icon className="h-4 w-4" /> : <FileTextIcon className="h-4 w-4" />}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-semibold text-[#253252]">{activity.label}</span>
-              <span className="block truncate text-xs text-[#667391]">{activity.description}</span>
+              <span className="block text-xs font-semibold text-[#253252]">{activity.label}</span>
+              <span className="mt-1 block line-clamp-2 text-xs text-[#667391]">{activity.description}</span>
             </span>
-            <span className="text-[11px] text-[#8b96ad]">{formatDate(activity.timestamp)}</span>
+            <span className="shrink-0 text-[11px] text-[#8b96ad]">{formatDate(activity.timestamp)}</span>
           </button>
         )) : (
           <p className="text-sm text-[#667391]">Nenhuma atividade registrada.</p>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -305,13 +278,12 @@ function QuickActionsCard({ onImport, onGoToScreening, onViewFlow, onExport }) {
     { label: "Ir para triagem", icon: FilterIcon, onClick: onGoToScreening },
     { label: "Ver fluxo (PRISMA)", icon: BarChart3Icon, onClick: onViewFlow },
     { label: "Exportar dados", icon: DownloadIcon, onClick: onExport },
-    { label: "Gerar relatório", icon: FileTextIcon, onClick: onExport },
   ];
 
   return (
-    <div className="rounded-lg border border-[#edf0f7] bg-white p-5">
-      <p className="mb-4 text-sm font-semibold text-[#111936]">Ações rápidas</p>
-      <div className="space-y-1">
+    <section aria-label="Ações rápidas" className="min-w-0 border-t border-[#edf0f7] bg-[#fbfcff] p-4 sm:p-5">
+      <h3 className="mb-3 text-sm font-semibold text-[#111936]">Ações rápidas</h3>
+      <div className="grid gap-1 sm:grid-cols-2 xl:grid-cols-4">
         {actions.map((action) => (
           <button
             key={action.label}
@@ -327,7 +299,7 @@ function QuickActionsCard({ onImport, onGoToScreening, onViewFlow, onExport }) {
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -342,6 +314,7 @@ function ProjectOverview({
   const [overview, setOverview] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [section, setSection] = useState("panorama");
 
   useEffect(() => {
     let ignore = false;
@@ -371,11 +344,11 @@ function ProjectOverview({
     };
   }, [project.id]);
 
-  const stats = overview?.prismaStats || project.prismaStats;
+  const stats = useMemo(() => ({ identified: 0, screening: 0, eligible: 0, included: 0, ...(overview?.prismaStats || project.prismaStats) }), [overview?.prismaStats, project.prismaStats]);
   const total = totalFromStats(stats);
 
   const metricDescriptions = useMemo(() => ({
-    identified: "100% do total",
+    identified: total ? "100% do total" : "Sem registros",
     screening: total ? `${formatPercent((stats.screening / total) * 100)} do total` : "Sem registros",
     eligible: total ? `${formatPercent((stats.eligible / total) * 100)} do total` : "Sem registros",
     included: total ? `${formatPercent((stats.included / total) * 100)} do total` : "Sem registros",
@@ -408,65 +381,61 @@ function ProjectOverview({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid items-stretch gap-4 xl:grid-cols-[0.95fr_1.45fr]">
-        <FunnelChart stats={stats} />
-        <div className="grid auto-rows-fr gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <MetricCard
-            icon={FileTextIcon}
-            label="Artigos identificados"
-            value={formatNumber(stats.identified)}
-            description={metricDescriptions.identified}
-            colorClass="bg-[#f0edff] text-[#6259ff]"
-          />
-          <MetricCard
-            icon={FilterIcon}
-            label="Em triagem"
-            value={formatNumber(stats.screening)}
-            description={metricDescriptions.screening}
-            colorClass="bg-[#eef1ff] text-[#6259ff]"
-          />
-          <MetricCard
-            icon={ShieldCheckIcon}
-            label="Artigos elegiveis"
-            value={formatNumber(stats.eligible)}
-            description={metricDescriptions.eligible}
-            colorClass="bg-[#eaf8f0] text-[#35a967]"
-          />
-          <MetricCard
-            icon={DatabaseIcon}
-            label="Taxa de concordancia entre revisores"
-            value={formatPercent(overview.reviewerAgreement.rate)}
-            description={`${overview.reviewerAgreement.agreed} de ${overview.reviewerAgreement.reviewed} decisoes com IA`}
-            colorClass="bg-[#eef1ff] text-[#6259ff]"
-            className="md:col-span-2"
-          />
-          <MetricCard
-            icon={StarIcon}
-            label="Estudos incluidos"
-            value={formatNumber(stats.included)}
-            description={metricDescriptions.included}
-            colorClass="bg-[#fff5e3] text-[#ff9f1c]"
-          />
-        </div>
-      </div>
-
-      <div data-testid="overview-supporting-grid" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <DataSourcesCard sources={overview.sources} />
-        <EvolutionCard evolution={overview.evolution} />
-        <RecentActivitiesCard activities={overview.recentActivities} onOpenArticle={onOpenArticle} />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <StudyTypeCard studyTypes={overview.studyTypes} included={stats.included} />
-        <PlanningSummaryCard summary={overview.planningSummary} onOpenPlanning={onOpenPlanning} />
+    <div className="min-w-0 space-y-4">
+      <ReviewSummaryHeader
+        title="Visão geral da revisão"
+        description="Acompanhe o andamento, consulte o contexto e continue sua revisão."
+        actions={<Button className="gap-2 bg-[#6259ff] text-white hover:bg-[#5148ee]" onClick={total ? onGoToScreening : onImportArticles}>
+          {total ? <ArrowRightIcon className="h-4 w-4" /> : <DownloadIcon className="h-4 w-4" />}
+          {total ? "Revisar artigos" : "Importar artigos"}
+        </Button>}
+        metrics={[
+          { label: "Artigos identificados", value: formatNumber(stats.identified), description: metricDescriptions.identified },
+          { label: "Em triagem", value: formatNumber(stats.screening), description: metricDescriptions.screening },
+          { label: "Artigos elegíveis", value: formatNumber(stats.eligible), description: metricDescriptions.eligible },
+          { label: "Estudos incluídos", value: formatNumber(stats.included), description: metricDescriptions.included },
+        ]}
+      />
+      <section className="min-w-0 overflow-hidden rounded-xl border border-[#e2e6ef] bg-white">
+        <nav aria-label="Seções da visão geral" className="grid grid-cols-3 border-b border-[#edf0f7] bg-[#fbfcff]">
+          {[["panorama", "Panorama"], ["activity", "Fontes e atividades"], ["protocol", "Protocolo e estudos"]].map(([key, label]) => (
+            <button type="button" key={key} aria-pressed={section === key} onClick={() => setSection(key)}
+              className={cn("min-w-0 border-b-2 px-2 py-3 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-[#6259ff] sm:px-4 sm:text-sm",
+                section === key ? "border-[#6259ff] bg-white text-[#554bea]" : "border-transparent text-[#667391] hover:text-[#111936]")}>
+              {label}
+            </button>
+          ))}
+        </nav>
+        {section === "panorama" ? <>
+          <div className="grid min-w-0 divide-y divide-[#edf0f7] lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+            <div className="min-w-0">
+              <FunnelChart stats={stats} />
+              <div className="px-4 pb-5 sm:px-5"><Button variant="outline" size="sm" className="gap-2" onClick={onViewFlow}><BarChart3Icon className="h-4 w-4" />Ver fluxo PRISMA</Button></div>
+            </div>
+            <EvolutionCard evolution={overview.evolution || []} />
+          </div>
+          <div className="flex flex-wrap items-center gap-3 border-t border-[#edf0f7] bg-[#fbfcff] px-4 py-4 sm:px-5">
+            <DatabaseIcon className="h-4 w-4 text-[#6259ff]" />
+            <h3 className="text-sm font-medium text-[#111936]">Concordância com a IA</h3>
+            <span className="text-sm font-semibold text-[#6259ff]">{formatPercent(overview.reviewerAgreement?.rate)}</span>
+            <span className="text-xs text-[#667391]">{overview.reviewerAgreement?.agreed || 0} de {overview.reviewerAgreement?.reviewed || 0} decisões humanas coincidem com a sugestão da IA.</span>
+          </div>
+        </> : null}
+        {section === "activity" ? <div className="grid min-w-0 divide-y divide-[#edf0f7] lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+          <DataSourcesCard sources={overview.sources || []} />
+          <RecentActivitiesCard activities={overview.recentActivities || []} onOpenArticle={onOpenArticle} />
+        </div> : null}
+        {section === "protocol" ? <div className="grid min-w-0 divide-y divide-[#edf0f7] lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+          <PlanningSummaryCard summary={overview.planningSummary || {}} onOpenPlanning={onOpenPlanning} />
+          <StudyTypeCard studyTypes={overview.studyTypes || []} included={stats.included} />
+        </div> : null}
         <QuickActionsCard
           onExport={handleExport}
           onGoToScreening={onGoToScreening}
           onImport={onImportArticles}
           onViewFlow={onViewFlow}
         />
-      </div>
+      </section>
     </div>
   );
 }

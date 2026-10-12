@@ -1,6 +1,7 @@
 import { Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
+import ReviewSummaryHeader from "@/components/layout/ReviewSummaryHeader";
 
 const MODES = [
   ["rqs", "Perguntas de pesquisa"],
@@ -29,16 +30,12 @@ export function SynthesisModeNavigation({ mode, onModeChange }) {
     </nav>
   );
 }
-
 export default function SynthesisHeader({ overview, loading, onRefresh, onExport }) {
   return (
-    <header className="min-w-0 rounded-xl border border-[#e2e6ef] bg-white px-4 py-4 shadow-[0_10px_30px_rgba(18,27,54,0.03)] sm:px-5">
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#111936]">Síntese da revisão</h1>
-          <p className="mt-1 text-sm text-[#667391]">Transforme dados extraídos em respostas sustentadas</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+    <ReviewSummaryHeader
+      title="Síntese da revisão"
+      description="Transforme dados extraídos em respostas sustentadas."
+      actions={<div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={onRefresh} disabled={loading} aria-label="Atualizar síntese" className="gap-2 border-[#dfe4ef] bg-white">
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
             Atualizar
@@ -59,18 +56,13 @@ export default function SynthesisHeader({ overview, loading, onRefresh, onExport
               ))}
             </div>
           </details>
-        </div>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-[#edf0f7] pt-3 md:grid-cols-4">
-        <Metric label="Estudos incluídos" value={overview?.includedCount ?? "—"} />
-        <Metric label="Com dados extraídos" value={overview?.extractedCount ?? "—"} />
-        <Metric label="RQs com evidência" value={overview ? `${overview.coveredRQCount}/${overview.researchQuestionCount}` : "—"} />
-        <Metric label="Qualidade avaliada" value={overview?.qualityAssessedCount ?? "—"} />
-      </div>
-    </header>
+        </div>}
+      metrics={[
+        { label: "Estudos incluídos", value: overview?.includedCount ?? "—" },
+        { label: "Com dados extraídos", value: overview?.extractedCount ?? "—" },
+        { label: "RQs com evidência", value: overview ? `${overview.coveredRQCount}/${overview.researchQuestionCount}` : "—" },
+        { label: "Qualidade avaliada", value: overview?.qualityAssessedCount ?? "—" },
+      ]}
+    />
   );
-}
-
-function Metric({ label, value }) {
-  return <div className="min-w-0"><p className="text-xs text-[#667391]">{label}</p><p className="mt-0.5 text-base font-semibold text-[#111936]">{value}</p></div>;
 }

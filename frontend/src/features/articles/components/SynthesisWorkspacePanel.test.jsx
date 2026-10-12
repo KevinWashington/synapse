@@ -25,7 +25,7 @@ describe("SynthesisWorkspacePanel", () => {
     expect(screen.getByRole("columnheader", { name: "Avaliação" })).toBeInTheDocument();
     expect(screen.queryByText("medium")).not.toBeInTheDocument();
     expect(container.querySelector("pre")).toBeNull();
-    const details = container.querySelector("dl");
+    const details = screen.getByText("Achado", { selector: "dt", exact: true }).closest("dl");
     expect(details).toHaveTextContent("AchadoOriginal English finding");
     expect(details).toHaveTextContent("ConfirmadoNão");
     expect(details).toHaveTextContent("GruposIdosos, Adultos");
@@ -36,10 +36,11 @@ describe("SynthesisWorkspacePanel", () => {
     useWorkspace.mockReturnValue({ ...base, mode: "quality", resources: { ...base.resources, study: { data: { articleId: 1, title: "Study", qualityRating: "unrated", qualityScore: null, qualityAnswers: { clear: "yes", bias: "partial", suitable: "no", other: "na" } } } } });
     const { container } = render(<SynthesisWorkspacePanel project={{ id: 2, qualityAssessmentSchema: [{ key: "clear", label: "Objetivo claro" }, { key: "bias", label: "Risco de viés" }, { key: "suitable", label: "Método adequado" }, { key: "other", label: "Outro critério" }] }} />);
     expect(container.querySelector("pre")).toBeNull();
-    expect(container.querySelector("dl")).toHaveTextContent("Objetivo claroSim");
-    expect(container.querySelector("dl")).toHaveTextContent("Risco de viésParcial");
-    expect(container.querySelector("dl")).toHaveTextContent("Método adequadoNão");
-    expect(container.querySelector("dl")).toHaveTextContent("Outro critérioNão se aplica");
+    const details = screen.getByText("Objetivo claro", { exact: true }).closest("dl");
+    expect(details).toHaveTextContent("Objetivo claroSim");
+    expect(details).toHaveTextContent("Risco de viésParcial");
+    expect(details).toHaveTextContent("Método adequadoNão");
+    expect(details).toHaveTextContent("Outro critérioNão se aplica");
     expect(screen.queryByText(/unrated|—%/)).not.toBeInTheDocument();
   });
   it("selects a matrix study without navigating and opens extraction only through its explicit action", () => {

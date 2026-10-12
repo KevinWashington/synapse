@@ -1,111 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { projectService } from "@features/projects/public/services";
+import { useCallback, useEffect, useState } from "react";
+import { homeService } from "../services/homeService";
+import { inboxService } from "@features/inbox/public/services";
 import { statsService } from "@services/statsService";
+import { useRemoteResource } from "@/hooks/useRemoteResource";
 
-function useDashboardData() {
-  const [loading, setLoading] = useState(false);
-  const [projects, setProjects] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [dailyReviews, setDailyReviews] = useState([]);
-  const [activeTab, setActiveTab] = useState("active");
-
-  const loadProjects = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await projectService.getAllProjects({ page: 1, limit: 20 });
-      setProjects(response.projects || []);
-    } catch (error) {
-      console.error("Erro ao carregar projetos:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadStats = useCallback(async () => {
-    try {
-      setStatsLoading(true);
-      const statsData = await statsService.getUserStats();
-      setStats(statsData);
-      setDailyReviews(statsData.dailyReviews || []);
-    } catch (error) {
-      console.error("Erro ao carregar estatísticas:", error);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProjects();
-    loadStats();
-  }, [loadProjects, loadStats]);
-
-  const todoProjects = useMemo(
-    () => projects.filter((project) => project.status === "ideia"),
-    [projects]
-  );
-  const inProgressProjects = useMemo(
-    () => projects.filter((project) => project.status === "em-progresso"),
-    [projects]
-  );
-  const completedProjects = useMemo(
-    () => projects.filter((project) => project.status === "concluido"),
-    [projects]
-  );
-
-  const tabs = useMemo(
-    () => [
-      {
-        key: "active",
-        label: "Ativos",
-        count: inProgressProjects.length + todoProjects.length,
-      },
-      {
-        key: "in-progress",
-        label: "Em andamento",
-        count: inProgressProjects.length,
-      },
-      {
-        key: "completed",
-        label: "Concluídos",
-        count: completedProjects.length,
-      },
-    ],
-    [completedProjects.length, inProgressProjects.length, todoProjects.length]
-  );
-
-  const filteredProjects =
-    activeTab === "active"
-      ? projects
-      : activeTab === "in-progress"
-      ? inProgressProjects
-      : completedProjects;
-
-  const totalProjects = stats?.totalProjects || 0;
-  const totalArticles = stats?.totalArticles || 0;
-  const reviewedArticles = stats?.totalArticlesReviewed || 0;
-  const completionRate =
-    totalArticles > 0 ? Math.round((reviewedArticles / totalArticles) * 100) : 0;
-
-  const chartData = dailyReviews.map((day) => ({
-    date: day.date,
-    current: day.count,
-    previous: 0,
-  }));
-
-  return {
-    activeTab,
-    chartData,
-    completionRate,
-    filteredProjects,
-    loading,
-    reviewedArticles,
-    setActiveTab,
-    statsLoading,
-    tabs,
-    totalArticles,
-    totalProjects,
+export default function useDashboardData(userId) {
+  const [phase, changePhase] = useState("screening");
+  const [taskPage, setTaskPage] = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
+  const enabled = Boolean(userId);
+  const summary = useRemoteResource({ key: `home-summary:${userId}`, enabled, load: homeService.getSummary });
+  const tasks = useRemoteResource({ key: `home-tasks:${userId}:${phase}:${taskPage}`, enabled, load: () => homeService.getTasks({ phase, page: taskPage, pageSize: 4 }) });
+  const activity = useRemoteResource({ key: `home-activity:${userId}:${activityPage}`, enabled, load: () => homeService.getActivity({ page: activityPage, pageSize: 4 }) });
+  const stats = useRemoteResource({ key: `home-stats:${userId}`, enabled, load: () => statsService.getUserStats() });
+  const inbox = useRemoteResource({ key: `home-inbox:${userId}`, enabled, load: () => inboxService.getInbox() });
+  const setPhase = useCallback((next) => { changePhase(next); setTaskPage(1); }, []);
+  useEffect(() => { if (tasks.data && !tasks.loading && !tasks.error) setTaskPage((page) => Math.min(page, Math.max(1, Math.ceil(tasks.data.total / 4)))); }, [tasks.data, tasks.loading, tasks.error]);
+  useEffect(() => { if (activity.data && !activity.loading && !activity.error) setActivityPage((page) => Math.min(page, Math.max(1, Math.ceil(activity.data.total / 4)))); }, [activity.data, activity.loading, activity.error]);
+  return { phase, setPhase, taskPage, setTaskPage, activityPage, setActivityPage, summary, tasks, activity, stats, inbox,
+    refresh: () => Promise.all([summary.reload(), tasks.reload(), activity.reload(), stats.reload(), inbox.reload()]),
+    chartData: (stats.error ? [] : stats.data?.dailyReviews || []).map(({ date, count }) => ({ date, count })),
   };
 }
-
-export default useDashboardData;

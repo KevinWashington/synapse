@@ -5,12 +5,14 @@ import {
   FileTextIcon,
   ImageIcon,
   PencilIcon,
-  PlusIcon,
+  LoaderIcon,
+  ChevronDownIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { articleService } from "@/features/articles/services/articleService";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/DropdownMenu";
 
 function formatNumber(value) {
   return new Intl.NumberFormat("pt-BR").format(value || 0);
@@ -135,7 +137,7 @@ function FlowBox({ children, tone = "blue", className }) {
   }[tone];
 
   return (
-    <div className={cn("rounded-lg border px-6 py-4 text-center shadow-[0_8px_20px_rgba(17,25,54,0.03)]", toneClass, className)}>
+    <div className={cn("min-w-0 break-words rounded-lg border px-4 py-4 text-center", toneClass, className)}>
       {children}
     </div>
   );
@@ -149,18 +151,18 @@ function StageLabel({ label, tone }) {
   }[tone];
 
   return (
-    <div className={cn("flex min-h-[110px] w-12 items-center justify-center rounded-lg text-xs font-bold uppercase tracking-wide [writing-mode:vertical-rl] rotate-180", toneClass)}>
+    <div className={cn("flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide md:min-h-[100px] md:w-9 md:px-1 md:[writing-mode:vertical-rl] md:rotate-180", toneClass)}>
       {label}
     </div>
   );
 }
 
 function ArrowRight() {
-  return <div className="hidden h-px flex-1 bg-[#8a95ad] after:ml-auto after:block after:h-0 after:w-0 after:-translate-y-[5px] after:border-y-[5px] after:border-l-[8px] after:border-y-transparent after:border-l-[#8a95ad] lg:block" />;
+  return <div aria-hidden="true" className="hidden h-px flex-1 bg-[#8a95ad] after:ml-auto after:block after:h-0 after:w-0 after:-translate-y-[5px] after:border-y-[5px] after:border-l-[8px] after:border-y-transparent after:border-l-[#8a95ad] md:block" />;
 }
 
 function ArrowDown() {
-  return <div className="mx-auto h-10 w-px bg-[#8a95ad] after:block after:h-0 after:w-0 after:-translate-x-[5px] after:translate-y-10 after:border-x-[5px] after:border-t-[8px] after:border-x-transparent after:border-t-[#8a95ad]" />;
+  return <div aria-hidden="true" className="mx-auto h-5 w-px bg-[#8a95ad] after:block after:h-0 after:w-0 after:-translate-x-[5px] after:translate-y-5 after:border-x-[5px] after:border-t-[8px] after:border-x-transparent after:border-t-[#8a95ad]" />;
 }
 
 function SummaryRow({ label, value, highlight }) {
@@ -196,18 +198,21 @@ function ProjectPrismaFlow({ project, onEditFlow }) {
   const [summary, setSummary] = useState(null);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("diagram");
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const [summaryResponse, reportResponse] = await Promise.all([
         articleService.getSelectionSummary(project.id),
         articleService.getSelectionReport(project.id),
       ]);
       setSummary(summaryResponse);
       setReport(reportResponse);
-    } catch (error) {
-      toast.error(`Erro ao carregar fluxo PRISMA: ${error.message}`);
+    } catch (currentError) {
+      setError(currentError.message || "Não foi possível carregar o fluxo PRISMA.");
     } finally {
       setLoading(false);
     }
@@ -284,30 +289,45 @@ function ProjectPrismaFlow({ project, onEditFlow }) {
   }
 
   const sourceText = metrics.sources.length
-    ? metrics.sources.slice(0, 4).map((item) => `${item.sourceName} (${formatNumber(item.total)})`).join(" · ")
+    ? metrics.sources.slice(0, 4).map((item) => `${item.sourceName} (${formatNumber(item.total)})`).join(" · ") + (metrics.sources.length > 4 ? ` · +${metrics.sources.length - 4} fontes em Resumo e fontes` : "")
     : "Sem fontes cadastradas";
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <section className="rounded-lg border border-[#edf0f7] bg-white p-6">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="min-w-0 overflow-hidden rounded-xl border border-[#e2e6ef] bg-white">
+      <section>
+        <header className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
           <div>
-            <h2 className="text-lg font-semibold text-[#111936]">Fluxo PRISMA</h2>
-            <p className="mt-2 text-sm text-[#56627f]">Acompanhe o fluxo de selecao dos estudos ao longo das etapas da revisão.</p>
+            <h2 className="text-xl font-semibold tracking-[-0.02em] text-[#111936]">Fluxo PRISMA</h2>
+            <p className="mt-1 text-sm text-[#667391]">Da identificação à inclusão: acompanhe o percurso dos registros e exporte o fluxo.</p>
           </div>
-          <Button variant="outline" className="h-10 gap-2 rounded-lg border-[#dfe4ef] bg-white" onClick={onEditFlow}>
+          <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" className="gap-2 border-[#dfe4ef] bg-white" onClick={onEditFlow}>
             <PencilIcon className="h-4 w-4" />
-            Editar fluxograma
+            Revisar registros
           </Button>
-        </div>
-
-        {loading ? (
-          <div className="grid min-h-[520px] place-items-center text-sm text-[#667391]">Carregando fluxo...</div>
-        ) : (
-          <div className="min-w-0 overflow-x-auto">
-            <div className="min-w-[860px] space-y-4 pb-4">
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
-                <StageLabel label="Identificacao" tone="blue" />
+          <DropdownMenu><DropdownMenuTrigger asChild>
+            <Button disabled={loading || Boolean(error)} className="gap-2 bg-[#6259ff] text-white hover:bg-[#5148ee]"><DownloadIcon className="h-4 w-4" />Exportar<ChevronDownIcon className="h-4 w-4" /></Button>
+          </DropdownMenuTrigger><DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={handleExportPng}><ImageIcon className="h-4 w-4" />Imagem (PNG)</DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleExportPdf}><FileDownIcon className="h-4 w-4" />Documento (PDF)</DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleExportCsv}><DownloadIcon className="h-4 w-4" />Dados (CSV)</DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleExportJson}><FileTextIcon className="h-4 w-4" />Relatório (JSON)</DropdownMenuItem>
+          </DropdownMenuContent></DropdownMenu>
+          </div>
+        </header>
+        <nav aria-label="Seções do fluxo" className="grid grid-cols-2 border-y border-[#edf0f7] bg-[#fbfcff]">
+          {[["diagram", "Diagrama"], ["summary", "Resumo e fontes"]].map(([key, label]) => <button type="button" key={key}
+            aria-pressed={activeTab === key} onClick={() => setActiveTab(key)}
+            className={cn("min-w-0 border-b-2 px-3 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-[#6259ff]", activeTab === key ? "border-[#6259ff] bg-white text-[#554bea]" : "border-transparent text-[#667391] hover:text-[#111936]")}>{label}</button>)}
+        </nav>
+        {error ? <div role="alert" className="space-y-3 p-5 text-sm text-[#667391]"><p>{error}</p><Button variant="outline" onClick={loadData}>Tentar novamente</Button></div> :
+        loading ? (
+          <div role="status" className="flex min-h-[320px] items-center justify-center gap-2 text-sm text-[#667391]"><LoaderIcon className="h-4 w-4 animate-spin" />Carregando fluxo...</div>
+        ) : activeTab === "diagram" ? (
+          <section aria-label="Diagrama PRISMA" className="min-w-0 p-4 sm:p-5">
+            <div className="mx-auto max-w-[1100px] space-y-3">
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
+                <StageLabel label="Identificação" tone="blue" />
                 <FlowBox tone="blue">
                   <p className="text-base font-semibold text-[#111936]">Registros identificados em bases de dados</p>
                   <p className="mt-1 text-base font-semibold text-[#111936]">(n = {formatNumber(metrics.identified)})</p>
@@ -320,12 +340,12 @@ function ProjectPrismaFlow({ project, onEditFlow }) {
                 </FlowBox>
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
-                <div />
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
+                <div className="hidden md:block" />
                 <ArrowDown />
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
                 <StageLabel label="Triagem" tone="blue" />
                 <FlowBox tone="blue">
                   <p className="text-base font-semibold text-[#111936]">Registros para triagem</p>
@@ -333,107 +353,95 @@ function ProjectPrismaFlow({ project, onEditFlow }) {
                 </FlowBox>
                 <ArrowRight />
                 <FlowBox tone="neutral" className="text-left">
-                  <p className="font-semibold text-[#111936]">Registros excluidos</p>
+                  <p className="font-semibold text-[#111936]">Registros excluídos</p>
                   <p className="mt-2 text-sm text-[#56627f]">(n = {formatNumber(metrics.excludedScreening)})</p>
                 </FlowBox>
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
-                <div />
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
+                <div className="hidden md:block" />
                 <ArrowDown />
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
                 <StageLabel label="Elegibilidade" tone="green" />
                 <FlowBox tone="green">
-                  <p className="text-base font-semibold text-[#111936]">Relatorios buscados para recuperacao</p>
+                  <p className="text-base font-semibold text-[#111936]">Relatórios buscados para recuperação</p>
                   <p className="mt-1 text-base font-semibold text-[#111936]">(n = {formatNumber(metrics.reportsSought)})</p>
                 </FlowBox>
                 <ArrowRight />
                 <FlowBox tone="neutral" className="text-left">
-                  <p className="font-semibold text-[#111936]">Relatorios nao recuperados</p>
+                  <p className="font-semibold text-[#111936]">Relatórios não recuperados</p>
                   <p className="mt-2 text-sm text-[#56627f]">(n = {formatNumber(metrics.fullTextUnavailable)})</p>
                 </FlowBox>
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
-                <div />
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
+                <div className="hidden md:block" />
                 <ArrowDown />
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
-                <div />
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
+                <div className="hidden md:block" />
                 <FlowBox tone="green">
-                  <p className="text-base font-semibold text-[#111936]">Relatorios avaliados para elegibilidade</p>
+                  <p className="text-base font-semibold text-[#111936]">Relatórios avaliados para elegibilidade</p>
                   <p className="mt-1 text-base font-semibold text-[#111936]">(n = {formatNumber(metrics.reportsAssessed)})</p>
                 </FlowBox>
                 <ArrowRight />
                 <FlowBox tone="neutral" className="text-left">
-                  <p className="font-semibold text-[#111936]">Relatorios excluidos</p>
+                  <p className="font-semibold text-[#111936]">Relatórios excluídos</p>
                   <p className="mt-2 text-sm text-[#56627f]">(n = {formatNumber(metrics.excludedEligibility)})</p>
-                  {(report?.exclusionReasons?.eligibility || []).slice(0, 4).map((item) => (
+                  <div className="max-h-40 overflow-y-auto">{(report?.exclusionReasons?.eligibility || []).map((item) => (
                     <p key={item.reason} className="mt-1 text-sm text-[#56627f]">- {item.reason} (n = {formatNumber(item.count)})</p>
-                  ))}
+                  ))}</div>
                 </FlowBox>
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
-                <div />
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
+                <div className="hidden md:block" />
                 <ArrowDown />
               </div>
 
-              <div className="grid grid-cols-[64px_minmax(280px,1fr)_80px_minmax(280px,1fr)] items-center gap-5">
-                <StageLabel label="Inclusao" tone="orange" />
+              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[40px_minmax(0,1fr)_24px_minmax(0,1fr)]">
+                <StageLabel label="Inclusão" tone="orange" />
                 <FlowBox tone="orange">
-                  <p className="text-base font-semibold text-[#111936]">Estudos incluidos na revisao</p>
+                  <p className="text-base font-semibold text-[#111936]">Estudos incluídos na revisão</p>
                   <p className="mt-1 text-base font-semibold text-[#111936]">(n = {formatNumber(metrics.included)})</p>
-                  <p className="mt-4 text-sm text-[#56627f]">Relatorios de estudos incluidos (n = {formatNumber(metrics.included)})</p>
                 </FlowBox>
               </div>
             </div>
-          </div>
-        )}
+          </section>
+        ) : null}
       </section>
 
-      <aside className="space-y-5">
-        <section className="rounded-lg border border-[#edf0f7] bg-white p-6">
+      {!loading && !error && activeTab === "summary" && <div className="grid min-w-0 divide-y divide-[#edf0f7] lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+        <section aria-label="Resumo do fluxo" className="min-w-0 p-4 sm:p-5">
           <h3 className="text-base font-semibold text-[#111936]">Resumo do fluxo</h3>
           <div className="mt-6 space-y-5">
             <SummaryRow label="Registros identificados" value={metrics.identified} />
             <SummaryRow label="Duplicatas removidas" value={metrics.duplicatesRemoved} />
             <SummaryRow label="Registros para triagem" value={metrics.screeningPool} />
-            <SummaryRow label="Registros excluidos" value={metrics.excludedScreening} />
-            <SummaryRow label="Relatorios avaliados para elegibilidade" value={metrics.reportsAssessed} />
-            <SummaryRow label="Relatorios excluidos" value={metrics.excludedEligibility} />
-            <SummaryRow label="Estudos incluidos" value={metrics.included} highlight />
+            <SummaryRow label="Registros excluídos na triagem" value={metrics.excludedScreening} />
+            <SummaryRow label="Relatórios não recuperados" value={metrics.fullTextUnavailable} />
+            <SummaryRow label="Relatórios avaliados para elegibilidade" value={metrics.reportsAssessed} />
+            <SummaryRow label="Relatórios excluídos na elegibilidade" value={metrics.excludedEligibility} />
+            <SummaryRow label="Estudos incluídos" value={metrics.included} highlight />
           </div>
           <div className="mt-8">
             <Donut value={metrics.included} total={metrics.reportsSought} />
+            <p className="mt-2 text-center text-xs text-[#667391]">Proporção de incluídos em relação aos relatórios buscados.</p>
           </div>
         </section>
 
-        <section className="rounded-lg border border-[#edf0f7] bg-white p-6">
-          <h3 className="text-base font-semibold text-[#111936]">Exportar fluxo</h3>
-          <div className="mt-5 space-y-3">
-            <Button variant="outline" className="h-10 w-full justify-start gap-3 rounded-lg border-[#dfe4ef] bg-white" onClick={handleExportPng}>
-              <ImageIcon className="h-4 w-4" />
-              Exportar como imagem (PNG)
-            </Button>
-            <Button variant="outline" className="h-10 w-full justify-start gap-3 rounded-lg border-[#dfe4ef] bg-white" onClick={handleExportPdf}>
-              <FileDownIcon className="h-4 w-4" />
-              Exportar como PDF
-            </Button>
-            <Button variant="outline" className="h-10 w-full justify-start gap-3 rounded-lg border-[#dfe4ef] bg-white" onClick={handleExportCsv}>
-              <DownloadIcon className="h-4 w-4" />
-              Exportar dados (CSV)
-            </Button>
-            <Button variant="outline" className="h-10 w-full justify-start gap-3 rounded-lg border-[#dfe4ef] bg-white" onClick={handleExportJson}>
-              <FileTextIcon className="h-4 w-4" />
-              Exportar relatorio (JSON)
-            </Button>
+        <section aria-label="Fontes do fluxo" className="min-w-0 p-4 sm:p-5">
+          <h3 className="text-base font-semibold text-[#111936]">Fontes de dados</h3>
+          <p className="mt-1 text-sm text-[#667391]">{metrics.sources.length} fontes na revisão.</p>
+          <div className="mt-5 max-h-[320px] overflow-y-auto divide-y divide-[#edf0f7]">
+            {metrics.sources.map((source) => <div key={source.sourceName} className="flex items-start justify-between gap-4 py-3 text-sm"><span className="min-w-0 break-words text-[#56627f]">{source.sourceName}</span><span className="shrink-0 font-semibold text-[#111936]">{formatNumber(source.total)}</span></div>)}
+            {!metrics.sources.length && <p className="text-sm text-[#667391]">Sem fontes cadastradas.</p>}
           </div>
         </section>
-      </aside>
+      </div>}
     </div>
   );
 }

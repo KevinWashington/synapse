@@ -52,6 +52,18 @@ function wrapperAt(entry) {
 }
 
 describe("useArticleDetailsPage stage queue", () => {
+  it("keeps personal task navigation in the assigned-only queue", async () => {
+    mocks.getArticleById.mockResolvedValue({ id: 11, hasPdf: false });
+    mocks.getProjectById.mockResolvedValue({ id: 7 });
+    mocks.getArticlesByProject.mockResolvedValue({ articles: [{ id: 11 }], total: 1 });
+    mocks.getSelectionSummary.mockResolvedValue({});
+    const { result } = renderHook(() => useArticleDetailsPage(), { wrapper: wrapperAt("/projetos/7/artigos/11?flow=screening&assignedToMe=1") });
+    await waitFor(() => expect(result.current.articleListLoading).toBe(false));
+    expect(mocks.getArticlesByProject).toHaveBeenCalledWith("7", expect.objectContaining({ assignedToMe: true, phase: "screening" }));
+    act(() => result.current.navigate("/projetos/7/artigos/12?flow=screening&workspace=notas"));
+    await waitFor(() => expect(result.current.articleId).toBe("12"));
+    expect(result.current.assignedToMe).toBe(true);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getArticleById.mockResolvedValue({ id: 11, title: "Artigo", hasPdf: false });

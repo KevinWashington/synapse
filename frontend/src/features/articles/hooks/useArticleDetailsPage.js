@@ -10,8 +10,17 @@ const WORKSPACE_TABS = new Set(["notas", "extracao", "chat"]);
 
 function useArticleDetailsPage() {
   const { projectId, articleId } = useParams();
-  const navigate = useNavigate();
+  const routerNavigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const assignedToMe = searchParams.get("assignedToMe") === "1";
+  const navigate = useCallback((target, options) => {
+    if (assignedToMe && typeof target === "string" && target.startsWith(`/projetos/${projectId}/artigos/`)) {
+      const [path, query] = target.split("?");
+      const params = new URLSearchParams(query);
+      params.set("assignedToMe", "1");
+      routerNavigate(`${path}?${params}`, options);
+    } else routerNavigate(target, options);
+  }, [assignedToMe, projectId, routerNavigate]);
   const [assignmentResource, setAssignmentResource] = useState(null);
   const myAssignments = assignmentResource?.projectId === projectId ? assignmentResource.data : [];
   const [isSavingEvidence, setIsSavingEvidence] = useState(false);
@@ -44,14 +53,15 @@ function useArticleDetailsPage() {
   const project = projectResource.data;
   const loadList = useCallback(async () => {
     const filters = { limit: 1000 };
+    if (assignedToMe) filters.assignedToMe = true;
     if (listFlow === "included") filters.outcome = "included";
     else { filters.phase = listFlow; if (["screening", "eligibility"].includes(listFlow)) filters.outcome = "active"; }
     const [response, summary] = await Promise.all([
       articleService.getArticlesByProject(projectId, filters), articleService.getSelectionSummary(projectId),
     ]);
     return { articles: response.articles || [], total: response.total || 0, summary };
-  }, [listFlow, projectId]);
-  const queueResource = useRemoteResource({ key: `${projectId}:${listFlow}`, enabled: Boolean(projectId && ["included", "identification", "screening", "eligibility"].includes(listFlow)), load: loadList });
+  }, [assignedToMe, listFlow, projectId]);
+  const queueResource = useRemoteResource({ key: `${projectId}:${listFlow}:${assignedToMe}`, enabled: Boolean(projectId && ["included", "identification", "screening", "eligibility"].includes(listFlow)), load: loadList });
   const articleList = queueResource.data?.articles || [];
   const article = remoteArticle || articleList.find((item) => String(item.id) === String(articleId)) || null;
   const articleListTotal = queueResource.data?.total || 0;
@@ -223,6 +233,7 @@ function useArticleDetailsPage() {
   }, [article, articleId, backUrl, navigate, projectId]);
 
   return {
+    assignedToMe,
     article,
     articleList,
     articleListTotal,

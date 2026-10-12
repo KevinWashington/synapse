@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/features/auth";
+import { saveReadingResume } from "@/features/dashboard";
 import { AlertTriangleIcon, ArrowLeftIcon, FileIcon, LoaderIcon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
@@ -15,6 +17,7 @@ function mapSuggestedDecision(aiSuggestedStatus) {
 }
 
 function ArticleDetails() {
+  const { user } = useAuth();
   const {
     article,
     articleList,
@@ -43,6 +46,10 @@ function ArticleDetails() {
     setRightTab,
   } = useArticleDetailsPage();
   const chatSession = useArticleChat({ article, pdfData, enabled: rightTab === "chat" });
+  useEffect(() => {
+    if (!user?.id || loading || articlePending || error || projectError || !article || !project || String(article.id) !== String(articleId) || String(project.id) !== String(projectId)) return;
+    saveReadingResume(user.id, { projectId, articleId, phase: article.reviewOutcome === "included" ? "included" : article.currentPhase, workspace: rightTab });
+  }, [user?.id, loading, articlePending, error, projectError, article, project, projectId, articleId, rightTab]);
   const [screeningDialogOpen, setScreeningDialogOpen] = useState(false);
   const [screeningInitialDecision, setScreeningInitialDecision] = useState("included");
   const [eligibilityDialogOpen, setEligibilityDialogOpen] = useState(false);

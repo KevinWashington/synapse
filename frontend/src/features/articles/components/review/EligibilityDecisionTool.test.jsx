@@ -12,6 +12,7 @@ function renderTool(overrides = {}) {
     researchQuestions: ["Qual é o efeito?"],
     isSaving: false,
     onAdvance: vi.fn(),
+    onSkip: vi.fn(),
     onAssist: vi.fn(),
     onDirtyChange: vi.fn(),
     onSubmit: vi.fn().mockResolvedValue(true),
@@ -22,6 +23,29 @@ function renderTool(overrides = {}) {
 }
 
 describe("EligibilityDecisionTool", () => {
+  it("explains the questions in an expandable reference and keeps the selection separate", async () => {
+    const { onSubmit } = renderTool();
+    expect(screen.getByRole("heading", { name: "Decisão de elegibilidade" })).toBeVisible();
+    expect(screen.getByText("Perguntas respondidas pelo estudo")).toBeVisible();
+    fireEvent.click(screen.getByText("Consultar perguntas", { exact: true }));
+    expect(screen.getByText("Qual é o efeito?", { exact: true })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "RQ 1" }));
+    expect(screen.getByRole("button", { name: "RQ 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("skips without submitting", () => {
+    const props = renderTool();
+    fireEvent.click(screen.getByRole("button", { name: "Pular estudo" }));
+    expect(props.onSkip).toHaveBeenCalledOnce();
+    expect(props.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("blocks skip while saving", () => {
+    const props = renderTool({ isSaving: true });
+    fireEvent.click(screen.getByRole("button", { name: "Pular estudo" }));
+    expect(props.onSkip).not.toHaveBeenCalled();
+  });
   it("does not mark persisted reason and RQs as a new draft", async () => {
     const onDirtyChange = vi.fn();
     renderTool({
@@ -42,6 +66,7 @@ describe("EligibilityDecisionTool", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar e próximo" }));
 
     expect(await screen.findByText("Envie o PDF antes de incluir o artigo no corpus final.")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveAttribute("aria-invalid", "false");
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

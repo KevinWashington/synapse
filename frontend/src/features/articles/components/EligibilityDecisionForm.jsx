@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
 import { cn } from "@/lib/utils";
+import DecisionOptions from "./review/DecisionOptions";
 
 const STATUS_OPTIONS = [
   { value: "met", label: "Sim", stored: "Atende", tone: "border-[#bfe8cf] bg-[#eefaf3] text-[#19884f]" },
@@ -116,13 +117,7 @@ function EligibilityDecisionForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-      <div className="grid gap-2 sm:grid-cols-3">
-        {[["included", "Incluir no corpus"], ["excluded", "Excluir"], ["full_text_unavailable", "Texto completo indisponível"]].map(([value, label]) => (
-          <Button key={value} type="button" variant="outline" aria-pressed={decision === value} className={cn("h-auto min-h-10 whitespace-normal px-2 text-xs", decision === value && "border-[#6259ff] bg-[#f0edff] text-[#554bea]")} disabled={isSaving || !canDecide} onClick={() => { setDecision(value); setError(""); }}>
-            {label}
-          </Button>
-        ))}
-      </div>
+      <DecisionOptions decision={decision} onChange={(value) => { setDecision(value); setError(""); }} disabled={isSaving || !canDecide} allowUnavailable />
 
       {decision !== "full_text_unavailable" && entries.length ? (
         <section className="space-y-3 border-y border-[#e5e8f0] py-4">
@@ -148,20 +143,27 @@ function EligibilityDecisionForm({
       ) : null}
 
       {decision === "included" && researchQuestions.length ? (
-        <div><p className="text-xs font-semibold text-[#111936]">RQs respondidas</p><div className="mt-2 flex flex-wrap gap-2">{researchQuestions.map((question, index) => {
+        <section><h3 className="text-sm font-medium text-[#111936]">Perguntas respondidas pelo estudo</h3>
+          <p className="mt-1 text-xs leading-5 text-[#667391]">Selecione as perguntas para as quais o artigo oferece evidências.</p>
+          <details key={article?.id} className="mt-2 rounded-lg border border-[#e2e6ef] bg-white">
+            <summary className="cursor-pointer rounded-lg px-3 py-2 text-xs font-medium text-[#667391] focus-visible:outline-2 focus-visible:outline-[#6259ff]">Consultar perguntas</summary>
+            <ol className="max-h-48 space-y-3 overflow-y-auto border-t border-[#edf0f7] p-3">{researchQuestions.map((question, index) => <li key={index} className="text-xs leading-5 text-[#56627f]"><span className="font-semibold text-[#111936]">RQ {index + 1}</span><p className="break-words">{question}</p></li>)}</ol>
+          </details>
+          <div role="group" aria-label="Perguntas respondidas pelo estudo" className="mt-3 flex flex-wrap gap-2">{researchQuestions.map((question, index) => {
           const number = index + 1; const selected = selectedRQs.includes(number);
-          return <button key={number} type="button" aria-pressed={selected} className={cn("rounded-md border px-2 py-1 text-xs", selected ? "border-[#6259ff] bg-[#f0edff] text-[#554bea]" : "border-[#dfe4ef] text-[#667391]")} title={question} disabled={isSaving || !canDecide} onClick={() => setSelectedRQs((current) => selected ? current.filter((value) => value !== number) : [...current, number])}>RQ {number}</button>;
-        })}</div></div>
+          return <button key={number} type="button" aria-pressed={selected} className={cn("min-h-8 rounded-md border px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-[#6259ff] disabled:cursor-not-allowed disabled:opacity-50", selected ? "border-[#6259ff] bg-[#f0edff] font-semibold text-[#554bea]" : "border-[#dfe4ef] bg-white text-[#667391]")} title={question} disabled={isSaving || !canDecide} onClick={() => setSelectedRQs((current) => selected ? current.filter((value) => value !== number) : [...current, number])}>RQ {number}</button>;
+        })}</div></section>
       ) : null}
 
       {decision === "full_text_unavailable" ? <p className="rounded-md bg-[#f5f7fb] p-3 text-xs leading-5 text-[#667391]">Informe por que não foi possível acessar o texto completo deste artigo.</p> : null}
 
       <div className="space-y-2">
         <Label htmlFor={`eligibility-reason-${article?.id || "new"}`}>{reasonLabel}</Label>
-        <Textarea id={`eligibility-reason-${article?.id || "new"}`} value={reasonText} onChange={(event) => setReasonText(event.target.value)} rows={3} placeholder={decision === "full_text_unavailable" ? "Descreva por que o texto completo não está disponível." : "Registre a justificativa da decisão."} required={decision !== "included"} disabled={isSaving || !canDecide} />
+        <p id={`eligibility-help-${article?.id || "new"}`} className="text-xs leading-5 text-[#667391]">{decision === "full_text_unavailable" ? "Descreva as tentativas de acesso e o motivo da indisponibilidade." : "Obrigatória ao excluir; opcional ao incluir."}</p>
+        <Textarea id={`eligibility-reason-${article?.id || "new"}`} aria-describedby={`eligibility-help-${article?.id || "new"}`} aria-invalid={Boolean(error && decision !== "included" && !reasonText.trim())} className="min-h-32 bg-white text-sm shadow-none" value={reasonText} onChange={(event) => setReasonText(event.target.value)} rows={5} placeholder="Registre os critérios que sustentam sua decisão." required={decision !== "included"} disabled={isSaving || !canDecide} />
         {error ? <p role="alert" className="text-sm text-red-600">{error}</p> : null}
       </div>
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{secondaryAction}<Button type="submit" disabled={isSaving || !canDecide}>{isSaving ? "Salvando..." : submitLabel}</Button></div>
+      <div className="flex flex-col gap-2 border-t border-[#edf0f7] pt-4">{secondaryAction}<Button type="submit" className="min-h-10 w-full bg-[#6259ff] text-white hover:bg-[#5148ee]" disabled={isSaving || !canDecide}>{isSaving ? <><LoaderIcon className="h-4 w-4 animate-spin" />Salvando...</> : submitLabel}</Button></div>
     </form>
   );
 }

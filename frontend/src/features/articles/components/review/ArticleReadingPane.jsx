@@ -111,12 +111,12 @@ function ArticleReadingPane({
           </div>
         ) : isEligibility ? (
           <div className="mt-5 min-h-72 rounded-lg border border-[#e2e6ef] bg-[#fbfcff] p-5">
-            <p className="max-w-[68ch] whitespace-pre-wrap text-sm leading-7 text-[#56627f]">
+            <p className=" whitespace-pre-wrap text-sm leading-7 text-[#56627f]">
               {article.abstract || "O texto completo ainda não está disponível. Envie o PDF para continuar a avaliação."}
             </p>
           </div>
         ) : (
-          <p className="mt-5 max-w-[68ch] whitespace-pre-wrap text-sm leading-7 text-[#56627f]">
+          <p className="mt-5  whitespace-pre-wrap text-sm leading-7 text-[#56627f]">
             {article.abstract || "Resumo não cadastrado para este artigo."}
           </p>
         )}

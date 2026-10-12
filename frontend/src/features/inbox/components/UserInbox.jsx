@@ -14,7 +14,7 @@ function destination(notification) {
   return `/projetos/${notification.projectId}`;
 }
 
-export default function UserInbox() {
+export default function UserInbox({ trigger, onUpdated }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [inbox, setInbox] = useState(emptyInbox);
@@ -34,13 +34,13 @@ export default function UserInbox() {
   async function run(id, action) {
     if (pendingId) return;
     setPendingId(id);
-    try { await action(); await refresh(); }
+    try { await action(); await refresh(); onUpdated?.(); }
     catch (failure) { setError(failure.message || "Não foi possível concluir esta ação."); }
     finally { setPendingId(null); }
   }
   const total = inbox.unreadNotificationCount + inbox.pendingInvitationCount;
   return <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) refresh(); }}>
-    <DialogTrigger asChild><Button variant="outline" size="icon" aria-label={`Central de notificações, ${total} pendente${total === 1 ? "" : "s"}`} className="relative h-10 w-10 rounded-full border-[var(--syn-border)] bg-[var(--syn-bg-primary)] text-[var(--syn-text-primary)] shadow-none hover:bg-[var(--accent)]"><BellIcon className="h-4 w-4" />{total > 0 ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#6259ff] px-1 text-[10px] font-semibold leading-5 text-white">{total > 99 ? "99+" : total}</span> : null}</Button></DialogTrigger>
+    <DialogTrigger asChild>{trigger || <Button variant="outline" size="icon" aria-label={`Central de notificações, ${total} pendente${total === 1 ? "" : "s"}`} className="relative h-10 w-10 rounded-full border-[var(--syn-border)] bg-[var(--syn-bg-primary)] text-[var(--syn-text-primary)] shadow-none hover:bg-[var(--accent)]"><BellIcon className="h-4 w-4" />{total > 0 ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#6259ff] px-1 text-[10px] font-semibold leading-5 text-white">{total > 99 ? "99+" : total}</span> : null}</Button>}</DialogTrigger>
     <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Central de notificações</DialogTitle><DialogDescription>Convites e atualizações de todos os seus projetos.</DialogDescription></DialogHeader>
       {loading ? <p role="status" className="text-sm text-muted-foreground">Carregando atualizações…</p> : null}
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}

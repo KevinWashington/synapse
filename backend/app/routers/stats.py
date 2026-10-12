@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -17,6 +18,39 @@ from app.services.project_access_service import accessible_project_ids_query, re
 
 
 router = APIRouter()
+
+from app.schemas.home import HomeSummary, HomeTaskPage, HomeActivityPage, HomeReading
+from app.services.home_query_service import get_home_summary, get_home_tasks, get_home_activity, get_home_reading
+
+
+@router.get("/home/reading", response_model=HomeReading)
+async def home_reading(
+    projectId: int = Query(..., ge=1), articleId: int = Query(..., ge=1),
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    return await get_home_reading(db, user_id=current_user.id, project_id=projectId, article_id=articleId)
+
+
+@router.get("/home/summary", response_model=HomeSummary)
+async def home_summary(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await get_home_summary(db, user_id=current_user.id)
+
+
+@router.get("/home/tasks", response_model=HomeTaskPage)
+async def home_tasks(
+    phase: Literal["screening", "eligibility"] = "screening",
+    page: int = Query(1, ge=1), pageSize: int = Query(4, ge=1, le=50),
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    return await get_home_tasks(db, user_id=current_user.id, phase=phase, page=page, page_size=pageSize)
+
+
+@router.get("/home/activity", response_model=HomeActivityPage)
+async def home_activity(
+    page: int = Query(1, ge=1), pageSize: int = Query(4, ge=1, le=50),
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db),
+):
+    return await get_home_activity(db, user_id=current_user.id, page=page, page_size=pageSize)
 
 
 def _build_anchor_joinability(postgres_metrics: dict, vector_metrics: dict) -> dict:

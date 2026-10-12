@@ -442,6 +442,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           onAdvance={() => { setIsReviewDraftDirty(false); selectAdjacent(1); }}
           onDirtyChange={setIsReviewDraftDirty}
           onSubmit={saveEligibilityDecision}
+          onSkip={() => draftGuard.guard(handleSkip)}
           researchQuestions={project?.researchQuestions || []}
         /> : activeStage === "included" ? <IncludedExtractionTool
           article={workspaceArticle}

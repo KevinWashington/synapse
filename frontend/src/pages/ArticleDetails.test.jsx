@@ -6,6 +6,7 @@ import ArticleDetails from "./ArticleDetails";
 const navigate = vi.fn();
 const handleSaveNotes = vi.fn().mockResolvedValue(undefined);
 let workspaceTab = "extracao";
+let readingPending = false;
 
 const article = {
   id: 2,
@@ -38,7 +39,7 @@ const articleList = [
 vi.mock("@/features/auth", () => ({
   useAuth: () => ({
     logout: vi.fn().mockResolvedValue({ success: true }),
-    user: { name: "Ana Rocha", email: "ana@example.com" },
+    user: { id: 1, name: "Ana Rocha", email: "ana@example.com" },
   }),
 }));
 
@@ -57,6 +58,7 @@ vi.mock("@features/articles/public/hooks", () => ({
     articleListTotal: 1093,
     articleListLoading: false,
     articleId: "2",
+    articlePending: readingPending,
     backUrl: "/projetos/7?tab=artigos&flow=included",
     error: null,
     handleAddNote: vi.fn(),
@@ -91,7 +93,20 @@ function renderPage() {
 }
 
 describe("ArticleDetails extraction workspace", () => {
+  it("does not register a fallback article while its request is pending", () => {
+    localStorage.clear();
+    readingPending = true;
+    renderPage();
+    expect(localStorage.getItem("synapse:last-reading:v1:1")).toBeNull();
+  });
+  it("registers successful reading without storing article content", async () => {
+    localStorage.clear();
+    renderPage();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("synapse:last-reading:v1:1"))).toMatchObject({ projectId: "7", articleId: "2", phase: "included", workspace: "extracao" }));
+    expect(localStorage.getItem("synapse:last-reading:v1:1")).not.toContain("Estudo atual");
+  });
   beforeEach(() => {
+    readingPending = false;
     workspaceTab = "extracao";
     navigate.mockClear();
     handleSaveNotes.mockClear();

@@ -23,6 +23,21 @@ function renderTool(overrides = {}) {
 }
 
 describe("ScreeningDecisionTool", () => {
+  it("keeps AI secondary and exposes guidance without relying on placeholders", () => {
+    renderTool();
+    expect(screen.getByRole("heading", { name: "Decisão de triagem" })).toBeVisible();
+    expect(screen.getByText("Obrigatória ao excluir; opcional ao incluir.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Copiar para justificativa" })).not.toBeVisible();
+    fireEvent.click(screen.getByText("Sugestão da IA", { exact: true }));
+    expect(screen.getByRole("button", { name: "Copiar para justificativa" })).toBeVisible();
+  });
+
+  it("does not skip an article while its decision is being saved", () => {
+    const { onSkip } = renderTool({ isSaving: true });
+    expect(screen.getByRole("button", { name: "Pular estudo" })).toBeDisabled();
+    fireEvent.keyDown(screen.getByRole("complementary", { name: "Decisão de triagem" }), { key: "p" });
+    expect(onSkip).not.toHaveBeenCalled();
+  });
   it("requires a justification before excluding", async () => {
     const { onSubmit } = renderTool();
 
@@ -50,7 +65,8 @@ describe("ScreeningDecisionTool", () => {
     const { onSubmit } = renderTool();
 
     expect(screen.getByText("Sugestão da IA")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Usar como rascunho" }));
+    fireEvent.click(screen.getByText("Sugestão da IA", { exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Copiar para justificativa" }));
 
     expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveValue(article.aiEvaluation);
     expect(onSubmit).not.toHaveBeenCalled();
@@ -68,6 +84,7 @@ describe("ScreeningDecisionTool", () => {
 
     expect(await screen.findByText("Não foi possível salvar. Revise a conexão e tente novamente.")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveValue("Fora da população definida.");
+    expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveAttribute("aria-invalid", "false");
   });
 
   it("disables decisions for an unassigned collaborative article", () => {
