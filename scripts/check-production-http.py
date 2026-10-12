@@ -23,6 +23,9 @@ ready = json.loads(ready)
 assert ready["status"] == "ready", ready
 assert all(value == "ok" for value in ready["checks"].values()), ready
 index, headers = get("/")
+assert headers.get("Strict-Transport-Security") == "max-age=31536000", (
+    "HTTPS enforcement is missing"
+)
 assert "text/html" in headers.get("Content-Type", ""), "Expected SPA HTML"
 assert b"@vite/client" not in index, "Development frontend is running"
 route, _ = get("/login")
