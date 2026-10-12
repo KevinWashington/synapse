@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "vitest --exclude src/features/articles/utils/synthesisExport.test.js --exclude e2e/**",
-    "test:ci": "node --test src/features/articles/utils/synthesisExport.test.js && vitest run --exclude src/features/articles/utils/synthesisExport.test.js --exclude e2e/**",
+    "test": "vitest --exclude src/features/articles/utils/synthesisExport.test.js --exclude \"e2e/**\"",
+    "test:ci": "node --test src/features/articles/utils/synthesisExport.test.js && vitest run --exclude src/features/articles/utils/synthesisExport.test.js --exclude \"e2e/**\"",
     "test:e2e": "playwright test",
     "preview": "vite preview",
     "typecheck": "tsc --project jsconfig.check.json"
