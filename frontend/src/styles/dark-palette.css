@@ -1,0 +1,192 @@
+/*
+ * Dark-mode mapping for the hardcoded palette used across the app (bg-white,
+ * text-[#111936], border-[#edf0f7], ...). Rules are unlayered, so they win over
+ * Tailwind utilities while .dark is set. Prefer theme tokens in new code.
+ * Generated from a color table; keep entries grouped by role.
+ */
+.dark {
+  --syn-dark-surface: #1a1d23;
+  --syn-dark-raised: #23262e;
+  --syn-dark-hover: #2a2e37;
+}
+
+.dark .bg-white,
+.dark .bg-\[\#fff\],
+.dark .bg-\[\#ffffff\],
+.dark .bg-\[\#fbfcff\],
+.dark .bg-\[\#fbfaff\],
+.dark .bg-\[\#fbfbfe\],
+.dark .bg-\[\#f7f8fc\],
+.dark .bg-\[\#f8f9fc\],
+.dark .bg-\[\#f8f9fb\],
+.dark .bg-\[\#faf9ff\],
+.dark .bg-\[\#fcfcff\] {
+  background-color: var(--syn-dark-surface);
+}
+
+.dark .bg-\[\#f4f6fb\],
+.dark .bg-\[\#f2f4f8\],
+.dark .bg-\[\#f5f7fc\],
+.dark .bg-\[\#f5f7fb\],
+.dark .bg-\[\#eef1f7\],
+.dark .bg-\[\#edf1f7\],
+.dark .bg-\[\#f0f2f7\],
+.dark .bg-\[\#f6f7fb\],
+.dark .bg-\[\#edf0f7\],
+.dark .bg-\[\#e2e6ef\],
+.dark .bg-\[\#dfe4ef\] {
+  background-color: var(--syn-dark-raised);
+}
+
+.dark .bg-\[\#eef1ff\],
+.dark .bg-\[\#f0edff\],
+.dark .bg-\[\#eef3ff\],
+.dark .bg-\[\#f0efff\],
+.dark .bg-\[\#eeefff\],
+.dark .bg-\[\#f5f6ff\],
+.dark .bg-\[\#f4f3ff\],
+.dark .bg-\[\#f3f1ff\] {
+  background-color: rgba(98, 89, 255, 0.18);
+}
+
+.dark .bg-\[\#e8f8ef\],
+.dark .bg-\[\#eefaf3\],
+.dark .bg-\[\#eaf8f0\] {
+  background-color: rgba(20, 163, 101, 0.16);
+}
+
+.dark .bg-\[\#fff0f0\],
+.dark .bg-\[\#ffecef\],
+.dark .bg-\[\#fff1f2\] {
+  background-color: rgba(240, 68, 68, 0.16);
+}
+
+.dark .bg-\[\#fff6e5\],
+.dark .bg-\[\#fff9ed\],
+.dark .bg-\[\#fff8e8\] {
+  background-color: rgba(255, 146, 15, 0.14);
+}
+
+.dark .text-\[\#111936\],
+.dark .text-\[\#0f1734\],
+.dark .text-\[\#182344\],
+.dark .text-\[\#253252\],
+.dark .text-\[\#111827\] {
+  color: #eef0f6;
+}
+
+.dark .text-\[\#56627f\] {
+  color: #b4bbcc;
+}
+
+.dark .text-\[\#667391\],
+.dark .text-\[\#7a849d\],
+.dark .text-\[\#8a94aa\],
+.dark .text-\[\#8b96ad\],
+.dark .text-\[\#929bb0\] {
+  color: #9aa3b8;
+}
+
+.dark .text-\[\#a4adc2\],
+.dark .text-\[\#a8b0c3\] {
+  color: #6f788d;
+}
+
+.dark .text-\[\#6259ff\],
+.dark .text-\[\#554bea\],
+.dark .text-\[\#5148ee\],
+.dark .text-\[\#4b43d9\] {
+  color: #a39dff;
+}
+
+.dark .text-\[\#4d68ff\] {
+  color: #8ea0ff;
+}
+
+.dark .text-\[\#d94343\],
+.dark .text-\[\#be123c\] {
+  color: #ff8a8a;
+}
+
+.dark .text-\[\#258c55\],
+.dark .text-\[\#19884f\],
+.dark .text-\[\#2fa060\] {
+  color: #5fd394;
+}
+
+.dark .text-\[\#d48700\],
+.dark .text-\[\#8a5a00\],
+.dark .text-\[\#a16500\] {
+  color: #f5b94d;
+}
+
+.dark .border-\[\#edf0f7\],
+.dark .border-\[\#dfe4ef\],
+.dark .border-\[\#e2e6ef\],
+.dark .border-\[\#e7ebf4\],
+.dark .border-\[\#e5e8f0\],
+.dark .border-\[\#e5e7eb\] {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .border-\[\#bfe8cf\] {
+  border-color: rgba(20, 163, 101, 0.35);
+}
+
+.dark .border-\[\#ffc9c9\] {
+  border-color: rgba(240, 68, 68, 0.35);
+}
+
+.dark .border-\[\#ffe2a8\] {
+  border-color: rgba(255, 146, 15, 0.35);
+}
+
+.dark .border-\[\#c9c3ff\] {
+  border-color: rgba(98, 89, 255, 0.45);
+}
+
+.dark .divide-\[\#edf0f7\] > :not(:last-child),
+.dark .divide-\[\#dfe4ef\] > :not(:last-child),
+.dark .divide-\[\#e2e6ef\] > :not(:last-child) {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .hover\:bg-white:hover,
+.dark .hover\:bg-\[\#f4f6fb\]:hover,
+.dark .hover\:bg-\[\#f5f7fc\]:hover,
+.dark .hover\:bg-\[\#f0f2f7\]:hover,
+.dark .hover\:bg-\[\#f7f8fc\]:hover,
+.dark .hover\:bg-\[\#faf9ff\]:hover,
+.dark .hover\:bg-\[\#fbfcff\]:hover,
+.dark .hover\:bg-\[\#f8f9fc\]:hover,
+.dark .hover\:bg-\[\#eef1f7\]:hover {
+  background-color: var(--syn-dark-hover);
+}
+
+.dark .hover\:bg-\[\#eef1ff\]:hover,
+.dark .hover\:bg-\[\#f0edff\]:hover,
+.dark .hover\:bg-\[\#eef3ff\]:hover,
+.dark .hover\:bg-\[\#f0efff\]:hover,
+.dark .hover\:bg-\[\#f5f6ff\]:hover {
+  background-color: rgba(98, 89, 255, 0.26);
+}
+
+.dark .hover\:bg-\[\#fff0f0\]:hover {
+  background-color: rgba(240, 68, 68, 0.22);
+}
+
+.dark .hover\:text-\[\#6259ff\]:hover,
+.dark .hover\:text-\[\#554bea\]:hover,
+.dark .hover\:text-\[\#5148ee\]:hover,
+.dark .group:hover .group-hover\:text-\[\#6259ff\],
+.dark .group:hover .group-hover\:text-\[\#554bea\],
+.dark .group:hover .group-hover\:text-\[\#5148ee\] {
+  color: #a39dff;
+}
+
+.dark .hover\:text-\[\#111936\]:hover,
+.dark .hover\:text-\[\#253252\]:hover,
+.dark .group:hover .group-hover\:text-\[\#111936\],
+.dark .group:hover .group-hover\:text-\[\#253252\] {
+  color: #eef0f6;
+}

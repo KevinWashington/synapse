@@ -18,7 +18,7 @@ function ReviewsChartCard({ chartData, loading, error, embedded = false }) {
           : <ResponsiveContainer width="100%" height={embedded ? 120 : 180}>
             <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6259ff" stopOpacity={0.18} /><stop offset="95%" stopColor="#6259ff" stopOpacity={0} /></linearGradient></defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#edf0f7" />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--syn-border)" />
               <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: "#667391", fontSize: 11 }} tickFormatter={formatDay} />
               <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "#667391", fontSize: 11 }} width={32} />
               <Tooltip contentStyle={{ backgroundColor: "#ffffff", border: "1px solid #e2e6ef", borderRadius: 8, fontSize: 12 }} labelFormatter={formatDay} />

@@ -27,8 +27,9 @@ function Dashboard() {
       {[summary, inbox].map((resource, index) => resource.error && <div key={index} role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e2e6ef] bg-white p-4 text-sm text-[#667391]"><p>{index === 0 ? "Seus indicadores pessoais estão indisponíveis." : "Não foi possível carregar a contagem de convites."}</p><Button variant="outline" size="sm" onClick={resource.reload}>Tentar novamente</Button></div>)}
       <ReadingResumePanel resume={resume} />
       <div className="grid min-w-0 overflow-hidden rounded-xl border border-[#e2e6ef] bg-white lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <PersonalWorkPanel phase={data.phase} setPhase={data.setPhase} page={data.taskPage} setPage={data.setTaskPage} resource={tasks} counts={summary.error ? null : summary.data} />
-        <div className="min-w-0 border-t border-[#edf0f7] lg:border-l lg:border-t-0"><RecentActivityPanel resource={activity} page={data.activityPage} setPage={data.setActivityPage} /><ReviewsChartCard chartData={data.chartData} loading={stats.loading} error={stats.error} embedded /></div>
+        <div className="min-w-0"><PersonalWorkPanel phase={data.phase} setPhase={data.setPhase} page={data.taskPage} setPage={data.setTaskPage} resource={tasks} counts={summary.error ? null : summary.data} /><ReviewsChartCard chartData={data.chartData} loading={stats.loading} error={stats.error} embedded /></div>
+        {/* On large screens the activity column follows the left column height and scrolls inside, instead of stretching the card. */}
+        <div className="relative min-w-0 border-t border-[#edf0f7] lg:border-l lg:border-t-0"><div className="lg:absolute lg:inset-0"><RecentActivityPanel resource={activity} page={data.activityPage} setPage={data.setActivityPage} /></div></div>
       </div>
       <footer className="flex flex-wrap items-center justify-between gap-3 px-1 text-xs text-[#667391]"><p>Nos seus projetos · {formatNumber(stats, "totalProjects")} projetos · {formatNumber(stats, "totalArticles")} artigos</p>{stats.error && <Button variant="ghost" size="sm" onClick={stats.reload}>Tentar carregar dados da conta</Button>}</footer>
     </div>
