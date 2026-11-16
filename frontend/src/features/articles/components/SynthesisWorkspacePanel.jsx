@@ -7,17 +7,6 @@ import SynthesisHeader, { SynthesisModeNavigation } from "./SynthesisHeader";
 import SynthesisWorkspaceShell from "./SynthesisWorkspaceShell";
 import SynthesisDraftEditor from "./SynthesisDraftEditor";
 
-const WORKSPACE_TOKENS = {
-  "--syn-accent": "#6259ff",
-  "--syn-accent-soft": "#f1efff",
-  "--syn-border": "#edf0f7",
-  "--syn-bg-primary": "#ffffff",
-  "--syn-bg-secondary": "#fbfcff",
-  "--syn-text-primary": "#111936",
-  "--syn-text-secondary": "#667391",
-  "--syn-danger": "#b42318",
-};
-
 export default function SynthesisWorkspacePanel({ project, canEdit, onDirtyChange, onOpenArticle }) {
   const workspace = useSynthesisWorkspace({ projectId: project?.id, canEdit, onDirtyChange });
   const [search, setSearch] = useState("");
@@ -92,7 +81,7 @@ export default function SynthesisWorkspacePanel({ project, canEdit, onDirtyChang
       context: <StudyContext study={resources.study.data} mode={mode} fields={mode === "matrix" ? project?.dataExtractionSchema : project?.qualityAssessmentSchema} onOpenArticle={requestOpenArticle} />,
     };
   }
-  return <div className="min-w-0 space-y-5" style={WORKSPACE_TOKENS}><SynthesisHeader overview={resources.overview.data} loading={loading} onRefresh={actions.refresh} onExport={onExport} />{loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><p>Não foi possível carregar os dados da síntese. Tente atualizar novamente.</p><Button variant="outline" size="sm" onClick={actions.refresh}>Tentar novamente</Button></div>}<SynthesisWorkspaceShell {...regions} navigation={<SynthesisModeNavigation mode={mode} onModeChange={requestModeChange} />} />{pending && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="alertdialog" aria-modal="true" aria-labelledby="synthesis-unsaved-title"><div className="w-full max-w-md rounded-xl bg-[var(--syn-bg-primary)] p-5 shadow-xl"><h2 id="synthesis-unsaved-title" className="font-semibold">Alterações não salvas</h2><p className="mt-2 text-sm text-[var(--syn-text-secondary)]">Salve ou descarte o rascunho antes de continuar.</p>{draft.conflict?.message && <p role="alert" className="mt-2 text-sm text-[var(--syn-danger)]">{draft.conflict.message}</p>}<div className="mt-5 flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setPending(null)}>Continuar editando</Button><Button variant="outline" onClick={() => continuePending(false)}>Descartar</Button><Button onClick={() => continuePending(true)}>Salvar e continuar</Button></div></div></div>}</div>;
+  return <div className="syn-synthesis-workspace min-w-0 space-y-5"><SynthesisHeader overview={resources.overview.data} loading={loading} onRefresh={actions.refresh} onExport={onExport} />{loadError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><p>Não foi possível carregar os dados da síntese. Tente atualizar novamente.</p><Button variant="outline" size="sm" onClick={actions.refresh}>Tentar novamente</Button></div>}<SynthesisWorkspaceShell {...regions} navigation={<SynthesisModeNavigation mode={mode} onModeChange={requestModeChange} />} />{pending && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="alertdialog" aria-modal="true" aria-labelledby="synthesis-unsaved-title"><div className="w-full max-w-md rounded-xl bg-[var(--syn-bg-primary)] p-5 shadow-xl"><h2 id="synthesis-unsaved-title" className="font-semibold">Alterações não salvas</h2><p className="mt-2 text-sm text-[var(--syn-text-secondary)]">Salve ou descarte o rascunho antes de continuar.</p>{draft.conflict?.message && <p role="alert" className="mt-2 text-sm text-[var(--syn-danger)]">{draft.conflict.message}</p>}<div className="mt-5 flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setPending(null)}>Continuar editando</Button><Button variant="outline" onClick={() => continuePending(false)}>Descartar</Button><Button onClick={() => continuePending(true)}>Salvar e continuar</Button></div></div></div>}</div>;
 }
 
 function Index({ title, count, search, onSearch, children }) { return <div><div className="sticky top-0 z-10 border-b border-[var(--syn-border)] bg-[var(--syn-bg-primary)] p-3"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">{title}</h2>{count != null && <span className="rounded-full bg-[var(--syn-accent-soft)] px-2 py-0.5 text-xs text-[var(--syn-accent)]">{count}</span>}</div>{search !== undefined && <FilterBox value={search} onChange={onSearch} />}</div>{children}</div>; }

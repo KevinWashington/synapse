@@ -190,3 +190,127 @@
 .dark .group:hover .group-hover\:text-\[\#253252\] {
   color: #eef0f6;
 }
+
+/* Synthesis workspace tokens (previously inline styles, which blocked the dark theme). */
+.syn-synthesis-workspace {
+  --syn-accent: #6259ff;
+  --syn-accent-soft: #f1efff;
+  --syn-border: #edf0f7;
+  --syn-bg-primary: #ffffff;
+  --syn-bg-secondary: #fbfcff;
+  --syn-text-primary: #111936;
+  --syn-text-secondary: #667391;
+  --syn-danger: #b42318;
+}
+
+.dark .syn-synthesis-workspace {
+  --syn-accent: #a39dff;
+  --syn-accent-soft: rgba(98, 89, 255, 0.2);
+  --syn-border: rgba(255, 255, 255, 0.1);
+  --syn-bg-primary: var(--syn-dark-surface);
+  --syn-bg-secondary: var(--syn-dark-raised);
+  --syn-text-primary: #eef0f6;
+  --syn-text-secondary: #9aa3b8;
+  --syn-danger: #ff8a8a;
+}
+
+/* PRISMA flow: inclusion box and stage labels. */
+.dark .bg-\[\#fffaf0\],
+.dark .bg-\[\#fff4df\],
+.dark .bg-\[\#fff5e3\],
+.dark .bg-\[\#fff7e8\] {
+  background-color: rgba(255, 146, 15, 0.14);
+}
+
+.dark .bg-\[\#f5f3ff\],
+.dark .bg-\[\#f8f7ff\],
+.dark .bg-\[\#f1efff\],
+.dark .bg-\[\#e5dfff\],
+.dark .bg-\[\#e9f2ff\] {
+  background-color: rgba(98, 89, 255, 0.18);
+}
+
+.dark .bg-\[\#e7eaf3\] {
+  background-color: var(--syn-dark-raised);
+}
+
+.dark .text-\[\#f59a00\],
+.dark .text-\[\#ff9f1c\] {
+  color: #f5b94d;
+}
+
+.dark .text-\[\#4035a8\],
+.dark .text-\[\#7b61ff\] {
+  color: #a39dff;
+}
+
+.dark .text-\[\#101936\],
+.dark .text-\[\#33405f\] {
+  color: #eef0f6;
+}
+
+.dark .text-\[\#78839d\] {
+  color: #9aa3b8;
+}
+
+.dark .text-\[\#36b66b\] {
+  color: #5fd394;
+}
+
+.dark .border-\[\#ffc66f\] {
+  border-color: rgba(255, 146, 15, 0.45);
+}
+
+.dark .border-\[\#7ed7a7\] {
+  border-color: rgba(20, 163, 101, 0.5);
+}
+
+.dark .border-\[\#9bb6ff\],
+.dark .border-\[\#d9d4ff\],
+.dark .border-\[\#bdb7ff\] {
+  border-color: rgba(98, 89, 255, 0.5);
+}
+
+/* Translucent white panels. */
+.dark .bg-white\/80,
+.dark .bg-white\/70 {
+  background-color: rgba(26, 29, 35, 0.85);
+}
+
+/* Tailwind palette alerts (amber / red / emerald). */
+.dark .bg-amber-50 {
+  background-color: rgba(255, 146, 15, 0.12);
+}
+
+.dark .border-amber-200,
+.dark .border-amber-300 {
+  border-color: rgba(255, 146, 15, 0.35);
+}
+
+.dark .text-amber-900 {
+  color: #f5c97a;
+}
+
+.dark .bg-red-50 {
+  background-color: rgba(240, 68, 68, 0.14);
+}
+
+.dark .border-red-200 {
+  border-color: rgba(240, 68, 68, 0.35);
+}
+
+.dark .text-red-800 {
+  color: #ff9b9b;
+}
+
+.dark .bg-emerald-50 {
+  background-color: rgba(20, 163, 101, 0.14);
+}
+
+.dark .border-emerald-200 {
+  border-color: rgba(20, 163, 101, 0.35);
+}
+
+.dark .text-emerald-900 {
+  color: #7fe0ad;
+}

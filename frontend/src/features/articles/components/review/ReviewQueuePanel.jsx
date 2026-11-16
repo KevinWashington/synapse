@@ -75,6 +75,7 @@ export function getFilterOptions(stageKey, duplicateIds, articles, stageTotal = 
     return [
       { key: "all", label: "Na fila", count: stageTotal },
       { key: "assigned", label: "Atribuídos a mim" },
+      { key: "excluded", label: "Excluídos" },
     ];
   }
 

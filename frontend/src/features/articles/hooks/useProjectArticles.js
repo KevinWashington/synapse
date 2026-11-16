@@ -11,6 +11,11 @@ const PHASE_FILTERS = {
   eligibility: { phase: "eligibility", outcome: "active" },
   included: { outcome: "included" },
 };
+// Excluded records keep the phase where they were excluded.
+const EXCLUDED_FILTERS = {
+  screening: { phase: "screening", outcome: "excluded_screening" },
+  eligibility: { phase: "eligibility", outcome: "excluded_eligibility,full_text_unavailable" },
+};
 const FLOW_TABS = new Set(["identification", "screening", "eligibility", "included"]);
 const ARTICLE_PAGE_SIZE = 20;
 
@@ -22,6 +27,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   });
   const [articlePage, setArticlePage] = useState(1);
   const [assignedToMe, setAssignedToMeState] = useState(false);
+  const [showExcluded, setShowExcludedState] = useState(false);
   const [searchTermsByFlow, setSearchTermsByFlow] = useState({});
   const [isLoadingDuplicates, setIsLoadingDuplicates] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
@@ -42,6 +48,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     articlePage,
     assignedToMe,
     searchTermsByFlow,
+    showExcluded,
   };
 
   useEffect(() => {
@@ -51,6 +58,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     if (activeFlowTab !== nextFlow) {
       setActiveFlowTabState(nextFlow);
       setAssignedToMeState(false);
+      setShowExcludedState(false);
       setArticlePage(1);
     }
   }, [activeFlowTab, searchParams]);
@@ -90,6 +98,11 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     setArticlePage(1);
   }, []);
 
+  const setShowExcluded = useCallback((value) => {
+    setShowExcludedState(value);
+    setArticlePage(1);
+  }, []);
+
   const fetchSummary = useCallback(() => articleService.getSelectionSummary(project.id), [project?.id]);
   const summaryResource = useRemoteResource({ key: project?.id, enabled: Boolean(project?.id), load: fetchSummary });
   const { data: summary, loading: isLoadingSummary, reload: loadSummary } = summaryResource;
@@ -109,13 +122,13 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     const flow = FLOW_TABS.has(flowOverride) ? flowOverride : context.activeFlowTab;
     const page = pageOverride ?? context.articlePage;
     const response = await articleService.getArticlesByProject(project.id, {
-      ...PHASE_FILTERS[flow], search: context.searchTermsByFlow[flow] || undefined,
+      ...(context.showExcluded && EXCLUDED_FILTERS[flow] ? EXCLUDED_FILTERS[flow] : PHASE_FILTERS[flow]), search: context.searchTermsByFlow[flow] || undefined,
       page, limit: ARTICLE_PAGE_SIZE,
       ...(context.assignedToMe && ["screening", "eligibility"].includes(flow) ? { assignedToMe: true } : {}),
     });
     return response;
   }, [project?.id]);
-  const articlesResource = useRemoteResource({ key: JSON.stringify([project?.id, activeFlowTab, articlePage, assignedToMe, searchTerm]), enabled: Boolean(project?.id), load: fetchArticles });
+  const articlesResource = useRemoteResource({ key: JSON.stringify([project?.id, activeFlowTab, articlePage, assignedToMe, showExcluded, searchTerm]), enabled: Boolean(project?.id), load: fetchArticles });
   const articles = useMemo(() => articlesResource.data?.articles || [], [articlesResource.data]);
   const articleTotal = articlesResource.data?.total || 0;
   const isLoadingArticles = articlesResource.loading;
@@ -423,6 +436,8 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     setActiveFlowTab,
     setAssignedToMe,
     setSearchTerm,
+    setShowExcluded,
+    showExcluded,
     setSelectedDuplicateMap,
     submitEligibilityDecision,
     submitScreeningDecision,

@@ -160,6 +160,7 @@ describe("ReviewQueuePanel", () => {
       expect(getFilterOptions(stage, new Set(), [article], 124)).toEqual([
         { key: "all", label: "Na fila", count: 124 },
         { key: "assigned", label: "Atribuídos a mim" },
+        { key: "excluded", label: "Excluídos" },
       ]);
     }
   );

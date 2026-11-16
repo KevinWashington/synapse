@@ -7,6 +7,7 @@ import { useReviewWorkspaceActions } from "../hooks/useReviewWorkspaceActions";
 import { useProjectArticles } from "@features/articles/hooks/useProjectArticles";
 import { useWorkspaceArticle } from "@features/articles/hooks/useWorkspaceArticle";
 import { resolveSelectedArticle } from "@features/articles/utils/reviewFlow";
+import { requestEligibilityAssist } from "@features/articles/utils/eligibilityAssist";
 import { getExtractionProgress } from "@features/articles/utils/reviewWorkspace";
 import { toast } from "@/lib/toast";
 import ImportBibTeXModal from "@/features/articles/components/ImportBibTeXModal";
@@ -131,6 +132,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     selectedDuplicateMap,
     setActiveFlowTab,
     setAssignedToMe,
+    setShowExcluded,
+    showExcluded,
     setSearchTerm,
     setSelectedDuplicateMap,
     submitEligibilityDecision,
@@ -175,11 +178,12 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
 
   const filterOptions = useMemo(
     () => getFilterOptions(activeStage, duplicateIds, stageArticles, articleTotal).map((option) => {
-      if (assignedToMe && option.key === "all") return { ...option, count: undefined };
+      if ((assignedToMe || showExcluded) && option.key === "all") return { ...option, count: undefined };
       if (assignedToMe && option.key === "assigned") return { ...option, count: articleTotal };
+      if (option.key === "excluded") return { ...option, count: showExcluded ? articleTotal : summary?.[activeStage]?.excluded };
       return option;
     }),
-    [activeStage, articleTotal, assignedToMe, duplicateIds, stageArticles]
+    [activeStage, articleTotal, assignedToMe, duplicateIds, showExcluded, stageArticles, summary]
   );
 
   const filteredArticles = useMemo(
@@ -371,6 +375,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
             draftGuard.guard(() => {
               setActiveFilter(filter);
               setAssignedToMe(filter === "assigned");
+              setShowExcluded(filter === "excluded");
             });
           }}
           onOpenArticle={(articleId) => {
@@ -442,6 +447,7 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           checklist={project?.eligibilityChecklist || []}
           isSaving={isSavingDecision}
           onAdvance={() => { setIsReviewDraftDirty(false); selectAdjacent(1); }}
+          onAssist={(request) => requestEligibilityAssist({ ...request, article: workspaceArticle, pdfData: workspacePdfData })}
           onDirtyChange={setIsReviewDraftDirty}
           onSubmit={saveEligibilityDecision}
           onSkip={() => draftGuard.guard(handleSkip)}

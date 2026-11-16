@@ -320,7 +320,9 @@ async def get_articles_by_project(
         )
 
     if outcome:
-        query = query.where(Article.reviewOutcome == outcome)
+        # Accept a comma-separated list, e.g. "excluded_eligibility,full_text_unavailable".
+        outcomes = [value.strip() for value in outcome.split(",") if value.strip()]
+        query = query.where(Article.reviewOutcome.in_(outcomes))
 
     if sourceCategory:
         query = query.where(Article.sourceCategory == sourceCategory)
