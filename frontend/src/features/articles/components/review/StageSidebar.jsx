@@ -1,5 +1,7 @@
-import { SparklesIcon } from "lucide-react";
+import { useState } from "react";
+import { SparklesIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import ConfirmationDialog from "@/components/ui/ConfirmationDialog";
 import { cn } from "@/lib/utils";
 
 const SOURCE_TONES = {
@@ -70,11 +72,14 @@ export function StageSidebar({
   canManageArticles = true,
   duplicateCandidates,
   onBatchEvaluate,
+  onExcludeZeroScore,
+  isExcludingZeroScore = false,
   onExportStage,
   onRunDedup,
   onViewFlow,
   summary,
 }) {
+  const [confirmZeroScoreOpen, setConfirmZeroScoreOpen] = useState(false);
   const duplicateIds = new Set(
     duplicateCandidates.flatMap((candidate) => candidate.candidateIds || [])
   );
@@ -153,6 +158,10 @@ export function StageSidebar({
                 <SparklesIcon className="h-4 w-4" />
                 Triagem IA
               </Button> : null}
+              {canManageArticles && onExcludeZeroScore ? <Button variant="outline" className="h-10 w-full justify-start gap-2 rounded-lg border-[#dfe4ef] bg-white text-[#d94343] hover:bg-[#fff0f0] hover:text-[#c73636]" disabled={isExcludingZeroScore} onClick={() => setConfirmZeroScoreOpen(true)}>
+                <Trash2Icon className="h-4 w-4" />
+                Excluir nota 0 da IA
+              </Button> : null}
               <Button variant="outline" className="h-10 w-full justify-start rounded-lg border-[#dfe4ef] bg-white" onClick={onExportStage}>
                 Exportar etapa
               </Button>
@@ -191,6 +200,19 @@ export function StageSidebar({
               : "Registre decisões com justificativas para manter a trilha de auditoria da revisão."}
         </p>
       </section>
+      <ConfirmationDialog
+        open={confirmZeroScoreOpen}
+        onOpenChange={setConfirmZeroScoreOpen}
+        title="Excluir artigos com nota 0?"
+        description="Todos os artigos pendentes na triagem com nota de relevância 0 da IA serão marcados como excluídos, com justificativa automática. Eles continuam contabilizados no fluxo PRISMA."
+        confirmLabel="Excluir na triagem"
+        tone="destructive"
+        isPending={isExcludingZeroScore}
+        onConfirm={async () => {
+          await onExcludeZeroScore?.();
+          setConfirmZeroScoreOpen(false);
+        }}
+      />
     </aside>
   );
 }

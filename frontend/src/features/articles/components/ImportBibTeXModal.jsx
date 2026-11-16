@@ -18,6 +18,8 @@ import { articleService } from "@features/articles/services/articleService";
 import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS, STUDY_TYPE_OPTIONS } from "@features/articles/utils/selectionFlow";
 import { toast } from "@/lib/toast";
 
+const MISSING_AUTHORS_LABEL = "Autor nao informado";
+
 function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
   const [bibtexContent, setBibtexContent] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,6 +47,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
 
   function parseBibTeX(content) {
     const articles = [];
+    let skipped = 0;
     const bibEntries = parseBibTeXLib(content);
 
     for (const entry of bibEntries) {
@@ -58,9 +61,15 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
       }
 
       const title = cleanBibTeXValue(fields.title);
-      const authors = cleanBibTeXValue(fields.author);
+      // Proceedings/front-matter records (e.g. Scopus volume entries) often have no
+      // author; keep them so the imported count matches the database export.
+      const authors =
+        cleanBibTeXValue(fields.author) ||
+        cleanBibTeXValue(fields.editor) ||
+        MISSING_AUTHORS_LABEL;
       const year = Number.parseInt(cleanBibTeXValue(fields.year), 10);
-      if (!title || !authors || Number.isNaN(year)) {
+      if (!title || Number.isNaN(year)) {
+        skipped += 1;
         continue;
       }
 
@@ -81,7 +90,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
       });
     }
 
-    return articles;
+    return { articles, skipped };
   }
 
   function handleClose() {
@@ -120,7 +129,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
       setLoading(true);
       setError("");
 
-      const entries = parseBibTeX(bibtexContent);
+      const { articles: entries, skipped } = parseBibTeX(bibtexContent);
       if (!entries.length) {
         setError("Nenhum artigo valido encontrado no arquivo BibTeX");
         return;
@@ -135,6 +144,9 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
       });
 
       toast.success(`${response.importedCount || entries.length} registro(s) importado(s)!`);
+      if (skipped > 0) {
+        toast.warning(`${skipped} registro(s) ignorado(s) por falta de titulo ou ano.`);
+      }
       onSuccess?.(response);
       handleClose();
     } catch (requestError) {

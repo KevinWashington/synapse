@@ -26,6 +26,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
   const [isLoadingDuplicates, setIsLoadingDuplicates] = useState(false);
   const [isSavingDecision, setIsSavingDecision] = useState(false);
   const [isBatchEvaluating, setIsBatchEvaluating] = useState(false);
+  const [isExcludingZeroScore, setIsExcludingZeroScore] = useState(false);
   const [isPromotingUnique, setIsPromotingUnique] = useState(false);
   const [selectedIdentificationIds, setSelectedIdentificationIds] = useState([]);
   const [selectedDuplicateMap, setSelectedDuplicateMap] = useState({});
@@ -364,8 +365,35 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     }
   }, [project?.id, refreshAll]);
 
+  const excludeZeroScoreArticles = useCallback(async () => {
+    if (!project?.id) {
+      return;
+    }
+    try {
+      setIsExcludingZeroScore(true);
+      const response = await articleService.excludeZeroScoreScreening(project.id);
+      const excluded = response.excludedCount || 0;
+      const skipped = response.skippedAssignedCount || 0;
+      if (excluded === 0 && skipped === 0) {
+        toast.info("Nenhum artigo pendente com nota 0 da IA.");
+      } else {
+        toast.success(`${excluded} artigo(s) com nota 0 excluido(s) na triagem.`);
+        if (skipped > 0) {
+          toast.warning(`${skipped} artigo(s) distribuido(s) para revisores foram mantidos.`);
+        }
+      }
+      await refreshAll();
+    } catch (error) {
+      toast.error("Erro ao excluir artigos com nota 0: " + error.message);
+    } finally {
+      setIsExcludingZeroScore(false);
+    }
+  }, [project?.id, refreshAll]);
+
   return {
     activeFlowTab,
+    excludeZeroScoreArticles,
+    isExcludingZeroScore,
     applyDuplicateReview,
     articlePage,
     articlePageSize: ARTICLE_PAGE_SIZE,

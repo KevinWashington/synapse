@@ -114,6 +114,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
     duplicateCandidates,
     identificationArticles,
     isBatchEvaluating,
+    excludeZeroScoreArticles,
+    isExcludingZeroScore,
     isLoadingArticles,
     remoteErrors = [],
     isLoadingDuplicates,
@@ -463,6 +465,8 @@ function ProjectArticles({ project, onNavigate, onGraphNeedsRefresh, onViewFlow,
           canManageArticles={canManageArticles}
           duplicateCandidates={duplicateCandidates}
           onBatchEvaluate={runBatchEvaluate}
+          onExcludeZeroScore={excludeZeroScoreArticles}
+          isExcludingZeroScore={isExcludingZeroScore}
           onExportStage={handleExportStage}
           onRunDedup={handleDedupAndRefresh}
           onViewFlow={onViewFlow}

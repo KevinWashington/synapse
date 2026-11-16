@@ -228,6 +228,12 @@ class BatchEvaluateResponse(BaseModel):
     projectId: int
 
 
+class ExcludeZeroScoreResponse(BaseModel):
+    projectId: int
+    excludedCount: int
+    skippedAssignedCount: int
+
+
 class LegacyArticleStatusUpdate(BaseModel):
     status: str = Field(..., pattern="^(pendente|analisado|excluido)$")
 

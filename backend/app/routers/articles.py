@@ -38,6 +38,7 @@ from app.schemas.article import (
     DuplicateCandidate,
     DuplicateCandidateArticle,
     EligibilityDecisionRequest,
+    ExcludeZeroScoreResponse,
     FullTextStatusUpdate,
     ImportBibTeXRequest,
     ImportBibTeXResponse,
@@ -681,6 +682,70 @@ async def screening_decision(
     await db.commit()
     await db.refresh(article)
     return build_article_response(article)
+
+
+ZERO_SCORE_EXCLUSION_REASON = "Excluído em lote: nota de relevância da IA igual a 0."
+
+
+@router.post(
+    "/{projectId}/artigos/screening/exclude-zero-score",
+    response_model=ExcludeZeroScoreResponse,
+)
+async def exclude_zero_score_articles(
+    projectId: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exclude at screening every pending article whose AI relevance score is 0.
+
+    Articles distributed to reviewers are left untouched so the collaborative
+    decision flow is never bypassed.
+    """
+    access = await resolve_project_access(db, project_id=projectId, user_id=current_user.id)
+    require_capability(access, CAP_EDIT_PROJECT)
+    result = await db.execute(
+        select(Article).where(
+            Article.projectId == projectId,
+            Article.currentPhase == "screening",
+            Article.reviewOutcome == "active",
+            Article.screeningDecision == "pending",
+            Article.aiRelevanceScore == 0,
+        )
+    )
+    candidates = list(result.scalars().all())
+    assigned_ids: set[int] = set()
+    if candidates:
+        assigned = await db.execute(
+            select(ReviewAssignment.articleId).where(
+                ReviewAssignment.articleId.in_([article.id for article in candidates]),
+                ReviewAssignment.phase == "screening",
+                ReviewAssignment.status != "cancelled",
+            )
+        )
+        assigned_ids = set(assigned.scalars().all())
+
+    now = datetime.now(timezone.utc)
+    excluded = 0
+    for article in candidates:
+        if article.id in assigned_ids:
+            continue
+        apply_review_decision(
+            article,
+            phase="screening",
+            decision=ReviewDecisionData(
+                decision="excluded", reason_text=ZERO_SCORE_EXCLUSION_REASON
+            ),
+            now=now,
+        )
+        await enqueue_article_index(db, article_id=article.id, project_id=projectId)
+        excluded += 1
+
+    await db.commit()
+    return ExcludeZeroScoreResponse(
+        projectId=projectId,
+        excludedCount=excluded,
+        skippedAssignedCount=len(assigned_ids),
+    )
 
 
 @router.post("/{projectId}/artigos/{articleId}/evaluate", response_model=ArticleResponse)

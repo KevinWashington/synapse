@@ -146,6 +146,10 @@ class ArtigosService {
     });
   }
 
+  async excludeZeroScoreScreening(projectId) {
+    return apiService.post(`${this.getProjectEndpoint(projectId)}/screening/exclude-zero-score`, {});
+  }
+
   async updateFullTextStatus(projectId, articleId, data) {
     return apiService.patch(`${this.getProjectEndpoint(projectId)}/${articleId}/full-text-status`, data);
   }

@@ -1,11 +1,15 @@
 import {
   ChevronLeftIcon,
+  CheckIcon,
   ChevronRightIcon,
+  CopyIcon,
   ExternalLinkIcon,
   FileTextIcon,
   UploadIcon,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { toast } from "@/lib/toast";
 import ArticleEvidenceEditor from "../ArticleEvidenceEditor";
 import PdfViewer from "../PdfViewer";
 import { collaborativeReview } from "../../utils/collaborativeReview";
@@ -13,6 +17,38 @@ import DecisionHistory from "./DecisionHistory";
 
 function formatNumber(value) {
   return new Intl.NumberFormat("pt-BR").format(value || 0);
+}
+
+function CopyTitleButton({ title }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(title);
+      setCopied(true);
+    } catch {
+      toast.error("Não foi possível copiar o título.");
+    }
+  }
+
+  const Icon = copied ? CheckIcon : CopyIcon;
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={copied ? "Título copiado" : "Copiar título para buscar o PDF"}
+      aria-label="Copiar título"
+      className="mt-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#a4adc2] hover:bg-[#f4f6fb] hover:text-[#6259ff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff]"
+    >
+      <Icon className="h-3.5 w-3.5" />
+    </button>
+  );
 }
 
 function ArticleReadingPane({
@@ -67,7 +103,10 @@ function ArticleReadingPane({
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8a94aa]">
           {article.year} · {article.journal}
         </p>
-        <h2 className="mt-3 text-2xl font-semibold leading-8 tracking-[-0.025em] text-[#111936]">{article.title}</h2>
+        <div className="mt-3 flex items-start gap-1">
+          <h2 className="text-2xl font-semibold leading-8 tracking-[-0.025em] text-[#111936]">{article.title}</h2>
+          {isEligibility && article.title ? <CopyTitleButton title={article.title} /> : null}
+        </div>
         <p className="mt-3 text-sm leading-6 text-[#56627f]">{article.authors}</p>
         {article.doi ? <p className="mt-1 text-xs text-[#7a849d]">DOI: {article.doi}</p> : null}
 

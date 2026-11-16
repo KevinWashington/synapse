@@ -24,6 +24,8 @@ function ScreeningDecisionForm({
     [article?.aiEvaluation]
   );
 
+  const aiScore = typeof article?.aiRelevanceScore === "number" ? Math.round(article.aiRelevanceScore) : null;
+
   useEffect(() => {
     setDecision(initialDecision);
     setReasonText(article?.screeningReasonText || "");
@@ -61,6 +63,14 @@ function ScreeningDecisionForm({
             <SparklesIcon className="h-4 w-4" />
             Sugestão da IA
           </span>
+          {aiScore != null ? (
+            <span
+              className="ml-auto rounded-full bg-[#f0efff] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[#4b43d9]"
+              title="Nota de relevância atribuída pela IA"
+            >
+              Nota {aiScore}%
+            </span>
+          ) : null}
           <ChevronDownIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-[#8a94aa] transition-transform group-open:rotate-180" />
         </summary>
         <div className="space-y-3 border-t border-[#edf0f7] p-3">
