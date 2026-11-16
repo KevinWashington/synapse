@@ -141,10 +141,68 @@ async def evaluate_article_if_possible(
         logger.exception("Erro ao gerar embedding do artigo %s", article.title)
 
 
+_STAGE_RANK = {"identification": 0, "screening": 1, "eligibility": 2, "included": 3}
+
+
+def _duplicate_keys(doi: str | None, title: str | None, year: int | None) -> list[tuple[str, str]]:
+    from app.services.article_dedup_service import normalize_doi, normalized_title_year_key
+
+    keys: list[tuple[str, str]] = []
+    normalized_doi = normalize_doi(doi)
+    if normalized_doi:
+        keys.append(("same_doi", f"doi:{normalized_doi}"))
+    title_year = normalized_title_year_key(title, year)
+    if title_year:
+        keys.append(("same_title_year", f"title-year:{title_year}"))
+    return keys
+
+
+def _build_duplicate_index(articles) -> dict[str, Article]:
+    """Index existing project records by exact DOI and title+year.
+
+    When several records share a key, the most advanced one (then the oldest) wins,
+    so new imports always point at the record that carries review decisions.
+    """
+    index: dict[str, Article] = {}
+    ranked = sorted(
+        (article for article in articles if article.reviewOutcome != "duplicate_removed"),
+        key=lambda article: (-_STAGE_RANK.get(article.currentPhase, 0), article.id),
+    )
+    for article in ranked:
+        for _reason, key in _duplicate_keys(article.doi, article.title, article.year):
+            index.setdefault(key, article)
+    return index
+
+
+def mark_as_import_duplicate(article: Article, original: Article, reason_code: str) -> None:
+    article.reviewOutcome = "duplicate_removed"
+    article.currentPhase = "identification"
+    article.duplicateOfArticleId = original.id
+    article.duplicateReasonCode = reason_code
+    article.duplicateReasonText = (
+        "Duplicata identificada na importação "
+        f"({'DOI idêntico' if reason_code == 'same_doi' else 'mesmo título e ano'}): {original.title}"
+    )[:500]
+    article.screeningDecision = "pending"
+    article.eligibilityDecision = "excluded"
+    article.fullTextStatus = "not_requested"
+    article.answeringRQs = []
+    apply_legacy_review_state(article)
+
+
 async def import_bibtex_articles(
-    db, *, access, request, actor_user_id, ai_service=None, evaluate_ai=True
+    db, *, access, request, actor_user_id, ai_service=None, evaluate_ai=False
 ):
+    """Import BibTeX entries, identifying exact duplicates before any AI work.
+
+    Entries matching a record already in the project (or earlier in the same file)
+    by DOI or by title+year are stored as removed duplicates, so they still count in
+    PRISMA but never reach screening or the AI. AI scoring happens when records are
+    promoted to screening; ``evaluate_ai`` only exists for API compatibility.
+    """
     from datetime import datetime, timezone
+
+    from sqlalchemy import select
 
     from app.schemas.article import ImportBibTeXResponse
     from app.services.project_access_service import CAP_EDIT_PROJECT, require_capability
@@ -153,7 +211,11 @@ async def import_bibtex_articles(
     batch_label = (
         request.importBatchLabel or f"bibtex-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     )
+    existing = await db.execute(select(Article).where(Article.projectId == access.project.id))
+    duplicate_index = _build_duplicate_index(existing.scalars().all())
+
     article_ids = []
+    duplicate_count = 0
     for entry in request.entries:
         article = create_article_entity(
             payload=entry,
@@ -165,14 +227,27 @@ async def import_bibtex_articles(
             import_batch_label=batch_label,
             study_type=request.studyType,
         )
-        if evaluate_ai:
+        keys = _duplicate_keys(article.doi, article.title, article.year)
+        match = next(
+            ((reason, duplicate_index[key]) for reason, key in keys if key in duplicate_index),
+            None,
+        )
+        if match is None and evaluate_ai:
             await evaluate_article_if_possible(article, access.project, ai_service)
         db.add(article)
         await db.flush()
+        if match is not None:
+            reason, original = match
+            mark_as_import_duplicate(article, original, reason)
+            duplicate_count += 1
+        else:
+            for _reason, key in keys:
+                duplicate_index.setdefault(key, article)
         article_ids.append(article.id)
     return ImportBibTeXResponse(
         projectId=access.project.id,
         importedCount=len(article_ids),
+        duplicateCount=duplicate_count,
         batchLabel=batch_label,
         articleIds=article_ids,
     )

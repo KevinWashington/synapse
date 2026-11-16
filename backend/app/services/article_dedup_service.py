@@ -41,7 +41,13 @@ def shared_author_signature(authors: str | None) -> set[str]:
 
 def analyze_duplicates(articles: list[Article]) -> list[DuplicateCandidate]:
     groups: dict[str, DuplicateCandidate] = {}
-    candidate_pool = [article for article in articles if article.reviewOutcome == "active"]
+    # Most advanced records first (then oldest), so each group lists the record that
+    # already carries review decisions as its default original.
+    stage_rank = {"identification": 0, "screening": 1, "eligibility": 2, "included": 3}
+    candidate_pool = sorted(
+        (article for article in articles if article.reviewOutcome == "active"),
+        key=lambda article: (-stage_rank.get(article.currentPhase, 0), article.id or 0),
+    )
 
     used_ids: set[int] = set()
     doi_groups: dict[str, list[Article]] = {}

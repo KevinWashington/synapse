@@ -435,7 +435,7 @@ async def create_article(
 async def import_bibtex_entries(
     projectId: int,
     data: ImportBibTeXRequest,
-    evaluate_ai: bool = True,
+    evaluate_ai: bool = False,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     ai_service: AIService | None = Depends(get_optional_user_ai_service),
@@ -553,6 +553,18 @@ async def apply_duplicate_decisions(
 
         for duplicate_id in decision.duplicateArticleIds:
             duplicate = await get_article_or_404(duplicate_id, projectId, current_user.id, db)
+            if duplicate.currentPhase != "identification":
+                # Never discard a record that already carries review decisions.
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "error": "Duplicata inválida",
+                        "message": (
+                            "Um dos registros já avançou de etapa. "
+                            "Escolha-o como original do grupo."
+                        ),
+                    },
+                )
             duplicate.reviewOutcome = "duplicate_removed"
             duplicate.currentPhase = "identification"
             duplicate.duplicateOfArticleId = canonical.id

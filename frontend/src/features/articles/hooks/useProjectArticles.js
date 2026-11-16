@@ -243,6 +243,26 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     }
   }, [duplicateCandidates, project?.id, refreshAll, selectedDuplicateMap]);
 
+  // Score newly promoted records automatically. Only pending, not-yet-scored records
+  // in screening are sent, so duplicates and already scored articles cost nothing.
+  const scorePromotedArticles = useCallback(async (movedCount) => {
+    if (!project?.id || !movedCount) return;
+    try {
+      setIsBatchEvaluating(true);
+      const response = await articleService.batchEvaluateScreening(project.id, {
+        onlyPending: true,
+        forceReevaluate: false,
+      });
+      const evaluated = response.summary?.evaluated || 0;
+      if (evaluated > 0) toast.success(`Notas da IA geradas para ${evaluated} artigo(s) da triagem.`);
+      await refreshAll();
+    } catch (error) {
+      toast.warning(`Não foi possível gerar as notas da IA automaticamente: ${error.message}. Use "Triagem IA" na triagem.`);
+    } finally {
+      setIsBatchEvaluating(false);
+    }
+  }, [project?.id, refreshAll]);
+
   const promoteSelectedToScreening = useCallback(async () => {
     if (!project?.id || !selectedIdentificationIds.length) {
       toast.warning("Selecione registros de identificacao para enviar para triagem.");
@@ -254,10 +274,11 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
       toast.success(`${response.movedCount || 0} registro(s) enviados para triagem.`);
       setSelectedIdentificationIds([]);
       await refreshAll({ targetFlowTab: "screening" });
+      await scorePromotedArticles(response.movedCount || 0);
     } catch (error) {
       toast.error("Erro ao enviar registros para triagem: " + error.message);
     }
-  }, [project?.id, refreshAll, selectedIdentificationIds]);
+  }, [project?.id, refreshAll, scorePromotedArticles, selectedIdentificationIds]);
 
   const promoteAllUniqueToScreening = useCallback(async () => {
     if (!project?.id) {
@@ -280,6 +301,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
       setSelectedIdentificationIds([]);
       setArticlePage(1);
       await refreshAll({ targetFlowTab: "identification" });
+      await scorePromotedArticles(movedCount);
     } catch (error) {
       if (error?.status === 0) {
         toast.error(
@@ -291,7 +313,7 @@ export const useProjectArticles = (project, onGraphNeedsRefresh, collaboration) 
     } finally {
       setIsPromotingUnique(false);
     }
-  }, [project?.id, refreshAll]);
+  }, [project?.id, refreshAll, scorePromotedArticles]);
 
   const submitScreeningDecision = useCallback(
     async (articleId, payload) => {

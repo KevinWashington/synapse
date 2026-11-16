@@ -143,7 +143,11 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
         entries,
       });
 
+      const duplicateCount = response.duplicateCount || 0;
       toast.success(`${response.importedCount || entries.length} registro(s) importado(s)!`);
+      if (duplicateCount > 0) {
+        toast.info(`${duplicateCount} já existiam no projeto ou no arquivo e foram marcados como duplicatas removidas.`);
+      }
       if (skipped > 0) {
         toast.warning(`${skipped} registro(s) ignorado(s) por falta de titulo ou ano.`);
       }

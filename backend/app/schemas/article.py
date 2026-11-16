@@ -100,6 +100,7 @@ class ImportBibTeXRequest(BaseModel):
 class ImportBibTeXResponse(BaseModel):
     projectId: int
     importedCount: int
+    duplicateCount: int = 0
     batchLabel: str | None = None
     articleIds: list[int] = Field(default_factory=list)
 
