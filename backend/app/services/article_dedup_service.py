@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from difflib import SequenceMatcher
 
@@ -34,6 +35,17 @@ def normalized_title_year_key(title: str | None, year: int | None) -> str | None
     return f"{normalized_title}|{year}"
 
 
+_GROUP_KEY_MAX = 120  # Article.duplicateGroupKey column size
+
+
+def build_group_key(prefix: str, value: str) -> str:
+    """Stable group key that always fits the column; long titles/DOIs are hashed."""
+    key = f"{prefix}:{value}"
+    if len(key) <= _GROUP_KEY_MAX:
+        return key
+    return f"{prefix}:{hashlib.sha1(value.encode('utf-8')).hexdigest()}"
+
+
 def shared_author_signature(authors: str | None) -> set[str]:
     normalized = (authors or "").replace(" and ", ";")
     return {part.strip().lower() for part in normalized.split(";") if part.strip()}
@@ -59,7 +71,7 @@ def analyze_duplicates(articles: list[Article]) -> list[DuplicateCandidate]:
     for normalized_doi, matches in doi_groups.items():
         if len(matches) < 2:
             continue
-        group_key = f"doi:{normalized_doi}"
+        group_key = build_group_key("doi", normalized_doi)
         groups[group_key] = DuplicateCandidate(
             groupKey=group_key,
             reasonCode="same_doi",
@@ -93,7 +105,7 @@ def analyze_duplicates(articles: list[Article]) -> list[DuplicateCandidate]:
     for title_year_key, matches in title_year_groups.items():
         if len(matches) < 2:
             continue
-        group_key = f"title-year:{title_year_key}"
+        group_key = build_group_key("title-year", title_year_key)
         groups[group_key] = DuplicateCandidate(
             groupKey=group_key,
             reasonCode="same_title_year",

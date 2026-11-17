@@ -118,3 +118,16 @@ def test_duplicate_groups_list_the_advanced_record_as_default_original():
     [group] = analyze_duplicates([new_copy, advanced])
 
     assert group.candidateIds == [3, 9]
+
+
+def test_group_keys_fit_the_column_for_long_titles():
+    from app.services.article_dedup_service import analyze_duplicates
+
+    title = "14th International Conference on Design, User Experience, and Usability, DUXU 2025, held as part of the 27th HCI International Conference, HCII 2025"
+    first = existing_article(1, title, year=2025, phase="identification")
+    second = existing_article(2, title, year=2025, phase="identification")
+
+    [group] = analyze_duplicates([first, second])
+
+    assert len(group.groupKey) <= 120
+    assert group.groupKey.startswith("title-year:")

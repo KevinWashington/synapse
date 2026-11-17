@@ -4,6 +4,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+# Keep in sync with frontend/src/features/articles/utils/articleFieldLimits.js
+ARTICLE_TITLE_MAX = 1000
+ARTICLE_AUTHORS_MAX = 5000
+ARTICLE_JOURNAL_MAX = 500
+ARTICLE_DOI_MAX = 255
+ARTICLE_ABSTRACT_MAX = 20000
+ARTICLE_KEYWORDS_MAX = 2000
+
 ENTRY_METHODS = Literal["manual", "bibtex"]
 SOURCE_CATEGORIES = Literal["database", "grey_literature", "manual_other"]
 STUDY_TYPES = Literal["journal_article", "conference_paper", "review", "thesis", "book_chapter", "other"]
@@ -29,19 +37,19 @@ DUPLICATE_REASON_CODES = Literal[
 
 
 class ArticleCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
-    authors: str = Field(..., min_length=1, max_length=300)
+    title: str = Field(..., min_length=1, max_length=ARTICLE_TITLE_MAX)
+    authors: str = Field(..., min_length=1, max_length=ARTICLE_AUTHORS_MAX)
     year: int = Field(..., ge=1900, le=2100)
-    journal: str = Field(..., min_length=1, max_length=200)
+    journal: str = Field(..., min_length=1, max_length=ARTICLE_JOURNAL_MAX)
     sourceCategory: SOURCE_CATEGORIES
     sourceName: str = Field(..., min_length=1, max_length=120)
     entryMethod: ENTRY_METHODS = "manual"
     importBatchLabel: str | None = Field(None, max_length=120)
     studyType: STUDY_TYPES | None = None
     paperId: str | None = Field(None, max_length=120)
-    doi: str | None = Field(None, max_length=100)
-    abstract: str | None = Field(None, max_length=8000)
-    keywords: str | None = Field(None, max_length=500)
+    doi: str | None = Field(None, max_length=ARTICLE_DOI_MAX)
+    abstract: str | None = Field(None, max_length=ARTICLE_ABSTRACT_MAX)
+    keywords: str | None = Field(None, max_length=ARTICLE_KEYWORDS_MAX)
     pages: str | None = Field(None, max_length=50)
     volume: str | None = Field(None, max_length=50)
     number: str | None = Field(None, max_length=50)
@@ -50,18 +58,18 @@ class ArticleCreate(BaseModel):
 
 
 class ArticleUpdate(BaseModel):
-    title: str | None = Field(None, min_length=1, max_length=200)
-    authors: str | None = Field(None, min_length=1, max_length=300)
+    title: str | None = Field(None, min_length=1, max_length=ARTICLE_TITLE_MAX)
+    authors: str | None = Field(None, min_length=1, max_length=ARTICLE_AUTHORS_MAX)
     year: int | None = Field(None, ge=1900, le=2100)
-    journal: str | None = Field(None, min_length=1, max_length=200)
+    journal: str | None = Field(None, min_length=1, max_length=ARTICLE_JOURNAL_MAX)
     sourceCategory: SOURCE_CATEGORIES | None = None
     sourceName: str | None = Field(None, min_length=1, max_length=120)
     importBatchLabel: str | None = Field(None, max_length=120)
     studyType: STUDY_TYPES | None = None
     paperId: str | None = Field(None, max_length=120)
-    doi: str | None = Field(None, max_length=100)
+    doi: str | None = Field(None, max_length=ARTICLE_DOI_MAX)
     abstract: str | None = None
-    keywords: str | None = Field(None, max_length=500)
+    keywords: str | None = Field(None, max_length=ARTICLE_KEYWORDS_MAX)
     pages: str | None = Field(None, max_length=50)
     volume: str | None = Field(None, max_length=50)
     number: str | None = Field(None, max_length=50)
@@ -74,14 +82,14 @@ class ArticleNotesUpdate(BaseModel):
 
 
 class ImportBibTeXArticleInput(BaseModel):
-    title: str = Field(..., min_length=1, max_length=200)
-    authors: str = Field(..., min_length=1, max_length=300)
+    title: str = Field(..., min_length=1, max_length=ARTICLE_TITLE_MAX)
+    authors: str = Field(..., min_length=1, max_length=ARTICLE_AUTHORS_MAX)
     year: int = Field(..., ge=1900, le=2100)
-    journal: str = Field(..., min_length=1, max_length=200)
+    journal: str = Field(..., min_length=1, max_length=ARTICLE_JOURNAL_MAX)
     paperId: str | None = Field(None, max_length=120)
-    doi: str | None = Field(None, max_length=100)
-    abstract: str | None = Field(None, max_length=8000)
-    keywords: str | None = Field(None, max_length=500)
+    doi: str | None = Field(None, max_length=ARTICLE_DOI_MAX)
+    abstract: str | None = Field(None, max_length=ARTICLE_ABSTRACT_MAX)
+    keywords: str | None = Field(None, max_length=ARTICLE_KEYWORDS_MAX)
     pages: str | None = Field(None, max_length=50)
     volume: str | None = Field(None, max_length=50)
     number: str | None = Field(None, max_length=50)

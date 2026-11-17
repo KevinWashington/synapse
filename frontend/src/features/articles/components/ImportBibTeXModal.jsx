@@ -17,6 +17,7 @@ import ArticleDialogFooter from "@features/articles/components/ArticleDialogFoot
 import { articleService } from "@features/articles/services/articleService";
 import { SOURCE_CATEGORY_OPTIONS, SOURCE_NAME_OPTIONS, STUDY_TYPE_OPTIONS } from "@features/articles/utils/selectionFlow";
 import { toast } from "@/lib/toast";
+import { fitArticleToLimits } from "../utils/articleFieldLimits";
 
 const MISSING_AUTHORS_LABEL = "Autor nao informado";
 
@@ -48,6 +49,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
   function parseBibTeX(content) {
     const articles = [];
     let skipped = 0;
+    let truncated = 0;
     const bibEntries = parseBibTeXLib(content);
 
     for (const entry of bibEntries) {
@@ -73,7 +75,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
         continue;
       }
 
-      articles.push({
+      const { article: fitted, truncated: shortened } = fitArticleToLimits({
         title,
         authors,
         year,
@@ -88,9 +90,11 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
         number: cleanBibTeXValue(fields.number),
         issn: cleanBibTeXValue(fields.issn),
       });
+      if (shortened.length) truncated += 1;
+      articles.push(fitted);
     }
 
-    return { articles, skipped };
+    return { articles, skipped, truncated };
   }
 
   function handleClose() {
@@ -129,7 +133,7 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
       setLoading(true);
       setError("");
 
-      const { articles: entries, skipped } = parseBibTeX(bibtexContent);
+      const { articles: entries, skipped, truncated } = parseBibTeX(bibtexContent);
       if (!entries.length) {
         setError("Nenhum artigo valido encontrado no arquivo BibTeX");
         return;
@@ -147,6 +151,9 @@ function ImportBibTeXModal({ isOpen, onClose, onSuccess, projectId }) {
       toast.success(`${response.importedCount || entries.length} registro(s) importado(s)!`);
       if (duplicateCount > 0) {
         toast.info(`${duplicateCount} já existiam no projeto ou no arquivo e foram marcados como duplicatas removidas.`);
+      }
+      if (truncated > 0) {
+        toast.info(`${truncated} registro(s) tinham campos muito longos e foram encurtados.`);
       }
       if (skipped > 0) {
         toast.warning(`${skipped} registro(s) ignorado(s) por falta de titulo ou ano.`);

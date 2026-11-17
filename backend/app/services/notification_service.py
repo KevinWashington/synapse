@@ -23,7 +23,7 @@ def create_notification(
         projectId=project_id,
         recipientUserId=recipient_user_id,
         type=type,
-        title=title,
+        title=title[:200],  # column limit; titles may embed user-provided names
         body=body,
         entityType=entity_type,
         entityId=entity_id,

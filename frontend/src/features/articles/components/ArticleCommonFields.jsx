@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
+import { ARTICLE_FIELD_LIMITS } from "../utils/articleFieldLimits";
 
 function FieldError({ error }) {
   if (!error) {
@@ -41,11 +42,11 @@ function ArticleCommonFields({
           onChange={(event) => onFieldChange("title", event.target.value)}
           placeholder={placeholders.title}
           className={errors.title ? "border-red-500" : ""}
-          maxLength={200}
+          maxLength={ARTICLE_FIELD_LIMITS.title}
         />
         <FieldError error={errors.title} />
         {showCounters ? (
-          <Counter currentLength={formData.title.length} maxLength={200} />
+          <Counter currentLength={formData.title.length} maxLength={ARTICLE_FIELD_LIMITS.title} />
         ) : null}
       </div>
 
@@ -59,11 +60,11 @@ function ArticleCommonFields({
           onChange={(event) => onFieldChange("authors", event.target.value)}
           placeholder={placeholders.authors}
           className={errors.authors ? "border-red-500" : ""}
-          maxLength={300}
+          maxLength={ARTICLE_FIELD_LIMITS.authors}
         />
         <FieldError error={errors.authors} />
         {showCounters ? (
-          <Counter currentLength={formData.authors.length} maxLength={300} />
+          <Counter currentLength={formData.authors.length} maxLength={ARTICLE_FIELD_LIMITS.authors} />
         ) : null}
       </div>
 
@@ -96,7 +97,7 @@ function ArticleCommonFields({
             onChange={(event) => onFieldChange("journal", event.target.value)}
             placeholder={placeholders.journal}
             className={errors.journal ? "border-red-500" : ""}
-            maxLength={200}
+            maxLength={ARTICLE_FIELD_LIMITS.journal}
           />
           <FieldError error={errors.journal} />
         </div>
@@ -115,7 +116,7 @@ function ArticleCommonFields({
           onChange={(event) => onFieldChange("doi", event.target.value)}
           placeholder={placeholders.doi}
           className={errors.doi ? "border-red-500" : ""}
-          maxLength={50}
+          maxLength={ARTICLE_FIELD_LIMITS.doi}
         />
         <FieldError error={errors.doi} />
       </div>
@@ -134,11 +135,11 @@ function ArticleCommonFields({
           placeholder={placeholders.abstract}
           className={errors.abstract ? "border-red-500" : ""}
           rows={4}
-          maxLength={3000}
+          maxLength={ARTICLE_FIELD_LIMITS.abstract}
         />
         <FieldError error={errors.abstract} />
         {showCounters ? (
-          <Counter currentLength={formData.abstract.length} maxLength={3000} />
+          <Counter currentLength={formData.abstract.length} maxLength={ARTICLE_FIELD_LIMITS.abstract} />
         ) : null}
       </div>
     </>

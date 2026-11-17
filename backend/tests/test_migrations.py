@@ -337,7 +337,7 @@ def test_migration_runner_stamps_compatible_legacy_schema():
         finally:
             await engine.dispose()
 
-    assert asyncio.run(preserved_state()) == ("0006_article_index_jobs", 1)
+    assert asyncio.run(preserved_state()) == ("0007_widen_article_metadata", 1)
 
 
 def test_migration_runner_rejects_partial_legacy_schema():

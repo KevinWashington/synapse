@@ -22,16 +22,16 @@ class Article(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    authors: Mapped[str] = mapped_column(String(300), nullable=False)
+    title: Mapped[str] = mapped_column(String(1000), nullable=False)
+    authors: Mapped[str] = mapped_column(Text, nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
-    journal: Mapped[str] = mapped_column(String(200), nullable=False)
+    journal: Mapped[str] = mapped_column(String(500), nullable=False)
     
     # Optional fields
     paperId: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
-    doi: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    doi: Mapped[str | None] = mapped_column(String(255), nullable=True)
     abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
-    keywords: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    keywords: Mapped[str | None] = mapped_column(Text, nullable=True)
     pages: Mapped[str | None] = mapped_column(String(50), nullable=True)
     volume: Mapped[str | None] = mapped_column(String(50), nullable=True)
     number: Mapped[str | None] = mapped_column(String(50), nullable=True)

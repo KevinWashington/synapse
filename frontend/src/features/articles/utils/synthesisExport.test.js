@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "vitest";
 import {
   buildDistributionsCsv,
   buildExtractionMatrixCsv,
@@ -66,24 +65,24 @@ const sampleData = {
 test("buildExtractionMatrixCsv serializes base and dynamic extraction columns", () => {
   const csv = buildExtractionMatrixCsv(sampleData);
 
-  assert.match(csv, /"Código do estudo","Identificador","Título","Ano","Fonte","Perguntas respondidas","Pontuação","Avaliação","country","techniques","peer_reviewed"/);
-  assert.match(csv, /"Study A"/);
-  assert.match(csv, /"BR"/);
-  assert.match(csv, /"survey\|case study"/);
-  assert.match(csv, /"true"/);
+  expect(csv).toMatch(/"Código do estudo","Identificador","Título","Ano","Fonte","Perguntas respondidas","Pontuação","Avaliação","country","techniques","peer_reviewed"/);
+  expect(csv).toMatch(/"Study A"/);
+  expect(csv).toMatch(/"BR"/);
+  expect(csv).toMatch(/"survey\|case study"/);
+  expect(csv).toMatch(/"true"/);
 });
 
 test("buildDistributionsCsv serializes long-form distribution rows", () => {
   const csv = buildDistributionsCsv(sampleData);
 
-  assert.match(csv, /"metricKey","metricLabel","value","count","percentage"/);
-  assert.match(csv, /"techniques","Techniques","survey","1","50"/);
-  assert.match(csv, /"peer_reviewed","Peer Reviewed","true","1","100"/);
+  expect(csv).toMatch(/"metricKey","metricLabel","value","count","percentage"/);
+  expect(csv).toMatch(/"techniques","Techniques","survey","1","50"/);
+  expect(csv).toMatch(/"peer_reviewed","Peer Reviewed","true","1","100"/);
 });
 
 test("buildQualitySummaryCsv serializes rating and criterion sections", () => {
   const csv = buildQualitySummaryCsv(sampleData);
 
-  assert.match(csv, /"overall_rating","","","high","1","100"/);
-  assert.match(csv, /"criterion_response","bias","Risk of bias","yes","1","100"/);
+  expect(csv).toMatch(/"overall_rating","","","high","1","100"/);
+  expect(csv).toMatch(/"criterion_response","bias","Risk of bias","yes","1","100"/);
 });
