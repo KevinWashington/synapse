@@ -84,6 +84,8 @@ function EligibilityDecisionForm({
       setStatuses((current) => ({ ...current, ...nextStatuses }));
       setEvidence((current) => ({ ...current, ...nextEvidence }));
       if (result?.reasonText && !reasonText) setReasonText(result.reasonText);
+      if (result?.suggestedDecision === "included" || result?.suggestedDecision === "excluded") setDecision(result.suggestedDecision);
+      if (result?.answeredRQs?.length) setSelectedRQs(result.answeredRQs);
       setAiDraft(true);
     } catch {
       setAssistError("A assistência da IA não está disponível. Continue a avaliação manualmente.");
@@ -122,7 +124,7 @@ function EligibilityDecisionForm({
       {decision !== "full_text_unavailable" && entries.length ? (
         <section className="space-y-3 border-y border-[#e5e8f0] py-4">
           <div className="flex items-start justify-between gap-3">
-            <div><h3 className="text-sm font-semibold text-[#111936]">Checklist assistido</h3><p className="mt-1 text-xs leading-5 text-[#667391]">A IA preenche apenas um rascunho. A decisão final continua humana.</p></div>
+            <div><h3 className="text-sm font-semibold text-[#111936]">Checklist assistido</h3><p className="mt-1 text-xs leading-5 text-[#667391]">A IA rascunha checklist, decisão, justificativa e RQs respondidas. A decisão final continua humana.</p></div>
             <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5 bg-white text-xs" disabled={isSaving || isAssisting || !canDecide || !onAssist} onClick={assistWithAI}>
               {isAssisting ? <LoaderIcon className="h-3.5 w-3.5 animate-spin" /> : <SparklesIcon className="h-3.5 w-3.5" />}{isAssisting ? "Analisando..." : "Assistir com IA"}
             </Button>

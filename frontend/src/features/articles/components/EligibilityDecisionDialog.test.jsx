@@ -2,6 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import EligibilityDecisionDialog from "./EligibilityDecisionDialog";
 
+const sendChatMessage = vi.hoisted(() => vi.fn());
+vi.mock("@/services/chatService", () => ({ chatService: { sendChatMessage } }));
+
 const checklist = ["A população corresponde à pergunta de pesquisa?"];
 const researchQuestions = ["Qual é o efeito da intervenção?"];
 
@@ -84,6 +87,25 @@ describe("EligibilityDecisionDialog decision-specific content", () => {
         answeringRQs: [],
       })
     );
+  });
+
+  it("applies the AI checklist, decision, reason and answered RQs as a draft", async () => {
+    sendChatMessage.mockResolvedValueOnce({
+      content: JSON.stringify({
+        items: [{ key: "item-1", status: "met", evidence: "Estudantes iniciantes" }],
+        answeredRQs: [{ rq: 1, evidence: "melhora de 20%" }],
+        suggestedDecision: "included",
+        reasonText: "Atende a população e responde à RQ 1.",
+      }),
+    });
+    const { onSubmit } = renderDialog({ article: { id: 1, title: "Estudo", hasPdf: false } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Assistir com IA" }));
+
+    expect(await screen.findByDisplayValue("Atende a população e responde à RQ 1.")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Estudantes iniciantes")).toBeInTheDocument();
+    expect(sendChatMessage.mock.calls[0][0].messages[0].content).toContain("answeredRQs");
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("clears irrelevant validation errors when the decision changes without submitting", () => {

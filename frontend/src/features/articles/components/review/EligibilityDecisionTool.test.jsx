@@ -128,6 +128,31 @@ describe("EligibilityDecisionTool", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("applies the AI decision and answered RQs as part of the draft", async () => {
+    const onAssist = vi.fn().mockResolvedValue({
+      items: [{ key: "item-1", status: "met", evidence: "Participantes com 60+" }],
+      answeredRQs: [1],
+      suggestedDecision: "included",
+      reasonText: "Critérios atendidos",
+    });
+    const { onSubmit } = renderTool({ onAssist });
+
+    fireEvent.click(screen.getByRole("button", { name: "Assistir com IA" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "RQ 1" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("textbox", { name: "Justificativa" })).toHaveValue("Critérios atendidos");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar e próximo" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(21, expect.objectContaining({ decision: "included", answeringRQs: [1] })));
+  });
+
+  it("switches to exclusion when the AI suggests it", async () => {
+    renderTool({ onAssist: vi.fn().mockResolvedValue({ items: [], suggestedDecision: "excluded", reasonText: "População fora do escopo" }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Assistir com IA" }));
+
+    expect(await screen.findByRole("textbox", { name: "Justificativa da exclusão" })).toHaveValue("População fora do escopo");
+  });
+
   it("keeps manual controls after AI assistance fails", async () => {
     renderTool({ onAssist: vi.fn().mockRejectedValue(new Error("offline")) });
 

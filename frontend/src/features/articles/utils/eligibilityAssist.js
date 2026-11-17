@@ -34,6 +34,18 @@ export function extractJsonPayload(text) {
   }
 }
 
+/** Keep only valid, unique RQ numbers (1..count) from the AI answer. */
+export function normalizeAnsweredRQs(value, count) {
+  if (!Array.isArray(value) || !count) return [];
+  const numbers = value.map((item) => {
+    const raw = item && typeof item === "object" ? item.rq ?? item.number ?? item.id : item;
+    const match = String(raw ?? "").match(/\d+/);
+    return match ? Number(match[0]) : NaN;
+  });
+  return [...new Set(numbers.filter((number) => Number.isInteger(number) && number >= 1 && number <= count))]
+    .sort((left, right) => left - right);
+}
+
 export function buildAssistancePrompt({ article, checklistEntries, researchQuestions }) {
   const checklistBlock = checklistEntries
     .map((entry, index) => `${index + 1}. ${entry.label} [key=${entry.key}]`)
@@ -51,6 +63,8 @@ Tarefa:
 3. Use evidencia literal curta quando houver. Nao invente evidencia.
 4. Sugira uma decisao apenas como rascunho: "included", "excluded" ou "review".
 5. Se faltar texto completo, use "unclear" e explique a limitacao.
+6. Para cada pergunta de pesquisa (RQ), verifique se o artigo traz evidencia que ajude a responde-la. Liste em "answeredRQs" apenas as RQs com evidencia, pelo numero, com um trecho literal curto. Se nenhuma, use [].
+7. Escreva "reasonText" citando os criterios que sustentam a decisao sugerida.
 
 Checklist:
 ${checklistBlock}
@@ -74,6 +88,9 @@ Responda apenas em JSON neste formato:
       "note": "observacao curta"
     }
   ],
+  "answeredRQs": [
+    { "rq": 1, "evidence": "trecho literal curto" }
+  ],
   "suggestedDecision": "included",
   "reasonText": "rascunho curto da justificativa"
 }`;
@@ -91,7 +108,7 @@ async function readPdfText(pdfData) {
 
 /**
  * Ask the AI for a draft of the eligibility checklist.
- * Returns { items: [{ key, status, evidence }], reasonText, suggestedDecision }.
+ * Returns { items: [{ key, status, evidence }], answeredRQs: [number], reasonText, suggestedDecision }.
  * Throws when the AI answer cannot be parsed, so callers can show a fallback message.
  */
 export async function requestEligibilityAssist({ article, checklist, researchQuestions = [], pdfData }) {
@@ -116,6 +133,7 @@ export async function requestEligibilityAssist({ article, checklist, researchQue
       status: normalizeChecklistStatus(item.status) || "unclear",
       evidence: [item.evidence, item.note].map((value) => String(value || "").trim()).filter(Boolean).join("\n"),
     })),
+    answeredRQs: normalizeAnsweredRQs(parsed.answeredRQs, researchQuestions.length),
     reasonText: typeof parsed.reasonText === "string" ? parsed.reasonText.trim() : "",
     suggestedDecision: parsed.suggestedDecision || "",
   };

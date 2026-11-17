@@ -23,10 +23,23 @@ describe("requestEligibilityAssist", () => {
         { key: "item-1", status: "met", evidence: "80 students\namostra" },
         { key: "item-2", status: "unclear", evidence: "" },
       ],
+      answeredRQs: [],
       reasonText: "Atende",
       suggestedDecision: "included",
     });
     expect(sendChatMessage.mock.calls[0][0].messages[0].content).toContain("[key=item-2]");
+  });
+
+  it("keeps only valid research questions the AI marked as answered", async () => {
+    sendChatMessage.mockResolvedValue({
+      content: "{\"items\":[],\"answeredRQs\":[{\"rq\":2,\"evidence\":\"x\"},\"RQ 1\",3,{\"rq\":9},2],\"suggestedDecision\":\"included\"}",
+    });
+
+    const result = await requestEligibilityAssist({ article: {}, checklist, researchQuestions: ["A?", "B?", "C?"] });
+
+    expect(result.answeredRQs).toEqual([1, 2, 3]);
+    expect(sendChatMessage.mock.calls[0][0].messages[0].content).toContain("RQ 3: C?");
+    expect(sendChatMessage.mock.calls[0][0].messages[0].content).toContain("answeredRQs");
   });
 
   it("rejects answers without JSON so the form can show its fallback", async () => {

@@ -84,7 +84,7 @@ function ArticleReadingPane({
   const review = collaborativeReview(article);
 
   return (
-    <article className="min-h-[620px] bg-white">
+    <article className="flex h-full min-h-[620px] flex-col bg-white">
       <header className="flex items-center justify-between border-b border-[#edf0f7] px-5 py-3">
         <button type="button" onClick={onPrevious} disabled={position.total <= 1} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-[#667391] hover:bg-[#f4f6fb] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6259ff] disabled:opacity-40">
           <ChevronLeftIcon className="h-4 w-4" />
@@ -99,7 +99,7 @@ function ArticleReadingPane({
         </button>
       </header>
 
-      <div data-testid="article-reading-content" className="w-full px-6 py-7 lg:px-8">
+      <div data-testid="article-reading-content" className="flex w-full flex-1 flex-col px-6 py-7 lg:px-8">
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8a94aa]">
           {article.year} · {article.journal}
         </p>
@@ -140,13 +140,16 @@ function ArticleReadingPane({
             />
           </div>
         ) : isEligibility && article.hasPdf ? (
-          <div className="mt-5 h-[520px] min-h-0 w-full">
-            <PdfViewer
-              article={article}
-              articleId={article.id}
-              pdfData={pdfData}
-              projectId={project?.id || article.projectId}
-            />
+          // Grow with the decision column so long checklists do not leave a blank area below the PDF.
+          <div data-testid="article-pdf-frame" className="relative mt-5 min-h-[520px] w-full flex-1">
+            <div className="absolute inset-0">
+              <PdfViewer
+                article={article}
+                articleId={article.id}
+                pdfData={pdfData}
+                projectId={project?.id || article.projectId}
+              />
+            </div>
           </div>
         ) : isEligibility ? (
           <div className="mt-5 min-h-72 rounded-lg border border-[#e2e6ef] bg-[#fbfcff] p-5">

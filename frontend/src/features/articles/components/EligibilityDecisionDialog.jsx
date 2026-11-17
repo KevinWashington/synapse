@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import {
   buildAssistancePrompt,
   extractJsonPayload,
+  normalizeAnsweredRQs,
   normalizeChecklistStatus,
 } from "../utils/eligibilityAssist";
 
@@ -330,6 +331,13 @@ function EligibilityDecisionDialog({
       if (parsed.suggestedDecision) {
         setAssistantSuggestedDecision(parsed.suggestedDecision);
       }
+      if (parsed.suggestedDecision === "included" || parsed.suggestedDecision === "excluded") {
+        selectDecision(parsed.suggestedDecision);
+      }
+      const answeredRQs = normalizeAnsweredRQs(parsed.answeredRQs, researchQuestions.length);
+      if (answeredRQs.length) {
+        setSelectedRQs(answeredRQs);
+      }
       if (parsed.reasonText && !reasonText.trim()) {
         setReasonText(parsed.reasonText);
       }
@@ -430,7 +438,7 @@ function EligibilityDecisionDialog({
                 <div>
                   <p className="text-sm font-semibold text-[var(--syn-text-primary)]">Checklist assistido</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--syn-text-secondary)]">
-                    A IA pode preencher evidências como rascunho. A decisão final continua humana.
+                    A IA rascunha checklist, decisão, justificativa e RQs respondidas. A decisão final continua humana.
                   </p>
                 </div>
                 <Button
