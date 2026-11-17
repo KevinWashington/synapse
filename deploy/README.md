@@ -20,10 +20,17 @@ deployment. It retains previous images, Compose configuration, environment and
 host Nginx configuration. Failed releases restore the previous application
 images/configuration without restoring or deleting database volumes.
 
-**Schema changes are intentionally refused by unattended deployment.** The
-backend requires an exact Alembic revision, so reverting an image after a schema
-upgrade would fail. A schema-changing release needs a separately tested migration
-and recovery procedure. The gate runs before production changes.
+**Schema changes deploy only when they are reversible.** The backend requires an
+exact Alembic revision, so reverting an image after a schema upgrade would fail on
+its own. Before any production change, the gate checks (with the release image)
+that the release head is a forward path from the deployed revision and that every
+step has a real `downgrade()`; otherwise the deployment is refused. Accepted
+releases take the usual verified backup, then the `migrate` service upgrades the
+schema. If the release fails afterwards, rollback stops the release, downgrades to
+the previous revision and only then restarts the previous images. If that
+downgrade fails, the previous images are not started and the verified backup is
+the recovery path. Migrations must keep their downgrade tested (see
+`backend/tests/test_migrations.py`).
 
 `Deploy production` runs after `Quality` succeeds on `main`. It builds both
 images on the GitHub runner and streams them over pinned-host SSH to the VPS.
